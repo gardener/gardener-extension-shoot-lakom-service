@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: lakom.extensions.config.gardener.cloud/v1alpha1
+kind: Configuration
+cosignPublicKeys:
+- |
+  -----BEGIN PUBLIC KEY-----
+  MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
+  hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
+  -----END PUBLIC KEY-----
+failurePolicy: Fail
+debugConfig:
+  enableProfiling: false
+  enableContentionProfiling: false

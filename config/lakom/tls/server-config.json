@@ -1,0 +1,19 @@
+{
+    "CN": "lakom.lakom-system.svc.cluster.local",
+    "hosts": [
+        "lakom",
+        "lakom.lakom-system",
+        "lakom.lakom-system.svc",
+        "lakom.lakom-system.svc.cluster",
+        "lakom.lakom-system.svc.cluster.local",
+        "localhost",
+        "127.0.0.1",
+        "IP_ADDRESS"
+    ],
+    "key": {
+        "algo": "rsa",
+        "size": 2048
+    },
+    "names": [
+    ]
+}

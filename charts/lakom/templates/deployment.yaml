@@ -1,0 +1,140 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.name }}
+    helm.sh/chart: {{ .Values.name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    high-availability-config.resources.gardener.cloud/type: server
+spec:
+  revisionHistoryLimit: 5
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        checksum/secret-lakom-cosign-public-keys: {{ include (print $.Template.BasePath "/secret-lakom-cosign-public-keys.yaml") . | sha256sum }}
+        checksum/secret-lakom-server-tls: {{ include (print $.Template.BasePath "/secret-lakom-server-tls.yaml") . | sha256sum }}
+        {{- if .Values.kubeconfig }}
+        checksum/secret-lakom-target-kubeconfig: {{ include (print $.Template.BasePath "/secret-lakom-target-kubeconfig.yaml") . | sha256sum }}
+        {{- end }}
+        prometheus.io/name: {{ .Release.Name | quote }}
+        prometheus.io/port: {{ .Values.metricsPort | quote }}
+        prometheus.io/scrape: "true"
+      labels:
+        app.kubernetes.io/name: {{ .Values.name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- if gt (int .Values.replicaCount) 1 }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 10
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - {{ .Values.name }}
+                - key: app.kubernetes.io/instance
+                  operator: In
+                  values:
+                  - {{ .Release.Name }}
+              topologyKey: "kubernetes.io/hostname"
+      {{- end }}
+      priorityClassName: {{ .Values.priorityClass.name }}
+      {{- if .Values.kubeconfig }}
+      automountServiceAccountToken: false
+      {{- else }}
+      serviceAccountName: {{ .Values.name }}
+      {{- end }}
+      containers:
+      - name: {{ .Values.name }}
+        image: {{ include "image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - /lakom
+        - --cache-ttl={{ .Values.cache.ttl }}
+        - --cache-refresh-interval={{ .Values.cache.refreshInterval }}
+        - --cosign-public-key-path=/etc/lakom/cosign/cosign.pub
+        - --tls-cert-dir=/etc/lakom/tls
+        - --health-bind-address=:{{ .Values.healthPort }}
+        - --metrics-bind-address=:{{ .Values.metricsPort }}
+        - --port={{ .Values.serverPort }}
+        {{- if .Values.kubeconfig }}
+        - --kubeconfig=/etc/lakom/client/kubeconfig
+        {{- end }}
+        {{- if .Values.resources }}
+        resources:
+{{ toYaml .Values.resources | trim | indent 10 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: {{ .Values.healthPort }}
+            scheme: HTTP
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: {{ .Values.healthPort }}
+            scheme: HTTP
+          initialDelaySeconds: 5
+        volumeMounts:
+        - name: lakom-cosign-public-keys
+          mountPath: /etc/lakom/cosign
+          readOnly: true
+        - name: lakom-server-tls
+          mountPath: /etc/lakom/tls
+          readOnly: true
+        {{- if .Values.kubeconfig }}
+        - name: kubeconfig
+          mountPath: /etc/lakom/client
+          readOnly: true
+        {{- else if semverCompare ">= 1.20-0" .Capabilities.KubeVersion.GitVersion }}
+        - name: kube-api-access-lakom
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+        {{- end }}
+      volumes:
+      - name: lakom-cosign-public-keys
+        secret:
+          secretName: lakom-cosign-public-keys
+      - name: lakom-server-tls
+        secret:
+          secretName: lakom-server-tls
+      {{- if .Values.kubeconfig }}
+      - name: kubeconfig
+        secret:
+          secretName: lakom-target-kubeconfig
+      {{- else if semverCompare ">= 1.20-0" .Capabilities.KubeVersion.GitVersion }}
+      - name: kube-api-access-lakom
+        projected:
+          defaultMode: 420
+          sources:
+            - serviceAccountToken:
+                expirationSeconds: 7200
+                path: token
+            - configMap:
+                items:
+                  - key: ca.crt
+                    path: ca.crt
+                name: kube-root-ca.crt
+            - downwardAPI:
+                items:
+                  - fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.namespace
+                    path: namespace
+      {{- end }}

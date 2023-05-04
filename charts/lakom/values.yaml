@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: lakom-admission-controller
+
+image:
+  pullPolicy: IfNotPresent
+  tag: latest
+  repository: eu.gcr.io/gardener-project/gardener/extensions/lakom
+
+replicaCount: 3
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+metricsPort: 8080
+healthPort: 8081
+serverPort: 10250
+cache:
+  ttl: 10m
+  refreshInterval: 30s
+cosign:
+  publicKeys: []
+  # - |
+  #   -----BEGIN PUBLIC KEY-----
+  #   1234
+  #   -----END PUBLIC KEY-----
+  # - |
+  #   -----BEGIN PUBLIC KEY-----
+  #   abcd
+  #   -----END PUBLIC KEY-----
+kubeconfig: {}
+admissionConfig:
+  objectSelector: {}
+  namespaceSelector:
+    matchExpressions:
+    - key: "kubernetes.io/metadata.name"
+      operator: "NotIn"
+      values:
+      - "kube-system"
+      - "lakom-system"
+  failurePolicy: Fail
+  clientConfig:
+    caBundle: foo
+    urlHostname: ""
+tls:
+  crt: aaaa
+  key: bbbb
+priorityClass:
+  enabled: true
+  value: 100
+  name: lakom-system
+vpa:
+  enabled: true
+  resourcePolicy:
+    minAllowed:
+      memory: 64Mi
+  updatePolicy:
+    updateMode: "Auto"

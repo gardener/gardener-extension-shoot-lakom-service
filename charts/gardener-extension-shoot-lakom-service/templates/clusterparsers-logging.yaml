@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterParser
+metadata:
+  name: extension-shoot-lakom-service-lakom-parser
+  labels:
+    fluentbit.gardener/type: "seed"
+spec:
+  json:
+    timeKey: ts

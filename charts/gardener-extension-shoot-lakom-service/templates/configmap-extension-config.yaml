@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: extension-shoot-lakom-service.config
+  namespace: {{ .Release.Namespace }}
+data:
+  config.yaml: |
+    apiVersion: lakom.extensions.config.gardener.cloud/v1alpha1
+    kind: Configuration
+    cosignPublicKeys:
+{{ toYaml .Values.controllers.cosignPublicKeys | indent 6 }}
+    failurePolicy: {{ .Values.controllers.failurePolicy }}
+    debugConfig:
+      enableProfiling: {{ .Values.controllers.debugConfig.enableProfiling | default false }}
+      enableContentionProfiling: {{ .Values.controllers.debugConfig.enableContentionProfiling | default false }}

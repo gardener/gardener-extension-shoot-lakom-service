@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+{{- if .Values.vpa.enabled}}
+apiVersion: "autoscaling.k8s.io/v1"
+kind: VerticalPodAutoscaler
+metadata:
+  name: gardener-extension-{{ .Values.serviceName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  {{- if .Values.vpa.resourcePolicy }}
+  resourcePolicy:
+    containerPolicies:
+    - containerName: gardener-extension-{{ .Values.serviceName }}
+      minAllowed:
+        memory: {{ required ".Values.vpa.resourcePolicy.minAllowed.memory is required" .Values.vpa.resourcePolicy.minAllowed.memory }}
+  {{- end }}
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gardener-extension-{{ .Values.serviceName }}
+  updatePolicy:
+    updateMode: {{ .Values.vpa.updatePolicy.updateMode }}
+{{- end }}

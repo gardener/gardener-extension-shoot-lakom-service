@@ -15,6 +15,6 @@ Possible values:
 - category:       breaking|feature|bugfix|doc|other
 - target_group:   user|operator|developer|dependency
 -->
-```feature user
+```other operator
 
 ```

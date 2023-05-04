@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: {{ .Values.admissionConfig.clientConfig.caBundle | b64enc }}
+{{- if .Values.admissionConfig.clientConfig.urlHostname }}
+    url: {{ printf "https://%s:443/lakom/resolve-tag-to-digest" (.Values.admissionConfig.clientConfig.urlHostname) }}
+{{- else }}
+    service:
+      name: {{ .Values.name }}
+      namespace: {{ .Release.Namespace }}
+      path: /lakom/verify-cosign-signature
+{{- end }}
+  failurePolicy: {{ .Values.admissionConfig.failurePolicy }}
+  matchPolicy: Equivalent
+  name: verify-signature.lakom.service.gardener.cloud
+{{- if .Values.admissionConfig.namespaceSelector }}
+  namespaceSelector:
+{{ toYaml .Values.admissionConfig.namespaceSelector | indent 4 }}
+{{- end }}
+{{- if .Values.admissionConfig.objectSelector }}
+  objectSelector:
+{{ toYaml .Values.admissionConfig.objectSelector | indent 4 }}
+{{- end }}
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+    - pods/ephemeralcontainers
+    scope: '*'
+  sideEffects: None
+  timeoutSeconds: 25

@@ -1,0 +1,12 @@
+{
+    "CN": "ca-lakom",
+    "hosts": [
+        "ca-lakom"
+    ],
+    "key": {
+        "algo": "rsa",
+        "size": 2048
+    },
+    "names": []
+}
+

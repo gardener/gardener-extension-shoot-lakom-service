@@ -1,0 +1,43 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Gardener gardener-extension-shoot-lakom-service
+Upstream-Contact: The Gardener project <gardener@googlegroups.com>
+Source: https://github.com/gardener/gardener-extension-shoot-lakom-service
+Comment:
+
+# --------------------------------------------------
+# declare copyright and license of files which can't carry license headers
+# --------------------------------------------------
+# source code
+Files:
+  .gitignore
+  .golangci.yaml
+  CODEOWNERS
+  VERSION
+  charts/gardener-extension-shoot-lakom-service/.helmignore
+  charts/gardener-extension-shoot-lakom-service/templates/_helpers.tpl
+  charts/gardener-extension-shoot-lakom-service/templates/_versions.tpl
+  charts/lakom/.helmignore
+  charts/lakom/templates/_helpers.tpl
+  charts/lakom/templates/_versions.tpl
+  config/lakom/cosign/password
+  example/controller-registration.yaml
+  go.mod
+  go.sum
+  *.json
+Copyright: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+License: Apache-2.0
+
+# --------------------------------------------------
+# documentation
+Files:
+  docs/**
+  *.md
+Copyright: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+License: CC-BY-4.0
+
+# --------------------------------------------------
+# source (vendored) dependencies
+#
+# Files: <relative path to vendored component>
+# Copyright: <vendored component's copyright>
+# License: <vendored component's license>

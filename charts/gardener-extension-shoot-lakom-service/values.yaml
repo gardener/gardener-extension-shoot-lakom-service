@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+serviceName: shoot-lakom-service
+replicaCount: 3
+
+image:
+  pullPolicy: IfNotPresent
+  tag: latest
+  repository: eu.gcr.io/gardener-project/gardener/extensions/shoot-lakom-service
+
+imageVectorOverwrite: {}
+  # images:
+  #   - name: lakom
+  #     repository: foo.bar/gardener/extensions/lakom
+  #     tag: v1.2.3
+ignoreResources: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+vpa:
+  enabled: true
+  resourcePolicy:
+    minAllowed:
+      memory: 64Mi
+  updatePolicy:
+    updateMode: "Auto"
+
+controllers:
+  ignoreOperationAnnotation: false
+  lifecycle:
+    concurrentSyncs: 20
+  healthcheck:
+    concurrentSyncs: 20
+  heartbeat:
+    renewIntervalSeconds: 30
+  cosignPublicKeys: []
+    # - |
+    #   -----BEGIN PUBLIC KEY-----
+    #   1234
+    #   -----END PUBLIC KEY-----
+    # - |
+    #   -----BEGIN PUBLIC KEY-----
+    #   abcd
+    #   -----END PUBLIC KEY-----
+  failurePolicy: Fail
+  serverPort: 10250
+  healthPort: 8080
+  metricsPort: 8081
+  debugConfig:
+    enableProfiling: false
+    enableContentionProfiling: false
