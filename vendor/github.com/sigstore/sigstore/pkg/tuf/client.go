@@ -43,7 +43,13 @@ import (
 
 const (
 	// DefaultRemoteRoot is the default remote TUF root location.
-	DefaultRemoteRoot = "https://sigstore-tuf-root.storage.googleapis.com"
+	DefaultRemoteRoot = "https://tuf-repo-cdn.sigstore.dev"
+	// defaultRemoteGCSBucket is the name of the GCS bucket that holds sigstore's public good production TUF root
+	defaultRemoteGCSBucket = "sigstore-tuf-root"
+	// defaultRemoteRootNoCDN is the URL of the GCS HTTP endpoint for the DefaultRootGCSBucket content
+	defaultRemoteRootNoCDN = "https://sigstore-tuf-root.storage.googleapis.com"
+	// defaultRemoteRootNoCDNAlt is an alternate URL to the GCS HTTP endpoint for the DefaultRootGCSBucket content
+	defaultRemoteRootNoCDNAlt = "https://storage.googleapis.com/sigstore-tuf-root"
 
 	// TufRootEnv is the name of the environment variable that locates an alternate local TUF root location.
 	TufRootEnv = "TUF_ROOT"
@@ -58,6 +64,9 @@ var (
 	singletonTUF     *TUF
 	singletonTUFOnce = new(sync.Once)
 	singletonTUFErr  error
+
+	// initMu locks concurrent calls to initializeTUF
+	initMu sync.Mutex
 )
 
 // getRemoteRoot is a var for testing.
@@ -71,6 +80,18 @@ type TUF struct {
 	remote   client.RemoteStore
 	embedded fs.FS
 	mirror   string // location of mirror
+}
+
+// Mirror returns the mirror configured; note if the object was configured with a legacy reference
+// to the GCS HTTP endpoint for sigstore's public good trust root, this will return DefaultRemoteRoot
+// which is a CDN fronting that DefaultRemoteGCSBucket
+func (t *TUF) Mirror() string {
+	switch t.mirror {
+	case defaultRemoteGCSBucket, defaultRemoteRootNoCDN, defaultRemoteRootNoCDNAlt:
+		return DefaultRemoteRoot
+	default:
+		return t.mirror
+	}
 }
 
 // JSON output representing the configured root status
@@ -173,7 +194,7 @@ func (t *TUF) getRootStatus() (*RootStatus, error) {
 	}
 	status := &RootStatus{
 		Local:    local,
-		Remote:   t.mirror,
+		Remote:   t.Mirror(),
 		Metadata: make(map[string]MetadataStatus),
 		Targets:  []string{},
 	}
@@ -240,6 +261,11 @@ func GetRootStatus(ctx context.Context) (*RootStatus, error) {
 // * forceUpdate: indicates checking the remote for an update, even when the local
 // timestamp.json is up to date.
 func initializeTUF(mirror string, root []byte, embedded fs.FS, forceUpdate bool) (*TUF, error) {
+	initMu.Lock()
+	defer initMu.Unlock()
+
+	// TODO: If a temporary error occurs for a long-running process, this singleton will
+	// never retry
 	singletonTUFOnce.Do(func() {
 		t := &TUF{
 			mirror:   mirror,
@@ -252,7 +278,7 @@ func initializeTUF(mirror string, root []byte, embedded fs.FS, forceUpdate bool)
 			return
 		}
 
-		t.remote, singletonTUFErr = remoteFromMirror(t.mirror)
+		t.remote, singletonTUFErr = remoteFromMirror(t.Mirror())
 		if singletonTUFErr != nil {
 			return
 		}
@@ -280,24 +306,30 @@ func initializeTUF(mirror string, root []byte, embedded fs.FS, forceUpdate bool)
 			return
 		}
 
-		// We may already have an up-to-date local store! Check to see if it needs to be updated.
-		trustedTimestamp, ok := trustedMeta["timestamp.json"]
-		if ok && !isExpiredTimestamp(trustedTimestamp) && !forceUpdate {
-			// We're golden so stash the TUF object for later use
-			singletonTUF = t
-			return
-		}
-
-		// Update if local is not populated or out of date.
-		if err := t.updateMetadataAndDownloadTargets(); err != nil {
-			singletonTUFErr = fmt.Errorf("updating local metadata and targets: %w", err)
-			return
-		}
-
-		// We're golden so stash the TUF object for later use
 		singletonTUF = t
 	})
-	return singletonTUF, singletonTUFErr
+	if singletonTUFErr != nil {
+		return nil, singletonTUFErr
+	}
+
+	trustedMeta, err := singletonTUF.local.GetMeta()
+	if err != nil {
+		return nil, fmt.Errorf("getting trusted meta: %w", err)
+	}
+
+	// We may already have an up-to-date local store! Check to see if it needs to be updated.
+	trustedTimestamp, ok := trustedMeta["timestamp.json"]
+	if ok && !isExpiredTimestamp(trustedTimestamp) && !forceUpdate {
+		// We're golden so stash the TUF object for later use
+		return singletonTUF, nil
+	}
+
+	// Update if local is not populated or out of date.
+	if err := singletonTUF.updateMetadataAndDownloadTargets(); err != nil {
+		return nil, fmt.Errorf("updating local metadata and targets: %w", err)
+	}
+
+	return singletonTUF, nil
 }
 
 // TODO: Remove ctx arg.
@@ -316,15 +348,16 @@ func NewFromEnv(_ context.Context) (*TUF, error) {
 	return initializeTUF(mirror, nil, getEmbedded(), false)
 }
 
-func Initialize(ctx context.Context, mirror string, root []byte) error {
+func Initialize(_ context.Context, mirror string, root []byte) error {
 	// Initialize the client. Force an update with remote.
-	if _, err := initializeTUF(mirror, root, getEmbedded(), true); err != nil {
+	tuf, err := initializeTUF(mirror, root, getEmbedded(), true)
+	if err != nil {
 		return err
 	}
 
 	// Store the remote for later if we are caching.
 	if !noCache() {
-		remoteInfo := &remoteCache{Mirror: mirror}
+		remoteInfo := &remoteCache{Mirror: tuf.Mirror()}
 		b, err := json.Marshal(remoteInfo)
 		if err != nil {
 			return err
@@ -423,7 +456,7 @@ func (t *TUF) updateClient() (data.TargetFiles, error) {
 			Mirror   string                    `json:"mirror"`
 			Metadata map[string]MetadataStatus `json:"metadata"`
 		}{
-			Mirror:   t.mirror,
+			Mirror:   t.Mirror(),
 			Metadata: make(map[string]MetadataStatus),
 		}
 		for _, md := range []string{"root.json", "targets.json", "snapshot.json", "timestamp.json"} {

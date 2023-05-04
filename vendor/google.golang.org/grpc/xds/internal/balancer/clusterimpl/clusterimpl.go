@@ -186,7 +186,7 @@ func (b *clusterImplBalancer) updateLoadStore(newConfig *LBConfig) error {
 	} else {
 		// Old is not nil, new is not nil, compare string values, if
 		// different, stop old and start new.
-		if *b.lrsServer != *newConfig.LoadReportingServer {
+		if !b.lrsServer.Equal(newConfig.LoadReportingServer) {
 			b.lrsServer = newConfig.LoadReportingServer
 			stopOldLoadReport = true
 			startNewLoadReport = true
@@ -331,6 +331,7 @@ func (b *clusterImplBalancer) Close() {
 	if b.childLB != nil {
 		b.childLB.Close()
 		b.childLB = nil
+		b.childState = balancer.State{}
 	}
 	<-b.done.Done()
 	b.logger.Infof("Shutdown")
