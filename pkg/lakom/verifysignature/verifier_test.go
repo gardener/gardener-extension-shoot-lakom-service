@@ -16,7 +16,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sigstore/cosign/pkg/cosign"
+	"github.com/sigstore/cosign/v2/pkg/cosign"
 )
 
 type anonymousKeyChain struct{}
