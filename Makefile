@@ -87,6 +87,9 @@ revendor:
 	@chmod +x $(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/*
 	@chmod +x $(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/.ci/*
 #	@$(HACK_DIR)/update-github-templates.sh
+	@rm -f $(REPO_ROOT)/vendor/github.com/go-openapi/validate/appveyor.yml \
+		$(REPO_ROOT)/vendor/github.com/go-openapi/analysis/appveyor.yml \
+		$(REPO_ROOT)/vendor/github.com/go-openapi/spec/appveyor.yml
 
 .PHONY: clean
 clean:
