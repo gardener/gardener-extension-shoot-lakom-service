@@ -7,7 +7,6 @@ package verifysignature
 import (
 	"context"
 	"crypto"
-	"errors"
 	"fmt"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
@@ -77,12 +76,20 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 			RegistryClientOpts: opts,
 			SigVerifier:        verifier,
 			ClaimVerifier:      cosign.SimpleClaimVerifier,
+			IgnoreSCT:          true,
+			IgnoreTlog:         true,
 		})
 		if err != nil {
+			if IsNoSignaturesFound(err) {
+				log.Info("no signatures found for the image", "error", err.Error())
+				return false, nil
+			}
+
 			if IsNoMatchingSignature(err) {
 				log.Info("no matching signatures found for current public key", "error", err.Error())
 				continue
 			}
+
 			return false, err
 		}
 
@@ -145,8 +152,20 @@ func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyC
 	return verified, nil
 }
 
-// IsNoMatchingSignature checks if error is of time github.com/sigstore/cosign/pkg/cosign.ErrNoMatchingSignatures.
+// IsNoMatchingSignature checks if error is of time github.com/sigstore/cosign/pkg/cosign.ErrNoMatchingSignaturesType.
 func IsNoMatchingSignature(err error) bool {
-	target := cosign.ErrNoMatchingSignatures
-	return errors.As(err, &target)
+	noMatchingSignatureErr, ok := err.(*cosign.VerificationError)
+	if !ok {
+		return false
+	}
+	return noMatchingSignatureErr.ErrorType() == cosign.ErrNoMatchingSignaturesType
+}
+
+// IsNoSignaturesFound checks if error is of time github.com/sigstore/cosign/pkg/cosign.ErrNoSignaturesFoundType.
+func IsNoSignaturesFound(err error) bool {
+	noMatchingSignatureErr, ok := err.(*cosign.VerificationError)
+	if !ok {
+		return false
+	}
+	return noMatchingSignatureErr.ErrorType() == cosign.ErrNoSignaturesFoundType
 }
