@@ -152,7 +152,8 @@ func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyC
 	return verified, nil
 }
 
-// IsNoMatchingSignature checks if error is of type github.com/sigstore/cosign/pkg/cosign.ErrNoMatchingSignaturesType.
+// IsNoMatchingSignature checks if error is of type
+// [cosign.ErrNoMatchingSignaturesType].
 func IsNoMatchingSignature(err error) bool {
 	noMatchingSignatureErr, ok := err.(*cosign.VerificationError)
 	if !ok {
@@ -161,7 +162,8 @@ func IsNoMatchingSignature(err error) bool {
 	return noMatchingSignatureErr.ErrorType() == cosign.ErrNoMatchingSignaturesType
 }
 
-// IsNoSignaturesFound checks if error is of type github.com/sigstore/cosign/pkg/cosign.ErrNoSignaturesFoundType.
+// IsNoSignaturesFound checks if error is of type
+// [cosign.ErrNoSignaturesFoundType].
 func IsNoSignaturesFound(err error) bool {
 	noMatchingSignatureErr, ok := err.(*cosign.VerificationError)
 	if !ok {
