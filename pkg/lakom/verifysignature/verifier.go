@@ -161,7 +161,7 @@ func IsNoMatchingSignature(err error) bool {
 	return noMatchingSignatureErr.ErrorType() == cosign.ErrNoMatchingSignaturesType
 }
 
-// IsNoSignaturesFound checks if error is of time github.com/sigstore/cosign/pkg/cosign.ErrNoSignaturesFoundType.
+// IsNoSignaturesFound checks if error is of type github.com/sigstore/cosign/pkg/cosign.ErrNoSignaturesFoundType.
 func IsNoSignaturesFound(err error) bool {
 	noMatchingSignatureErr, ok := err.(*cosign.VerificationError)
 	if !ok {
