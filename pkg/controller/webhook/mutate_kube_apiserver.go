@@ -25,6 +25,7 @@ func (m *kubeAPIServerMutator) Default(_ context.Context, obj runtime.Object) er
 		return fmt.Errorf("expected *appsv1.Deployment but got %T", obj)
 	}
 
+	// TODO: This label approach is deprecated and no longer needed in the future. Remove it as soon as gardener/gardener@v1.75 has been released.
 	metav1.SetMetaDataLabel(&deployment.Spec.Template.ObjectMeta, gutil.NetworkPolicyLabel(constants.ExtensionServiceName, 10250), v1beta1constants.LabelNetworkPolicyAllowed)
 	return nil
 }
