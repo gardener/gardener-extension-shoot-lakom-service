@@ -17,7 +17,8 @@ metadata:
 spec:
   deployment:
     deploymentRefs:
-    - name: shoot-lakom-service
+      - name: shoot-lakom-service
+    policy: Always
   resources:
-  - kind: Extension
-    type: shoot-lakom-service
+    - kind: Extension
+      type: shoot-lakom-service
