@@ -115,6 +115,7 @@ func GetWebhookConfigurations(mode, url, namespaceName, failurePolicyConfig stri
 				MatchPolicy:             &matchPolicy,
 				TimeoutSeconds:          pointer.Int32(25),
 			},
+			// TODO: This webhook approach is deprecated and no longer needed in the future. Remove it as soon as gardener/gardener@v1.75 has been released.
 			{
 				Name: "mutate-kube-apiserver.lakom.seed.service.extensions.gardener.cloud",
 				ClientConfig: webhook.BuildClientConfigFor(

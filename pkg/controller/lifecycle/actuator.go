@@ -36,7 +36,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -455,6 +454,13 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 			Name:      constants.ExtensionServiceName,
 			Namespace: namespace,
 			Labels:    getLabels(),
+			Annotations: map[string]string{
+				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
+				"networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports": `[{"protocol":"TCP","port":` + serverPort.String() + `}]`,
+				// TODO: This annotation approach is deprecated and no longer needed in the future. Remove them as soon as gardener/gardener@v1.75 has been released.
+				"networking.resources.gardener.cloud/from-policy-allowed-ports":      `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
+				"networking.resources.gardener.cloud/from-policy-pod-label-selector": "all-scrape-targets",
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
@@ -474,13 +480,6 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 				},
 			},
 		},
-	}
-
-	if err := gutil.InjectNetworkPolicyAnnotationsForScrapeTargets(lakomService, networkingv1.NetworkPolicyPort{
-		Port:     utils.IntStrPtrFromInt(metricsPort.IntValue()),
-		Protocol: utils.ProtocolPtr(tcpProto),
-	}); err != nil {
-		return nil, err
 	}
 
 	resources, err := registry.AddAllAndSerialize(
