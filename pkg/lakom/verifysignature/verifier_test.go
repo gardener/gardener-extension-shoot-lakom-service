@@ -7,7 +7,6 @@ package verifysignature_test
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
@@ -16,7 +15,9 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sigstore/cosign/pkg/cosign"
+	"github.com/sigstore/cosign/v2/pkg/cosign"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	logzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 type anonymousKeyChain struct{}
@@ -37,7 +38,8 @@ var _ = Describe("Verifier", func() {
 		refresh = time.Millisecond * 100
 		ttl     = time.Second
 		kcr     = &anonymousKeyChainReader{}
-		ctx     = context.TODO()
+		ctx     context.Context
+		logger  = logzap.New(logzap.WriteTo(GinkgoWriter), logzap.UseDevMode(true))
 
 		// source: https://github.com/sigstore/cosign/releases/download/v1.11.1/release-cosign.pub
 		cosignPublicKey = `-----BEGIN PUBLIC KEY-----
@@ -46,6 +48,10 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 -----END PUBLIC KEY-----
 `
 	)
+
+	BeforeEach(func() {
+		ctx = logf.IntoContext(context.TODO(), logger)
+	})
 
 	Describe("Direct Verifier", func() {
 		var (
@@ -168,10 +174,19 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 	})
 
 	It("Should detect NoMatchingSignature error", func() {
-		noMathcingSignatureErr := fmt.Errorf("%w:\n%s", cosign.ErrNoMatchingSignatures, strings.Join([]string{"some error message"}, "\n "))
+		noMathcingSignatureErr := &cosign.VerificationError{}
+		noMathcingSignatureErr.SetErrorType(cosign.ErrNoMatchingSignaturesType)
 
 		Expect(verifysignature.IsNoMatchingSignature(noMathcingSignatureErr)).To(BeTrue())
 		Expect(verifysignature.IsNoMatchingSignature(fmt.Errorf("some other error"))).To(BeFalse())
+	})
+
+	It("Should detect NoSignaturesFoundType error", func() {
+		noSignatureFound := &cosign.VerificationError{}
+		noSignatureFound.SetErrorType(cosign.ErrNoSignaturesFoundType)
+
+		Expect(verifysignature.IsNoSignaturesFound(noSignatureFound)).To(BeTrue())
+		Expect(verifysignature.IsNoSignaturesFound(fmt.Errorf("some other error"))).To(BeFalse())
 	})
 
 })

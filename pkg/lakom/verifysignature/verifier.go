@@ -7,7 +7,6 @@ package verifysignature
 import (
 	"context"
 	"crypto"
-	"errors"
 	"fmt"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
@@ -16,8 +15,8 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/sigstore/cosign/pkg/cosign"
-	ociremote "github.com/sigstore/cosign/pkg/oci/remote"
+	"github.com/sigstore/cosign/v2/pkg/cosign"
+	ociremote "github.com/sigstore/cosign/v2/pkg/oci/remote"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"golang.org/x/sync/singleflight"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -77,12 +76,20 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 			RegistryClientOpts: opts,
 			SigVerifier:        verifier,
 			ClaimVerifier:      cosign.SimpleClaimVerifier,
+			IgnoreSCT:          true,
+			IgnoreTlog:         true,
 		})
 		if err != nil {
+			if IsNoSignaturesFound(err) {
+				log.Info("no signatures found for the image", "error", err.Error())
+				return false, nil
+			}
+
 			if IsNoMatchingSignature(err) {
 				log.Info("no matching signatures found for current public key", "error", err.Error())
 				continue
 			}
+
 			return false, err
 		}
 
@@ -145,8 +152,22 @@ func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyC
 	return verified, nil
 }
 
-// IsNoMatchingSignature checks if error is of time github.com/sigstore/cosign/pkg/cosign.ErrNoMatchingSignatures.
+// IsNoMatchingSignature checks if error is of type
+// [cosign.ErrNoMatchingSignaturesType].
 func IsNoMatchingSignature(err error) bool {
-	target := cosign.ErrNoMatchingSignatures
-	return errors.As(err, &target)
+	noMatchingSignatureErr, ok := err.(*cosign.VerificationError)
+	if !ok {
+		return false
+	}
+	return noMatchingSignatureErr.ErrorType() == cosign.ErrNoMatchingSignaturesType
+}
+
+// IsNoSignaturesFound checks if error is of type
+// [cosign.ErrNoSignaturesFoundType].
+func IsNoSignaturesFound(err error) bool {
+	noMatchingSignatureErr, ok := err.(*cosign.VerificationError)
+	if !ok {
+		return false
+	}
+	return noMatchingSignatureErr.ErrorType() == cosign.ErrNoSignaturesFoundType
 }
