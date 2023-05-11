@@ -457,7 +457,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 			Annotations: map[string]string{
 				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
 				"networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports": `[{"protocol":"TCP","port":` + serverPort.String() + `}]`,
-				// TODO: This label approach is deprecated and no longer needed in the future. Remove them as soon as gardener/gardener@v1.75 has been released.
+				// TODO: This annotation approach is deprecated and no longer needed in the future. Remove them as soon as gardener/gardener@v1.75 has been released.
 				"networking.resources.gardener.cloud/from-policy-allowed-ports":      `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
 				"networking.resources.gardener.cloud/from-policy-pod-label-selector": "all-scrape-targets",
 			},
