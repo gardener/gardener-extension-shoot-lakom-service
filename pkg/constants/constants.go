@@ -7,6 +7,8 @@ package constants
 const (
 	// ApplicationName is the name for resource describing the components deployed by the extension controller.
 	ApplicationName = "lakom"
+	// SeedApplicationName is the name for resource describing the components bootstrapping the seed by the extension controller.
+	SeedApplicationName = ApplicationName + "-seed"
 	// ImageName is the name of the lakom admission controller image.
 	ImageName = ApplicationName
 	// ExtensionType is the name of the extension type.
