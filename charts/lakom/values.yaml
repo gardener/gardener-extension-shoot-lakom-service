@@ -58,3 +58,7 @@ vpa:
       memory: 64Mi
   updatePolicy:
     updateMode: "Auto"
+additionalAnnotations:
+  service: {}
+additionalLabels:
+  deployment: {}
