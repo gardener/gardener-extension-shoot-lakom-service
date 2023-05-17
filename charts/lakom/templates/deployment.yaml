@@ -13,6 +13,9 @@ metadata:
     helm.sh/chart: {{ .Values.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     high-availability-config.resources.gardener.cloud/type: server
+    {{- if .Values.additionalLabels.deployment }}
+    {{- toYaml .Values.additionalLabels.deployment | trim | nindent 4 }}
+    {{- end }}
 spec:
   revisionHistoryLimit: 5
   replicas: {{ .Values.replicaCount }}
@@ -34,6 +37,9 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Values.name }}
         app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- if .Values.additionalLabels.deployment }}
+        {{- toYaml .Values.additionalLabels.deployment | trim | nindent 8 }}
+        {{- end }}
     spec:
       {{- if gt (int .Values.replicaCount) 1 }}
       affinity:

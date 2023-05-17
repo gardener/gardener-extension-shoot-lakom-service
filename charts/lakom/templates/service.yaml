@@ -11,6 +11,10 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ .Values.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
+  {{- if .Values.additionalAnnotations.service }}
+  annotations:
+    {{- toYaml .Values.additionalAnnotations.service | trim | nindent 4 }}
+  {{- end }}
 spec:
   type: ClusterIP
   selector:
