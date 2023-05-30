@@ -11,6 +11,7 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/heartbeat"
@@ -90,9 +91,12 @@ func (o *Options) run(ctx context.Context) error {
 	ctrlConfig := o.lakomOptions.Completed()
 	ctrlConfig.ApplyHealthCheckConfig(&healthcheck.DefaultAddOptions.HealthCheckConfig)
 	ctrlConfig.Apply(&lifecycle.DefaultAddOptions.ServiceConfig)
+	ctrlConfig.Apply(&seed.DefaultAddOptions.ServiceConfig)
 	o.lifecycleOptions.Completed().Apply(&lifecycle.DefaultAddOptions.ControllerOptions)
+	o.seedBootstrapOptions.Completed().Apply(&seed.DefaultAddOptions.ControllerOptions)
 	o.healthOptions.Completed().Apply(&healthcheck.DefaultAddOptions.Controller)
 	o.heartbeatOptions.Completed().Apply(&heartbeat.DefaultAddOptions)
+	seed.DefaultAddOptions.OwnerNamespace = mgrOpts.LeaderElectionNamespace
 
 	if err := o.controllerSwitches.Completed().AddToManager(mgr); err != nil {
 		return fmt.Errorf("could not add controllers to manager: %s", err)
