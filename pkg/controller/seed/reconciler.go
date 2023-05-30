@@ -108,7 +108,6 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	}
 
 	resources, err := getResources(
-		kcr.ownerNamespace,
 		generatedSecrets[constants.WebhookTLSSecretName].Name,
 		image.String(),
 		kcr.serviceConfig.CosignPublicKeys,
@@ -141,7 +140,7 @@ func getLabels() map[string]string {
 	}
 }
 
-func getResources(ownerNamespace, serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType, serverVersion *semver.Version) (map[string][]byte, error) {
+func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType, serverVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
