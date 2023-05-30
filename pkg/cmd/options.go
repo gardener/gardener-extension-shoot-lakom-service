@@ -13,7 +13,7 @@ import (
 	controllerconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/config"
 	healthcheckcontroller "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/webhook"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
 
 	healthcheckconfig "github.com/gardener/gardener/extensions/pkg/apis/config"
 	"github.com/gardener/gardener/extensions/pkg/controller/cmd"
@@ -98,6 +98,7 @@ func (c *LakomServiceConfig) ApplyHealthCheckConfig(config *healthcheckconfig.He
 func ControllerSwitches() *cmd.SwitchOptions {
 	return cmd.NewSwitchOptions(
 		cmd.Switch(lifecycle.Name, lifecycle.AddToManager),
+		cmd.Switch(seed.Name, seed.AddToManager),
 		cmd.Switch(extensionshealthcheckcontroller.ControllerName, healthcheckcontroller.AddToManager),
 		cmd.Switch(extensionsheartbeatcontroller.ControllerName, extensionsheartbeatcontroller.AddToManager),
 	)

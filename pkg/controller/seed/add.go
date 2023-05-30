@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	// name is the name of the seed bootstrap controller.
-	name = "shoot_lakom_service_seed_bootstrap_controller"
+	// Name is the name of the seed bootstrap controller.
+	Name = "shoot_lakom_service_seed_bootstrap_controller"
 )
 
 // DefaultAddOptions contains configuration for the Lakom service.
@@ -56,7 +56,7 @@ func AddToManager(mgr manager.Manager) error {
 
 	DefaultAddOptions.ControllerOptions.Reconciler = r
 
-	ctrl, err := controller.New(name, mgr, DefaultAddOptions.ControllerOptions)
+	ctrl, err := controller.New(Name, mgr, DefaultAddOptions.ControllerOptions)
 	if err != nil {
 		return err
 	}
