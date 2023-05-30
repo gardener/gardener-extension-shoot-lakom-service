@@ -37,8 +37,7 @@ start:
 		./cmd/$(EXTENSION_PREFIX)-$(EXTENSION_NAME) \
 		--ignore-operation-annotation=$(IGNORE_OPERATION_ANNOTATION) \
 		--leader-election=$(LEADER_ELECTION) \
-		--config=./example/00-config.yaml \
-		--webhook-config-cert-dir=$(REPO_ROOT)/tmp/$(EXTENSION_PREFIX)-$(EXTENSION_NAME)-certs
+		--config=./example/00-config.yaml
 
 .PHONY: start-lakom
 start-lakom:

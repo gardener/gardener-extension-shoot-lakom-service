@@ -78,8 +78,6 @@ spec:
         - --leader-election-id={{ include "leaderelectionid" . }}
         - --heartbeat-namespace={{ .Release.Namespace }}
         - --heartbeat-renew-interval-seconds={{ .Values.controllers.heartbeat.renewIntervalSeconds }}
-        - --webhook-config-cert-dir=/tmp/gardener-extension-{{ .Values.serviceName }}/certs
-        - --webhook-config-server-port={{ .Values.controllers.serverPort }}
         - --health-bind-address=:{{ .Values.controllers.healthPort }}
         - --metrics-bind-address=:{{ .Values.controllers.metricsPort }}
         livenessProbe:
