@@ -145,7 +145,6 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		It("Should ensure the correct resources are created", func() {
 
 			resources, err := getResources(
-				ownerNamespace,
 				serverTLSSecretName,
 				image,
 				cosignPublicKeys,
@@ -182,7 +181,6 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, fp admissionregistrationv1.FailurePolicyType) {
 				resources, err := getResources(
-					ownerNamespace,
 					serverTLSSecretName,
 					image,
 					cosignPublicKeys,
@@ -203,7 +201,6 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		DescribeTable("Should ensure the validating webhook config is correctly set",
 			func(ca []byte, fp admissionregistrationv1.FailurePolicyType) {
 				resources, err := getResources(
-					ownerNamespace,
 					serverTLSSecretName,
 					image,
 					cosignPublicKeys,
@@ -223,7 +220,6 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 
 		It("Should ensure the clusterrolebinding is correctly set", func() {
 			resources, err := getResources(
-				ownerNamespace,
 				serverTLSSecretName,
 				image,
 				cosignPublicKeys,
