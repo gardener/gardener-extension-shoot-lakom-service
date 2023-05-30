@@ -94,16 +94,6 @@ func (c *LakomServiceConfig) ApplyHealthCheckConfig(config *healthcheckconfig.He
 	}
 }
 
-// ApplyWebhookConfig applies the lakom service configuration to the webhook config.
-func (c *LakomServiceConfig) ApplyWebhookConfig(config *webhook.Config) {
-	config.CosignPublicKeys = c.config.CosignPublicKeys
-	config.FailurePolicy = *c.config.FailurePolicy
-	if c.config.DebugConfig != nil {
-		config.EnableProfiling = c.config.DebugConfig.EnableProfiling
-		config.EnableContentionProfiling = c.config.DebugConfig.EnableContentionProfiling
-	}
-}
-
 // ControllerSwitches are the cmd.ControllerSwitches for the extension controllers.
 func ControllerSwitches() *cmd.SwitchOptions {
 	return cmd.NewSwitchOptions(
