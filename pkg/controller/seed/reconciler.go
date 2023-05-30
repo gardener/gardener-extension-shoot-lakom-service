@@ -120,41 +120,18 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		return err
 	}
 
-	if err := managedresources.CreateForSeed(ctx, kcr.client, kubeSystemNamespaceName, constants.SeedApplicationName, false, resources); err != nil { // TODO(vpnachev): Put the MR in the garden namespace? The resources are still deployed in kube-system.
+	if err := managedresources.CreateForSeed(ctx, kcr.client, kcr.ownerNamespace, constants.ManagedResourceNamesSeed, false, resources); err != nil {
 		return err
 	}
 
 	twoMinutes := 2 * time.Minute
 	timeoutSeedCtx, cancelSeedCtx := context.WithTimeout(ctx, twoMinutes)
 	defer cancelSeedCtx()
-	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, kcr.client, kubeSystemNamespaceName, constants.SeedApplicationName); err != nil {
-		return err
-	}
-
-	if err := kcr.setOwnerRef(ctx, kubeSystemNamespaceName); err != nil {
+	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, kcr.client, kcr.ownerNamespace, constants.ManagedResourceNamesSeed); err != nil {
 		return err
 	}
 
 	return secretsManager.Cleanup(ctx)
-}
-
-func (kcr *kubeSystemReconciler) setOwnerRef(ctx context.Context, namespace string) error {
-	ownerNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: kcr.ownerNamespace}}
-	if err := kcr.client.Get(ctx, client.ObjectKeyFromObject(ownerNamespace), ownerNamespace); err != nil {
-		return err
-	}
-
-	mr := &resourcesv1alpha1.ManagedResource{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: constants.SeedApplicationName}}
-	if err := kcr.client.Get(ctx, client.ObjectKeyFromObject(mr), mr); err != nil {
-		return err
-	}
-
-	patch := client.MergeFrom(mr)
-	ownerRef := metav1.NewControllerRef(ownerNamespace, corev1.SchemeGroupVersion.WithKind("Namespace"))
-	ownerRef.BlockOwnerDeletion = pointer.Bool(false)
-	mr.SetOwnerReferences(kutil.MergeOwnerReferences(mr.OwnerReferences, *ownerRef))
-
-	return kcr.client.Patch(ctx, mr, patch)
 }
 
 func getLabels() map[string]string {
