@@ -57,7 +57,7 @@ func NewServiceControllerCommand() *cobra.Command {
 			}
 			log.Info("Starting "+constants.GardenerExtensionName, "version", version.Get())
 			cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-				log.Info(fmt.Sprintf("FLAG: --%s=%s", flag.Name, flag.Value)) //nolint:logcheck
+				log.Info(fmt.Sprintf("FLAG: --%s=%s", flag.Name, flag.Value))
 			})
 
 			if err := options.heartbeatOptions.Validate(); err != nil {
@@ -118,7 +118,7 @@ func (o *Options) run(ctx context.Context) error {
 		ctx,
 		mgr,
 		clock.RealClock{},
-		validatingWebhookConfig,
+		[]client.Object{validatingWebhookConfig},
 		nil,
 		nil,
 		nil,

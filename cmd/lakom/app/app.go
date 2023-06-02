@@ -54,7 +54,7 @@ func NewAdmissionCommand() *cobra.Command {
 
 			log.Info("Starting "+constants.ApplicationName, "version", version.Get())
 			cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-				log.Info(fmt.Sprintf("FLAG: --%s=%s", flag.Name, flag.Value)) //nolint:logcheck
+				log.Info(fmt.Sprintf("FLAG: --%s=%s", flag.Name, flag.Value))
 			})
 
 			return opts.Run(cmd.Context())
