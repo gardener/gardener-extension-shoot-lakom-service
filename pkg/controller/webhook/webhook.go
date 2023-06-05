@@ -14,7 +14,6 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/webhook"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -43,7 +42,6 @@ func GetWebhookConfigurations(mode, url, namespaceName, failurePolicyConfig stri
 		sideEffects       = admissionregistrationv1.SideEffectClassNone
 		matchPolicy       = admissionregistrationv1.Exact
 		failurePolicy     = admissionregistrationv1.FailurePolicyType(failurePolicyConfig)
-		failurePolicyFail = admissionregistrationv1.Fail
 		namespaceSelector = metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
@@ -114,43 +112,6 @@ func GetWebhookConfigurations(mode, url, namespaceName, failurePolicyConfig stri
 				FailurePolicy:           &failurePolicy,
 				MatchPolicy:             &matchPolicy,
 				TimeoutSeconds:          pointer.Int32(25),
-			},
-			// TODO: This webhook approach is deprecated and no longer needed in the future. Remove it as soon as gardener/gardener@v1.75 has been released.
-			{
-				Name: "mutate-kube-apiserver.lakom.seed.service.extensions.gardener.cloud",
-				ClientConfig: webhook.BuildClientConfigFor(
-					constants.LakomMutateKubeAPIServer,
-					namespaceName,
-					Name,
-					443,
-					mode,
-					url,
-					nil,
-				),
-				AdmissionReviewVersions: []string{"v1", "v1beta1"},
-				Rules: []admissionregistrationv1.RuleWithOperations{{
-					Rule: admissionregistrationv1.Rule{
-						APIGroups:   []string{appsv1.SchemeGroupVersion.Group},
-						APIVersions: []string{appsv1.SchemeGroupVersion.Version},
-						Resources:   []string{"deployments"},
-					},
-					Operations: []admissionregistrationv1.OperationType{
-						admissionregistrationv1.Create,
-						admissionregistrationv1.Update,
-					},
-				}},
-				NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-					v1beta1constants.GardenRole:                            v1beta1constants.GardenRoleShoot,
-					"extensions.gardener.cloud/" + constants.ExtensionType: "true",
-				}},
-				ObjectSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-					v1beta1constants.LabelApp:  v1beta1constants.LabelKubernetes,
-					v1beta1constants.LabelRole: v1beta1constants.LabelAPIServer,
-				}},
-				SideEffects:    &sideEffects,
-				FailurePolicy:  &failurePolicyFail,
-				MatchPolicy:    &matchPolicy,
-				TimeoutSeconds: pointer.Int32(10),
 			},
 		},
 	}
