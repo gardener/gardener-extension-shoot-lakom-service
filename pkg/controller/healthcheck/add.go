@@ -40,16 +40,13 @@ func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) 
 		opts,
 		nil,
 		[]healthcheck.ConditionTypeToHealthCheck{
+			// Never register health checks for `managedresource.spec.class==nil` (ManagedResources installing resources in the shoot cluster) here as it is done by gardenlet, see https://github.com/gardener/gardener/blob/v1.71.3/docs/extensions/healthcheck-library.md?plain=1#L99
 			{
 				ConditionType: string(gardencorev1beta1.ShootControlPlaneHealthy),
 				HealthCheck:   general.CheckManagedResource(constants.ManagedResourceNamesSeed),
 			},
-			{
-				ConditionType: string(gardencorev1beta1.ShootSystemComponentsHealthy),
-				HealthCheck:   general.CheckManagedResource(constants.ManagedResourceNamesShoot),
-			},
 		},
-		sets.New[gardencorev1beta1.ConditionType](),
+		sets.New(gardencorev1beta1.ShootSystemComponentsHealthy), // TODO(vpnachev), remove this condition removal in a future version.
 	)
 }
 
