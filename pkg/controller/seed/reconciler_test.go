@@ -580,8 +580,7 @@ metadata:
   annotations:
     networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports: '[{"protocol":"TCP","port":8080}]'
     networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports: '[{"protocol":"TCP","port":10250}]'
-    networking.resources.gardener.cloud/from-policy-allowed-ports: '[{"protocol":"TCP","port":8080}]'
-    networking.resources.gardener.cloud/from-policy-pod-label-selector: all-scrape-targets
+    networking.resources.gardener.cloud/pod-label-selector-namespace-alias: extensions
   creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
