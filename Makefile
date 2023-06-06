@@ -37,6 +37,7 @@ start:
 		./cmd/$(EXTENSION_PREFIX)-$(EXTENSION_NAME) \
 		--ignore-operation-annotation=$(IGNORE_OPERATION_ANNOTATION) \
 		--leader-election=$(LEADER_ELECTION) \
+		--leader-election-id=extension-shoot-lakom-service-leader-election \
 		--config=./example/00-config.yaml
 
 .PHONY: start-lakom
