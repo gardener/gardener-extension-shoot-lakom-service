@@ -108,7 +108,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	}
 
 	resources, err := getResources(
-		generatedSecrets[constants.WebhookTLSSecretName].Name,
+		generatedSecrets[constants.SeedWebhookTLSSecretName].Name,
 		image.String(),
 		kcr.serviceConfig.CosignPublicKeys,
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
@@ -124,9 +124,9 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	}
 
 	twoMinutes := 2 * time.Minute
-	timeoutSeedCtx, cancelSeedCtx := context.WithTimeout(ctx, twoMinutes)
-	defer cancelSeedCtx()
-	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, kcr.client, kcr.ownerNamespace, constants.ManagedResourceNamesSeed); err != nil {
+	timeoutHealthCtx, cancelHealthCtx := context.WithTimeout(ctx, twoMinutes)
+	defer cancelHealthCtx()
+	if err := managedresources.WaitUntilHealthy(timeoutHealthCtx, kcr.client, kcr.ownerNamespace, constants.ManagedResourceNamesSeed); err != nil {
 		return err
 	}
 
@@ -159,7 +159,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		cacheTTL                   = time.Minute * 10
 		cacheRefreshInterval       = time.Second * 30
 		cosignPublicKeysDir        = "/etc/lakom/cosign"
-		cosignPublicKeysSecretName = constants.ExtensionServiceName + "-cosign-public-keys"
+		cosignPublicKeysSecretName = constants.SeedExtensionServiceName + "-cosign-public-keys"
 		webhookTLSCertDir          = "/etc/lakom/tls"
 		registry                   = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
 		requestCPU, _              = resource.ParseQuantity("50m")
@@ -207,7 +207,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
+			Name:      constants.SeedExtensionServiceName,
 			Namespace: kubeSystemNamespace,
 			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
 				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
@@ -230,6 +230,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 						v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
+						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
 					}),
 				},
 				Spec: corev1.PodSpec{
@@ -244,7 +245,8 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 							}},
 						},
 					},
-					ServiceAccountName: constants.ExtensionServiceName,
+					ServiceAccountName:           constants.SeedExtensionServiceName,
+					AutomountServiceAccountToken: pointer.Bool(true),
 					Containers: []corev1.Container{{
 						Name:            constants.SeedApplicationName,
 						Image:           image,
@@ -257,7 +259,6 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 							"--health-bind-address=:" + healthPort.String(),
 							"--metrics-bind-address=:" + metricsPort.String(),
 							"--port=" + serverPort.String(),
-							// "--kubeconfig=/etc/lakom/client/kubeconfig", // Should discover automatically the in-cluster kubeconfig
 						},
 						Ports: []corev1.ContainerPort{
 							{
@@ -346,13 +347,13 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 
 	lakomService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
+			Name:      constants.SeedExtensionServiceName,
 			Namespace: kubeSystemNamespace,
 			Labels:    getLabels(),
 			Annotations: map[string]string{
 				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
 				"networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports": `[{"protocol":"TCP","port":` + serverPort.String() + `}]`,
-				"networking.resources.gardener.cloud/pod-label-selector-namespace-alias":     "extensions",
+				"networking.resources.gardener.cloud/pod-label-selector-namespace-alias":     "extensions", // TODO(vpnachev): does this work from the kube-system namespace?
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -375,15 +376,13 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		},
 	}
 
-	var ()
-
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
 		lakomPDB,
 		&cosignPublicKeysSecret,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
+				Name:      constants.SeedExtensionServiceName,
 				Namespace: kubeSystemNamespace,
 				Labels:    getLabels(),
 			},
@@ -392,7 +391,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		lakomService,
 		&vpaautoscalingv1.VerticalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
+				Name:      constants.SeedExtensionServiceName,
 				Namespace: kubeSystemNamespace,
 				Labels:    getLabels(),
 			},
@@ -400,7 +399,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 				ResourcePolicy: &vpaautoscalingv1.PodResourcePolicy{
 					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
 						{
-							ContainerName: constants.ApplicationName,
+							ContainerName: constants.SeedApplicationName,
 							MinAllowed: corev1.ResourceList{
 								corev1.ResourceMemory: resource.MustParse("32Mi"),
 							},
@@ -419,12 +418,12 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		},
 		&corev1.ConfigMap{ // TODO(vpnachev): Is this working outside of shoot namespaces?
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName + "-monitoring",
+				Name:      constants.SeedExtensionServiceName + "-monitoring",
 				Namespace: kubeSystemNamespace,
 				Labels:    utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExtensionConfiguration: v1beta1constants.LabelMonitoring}),
 			},
 			Data: map[string]string{
-				v1beta1constants.PrometheusConfigMapScrapeConfig: `- job_name: ` + constants.ExtensionServiceName + `
+				v1beta1constants.PrometheusConfigMapScrapeConfig: `- job_name: ` + constants.SeedExtensionServiceName + `
   honor_labels: false
   kubernetes_sd_configs:
   - role: endpoints
@@ -435,7 +434,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
     - __meta_kubernetes_service_name
     - __meta_kubernetes_endpoint_port_name
     action: keep
-    regex: ` + constants.ExtensionServiceName + `;metrics
+    regex: ` + constants.SeedExtensionServiceName + `;metrics
   # common metrics
   - action: drop
     regex: __meta_kubernetes_service_label_(.+)
@@ -467,7 +466,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 				ClientConfig: admissionregistration.WebhookClientConfig{
 					Service: &admissionregistration.ServiceReference{
 						Namespace: kubeSystemNamespace,
-						Name:      constants.ExtensionServiceName,
+						Name:      constants.SeedExtensionServiceName,
 						Path:      pointer.String(constants.LakomResolveTagPath),
 					},
 					CABundle: webhookCaBundle,
@@ -491,7 +490,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 				ClientConfig: admissionregistration.WebhookClientConfig{
 					Service: &admissionregistration.ServiceReference{
 						Namespace: kubeSystemNamespace,
-						Name:      constants.ExtensionServiceName,
+						Name:      constants.SeedExtensionServiceName,
 						Path:      pointer.String(constants.LakomVerifyCosignSignaturePath),
 					},
 					CABundle: webhookCaBundle,
@@ -501,7 +500,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		},
 		&rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   webhookName,
+				Name:   constants.SeedExtensionServiceName,
 				Labels: getLabels(),
 			},
 			Rules: []rbacv1.PolicyRule{
@@ -514,18 +513,18 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		},
 		&rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   webhookName,
+				Name:   constants.SeedExtensionServiceName,
 				Labels: getLabels(),
 			},
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: "rbac.authorization.k8s.io",
 				Kind:     "ClusterRole",
-				Name:     webhookName,
+				Name:     constants.SeedExtensionServiceName,
 			},
 			Subjects: []rbacv1.Subject{
 				{
 					Kind:      rbacv1.ServiceAccountKind,
-					Name:      constants.ExtensionServiceName, // TODO(vpnachev): For managed seeds, there is already such service account!
+					Name:      constants.SeedExtensionServiceName,
 					Namespace: kubeSystemNamespace,
 				},
 			},
@@ -553,7 +552,7 @@ func getPDB(namespaceName string, k8sVersion *semver.Version) (client.Object, er
 	if constraintK8sLess121.Check(k8sVersion) {
 		return &policyv1beta1.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
+				Name:      constants.SeedExtensionServiceName,
 				Namespace: namespaceName,
 				Labels:    getLabels(),
 			},
@@ -566,7 +565,7 @@ func getPDB(namespaceName string, k8sVersion *semver.Version) (client.Object, er
 
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
+			Name:      constants.SeedExtensionServiceName,
 			Namespace: namespaceName,
 			Labels:    getLabels(),
 		},
