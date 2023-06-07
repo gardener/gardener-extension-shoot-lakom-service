@@ -29,6 +29,4 @@ const (
 	LakomResolveTagPath = "/" + ApplicationName + "/resolve-tag-to-digest"
 	// LakomVerifyCosignSignaturePath is the URL path to the hook verifying the cosign signature of the image.
 	LakomVerifyCosignSignaturePath = "/" + ApplicationName + "/verify-cosign-signature"
-	// LakomMutateKubeAPIServer is the URL path to the hook mutating the kube-apiserver deployment
-	LakomMutateKubeAPIServer = "/" + ApplicationName + "/mutate-kube-apiserver"
 )

@@ -16,12 +16,10 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
 
 	"github.com/gardener/gardener/pkg/controllerutils/routes"
-	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	crwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
-	webhookadmission "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 const (
@@ -98,11 +96,6 @@ func AddToManagerWithDefaultConfig(ctx context.Context, mgr manager.Manager, con
 	server.Register(
 		constants.LakomVerifyCosignSignaturePath,
 		&admission.Server{Webhook: crwebhook.Admission{Handler: cosignSignatureVerifyHandler}},
-	)
-
-	server.Register(
-		constants.LakomMutateKubeAPIServer,
-		webhookadmission.WithCustomDefaulter(&appsv1.Deployment{}, &kubeAPIServerMutator{}).WithRecoverPanic(true),
 	)
 
 	return nil
