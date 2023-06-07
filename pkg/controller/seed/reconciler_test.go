@@ -101,21 +101,21 @@ var _ = Describe("Reconciler", func() {
 			namespace           = "kube-system"
 			ownerNamespace      = "garden"
 			failurePolicy       = admissionregistrationv1.Ignore
-			cosignSecretName    = "extension-shoot-lakom-service-cosign-public-keys-e3b0c442"
-			serverTLSSecretName = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
+			cosignSecretName    = "extension-shoot-lakom-service-seed-cosign-public-keys-e3b0c442"
+			serverTLSSecretName = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
 			image               = "eu.gcr.io/gardener-project/gardener/extensions/lakom:v0.0.0"
 
 			validatingWebhookKey  = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
 			mutatingWebhookKey    = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
-			clusterRoleKey        = "clusterrole____gardener-extension-shoot-lakom-service-seed.yaml"
-			clusterRoleBindingKey = "clusterrolebinding____gardener-extension-shoot-lakom-service-seed.yaml"
+			clusterRoleKey        = "clusterrole____extension-shoot-lakom-service-seed.yaml"
+			clusterRoleBindingKey = "clusterrolebinding____extension-shoot-lakom-service-seed.yaml"
 			cosignSecretNameKey   = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
-			configMapKey          = "configmap__" + namespace + "__extension-shoot-lakom-service-monitoring.yaml"
-			deploymentKey         = "deployment__" + namespace + "__extension-shoot-lakom-service.yaml"
-			pdbKey                = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service.yaml"
-			serviceKey            = "service__" + namespace + "__extension-shoot-lakom-service.yaml"
-			serviceAccountKey     = "serviceaccount__" + namespace + "__extension-shoot-lakom-service.yaml"
-			vpaKey                = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service.yaml"
+			configMapKey          = "configmap__" + namespace + "__extension-shoot-lakom-service-seed-monitoring.yaml"
+			deploymentKey         = "deployment__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			pdbKey                = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			serviceKey            = "service__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			serviceAccountKey     = "serviceaccount__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			vpaKey                = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
 		)
 
 		var (
@@ -258,7 +258,7 @@ webhooks:
   clientConfig:
     caBundle: ` + caBundleEncoded + `
     service:
-      name: extension-shoot-lakom-service
+      name: extension-shoot-lakom-service-seed
       namespace: kube-system
       path: /lakom/resolve-tag-to-digest
   failurePolicy: ` + strFailurePolicy + `
@@ -306,7 +306,7 @@ webhooks:
   clientConfig:
     caBundle: ` + caBundleEncoded + `
     service:
-      name: extension-shoot-lakom-service
+      name: extension-shoot-lakom-service-seed
       namespace: kube-system
       path: /lakom/verify-cosign-signature
   failurePolicy: ` + strFailurePolicy + `
@@ -342,7 +342,7 @@ metadata:
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
-  name: gardener-extension-shoot-lakom-service-seed
+  name: extension-shoot-lakom-service-seed
 rules:
 - apiGroups:
   - ""
@@ -361,14 +361,14 @@ metadata:
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
-  name: gardener-extension-shoot-lakom-service-seed
+  name: extension-shoot-lakom-service-seed
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: gardener-extension-shoot-lakom-service-seed
+  name: extension-shoot-lakom-service-seed
 subjects:
 - kind: ServiceAccount
-  name: extension-shoot-lakom-service
+  name: extension-shoot-lakom-service-seed
   namespace: kube-system
 `
 }
@@ -377,7 +377,7 @@ func expectedConfigMap(namespace string) string {
 	return `apiVersion: v1
 data:
   scrape_config: |
-    - job_name: extension-shoot-lakom-service
+    - job_name: extension-shoot-lakom-service-seed
       honor_labels: false
       kubernetes_sd_configs:
       - role: endpoints
@@ -388,7 +388,7 @@ data:
         - __meta_kubernetes_service_name
         - __meta_kubernetes_endpoint_port_name
         action: keep
-        regex: extension-shoot-lakom-service;metrics
+        regex: extension-shoot-lakom-service-seed;metrics
       # common metrics
       - action: drop
         regex: __meta_kubernetes_service_label_(.+)
@@ -407,7 +407,7 @@ metadata:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
     extensions.gardener.cloud/configuration: monitoring
-  name: extension-shoot-lakom-service-monitoring
+  name: extension-shoot-lakom-service-seed-monitoring
   namespace: ` + namespace + `
 `
 }
@@ -433,7 +433,7 @@ metadata:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
     high-availability-config.resources.gardener.cloud/type: server
-  name: extension-shoot-lakom-service
+  name: extension-shoot-lakom-service-seed
   namespace: ` + namespace + `
 spec:
   replicas: 3
@@ -455,6 +455,7 @@ spec:
       labels:
         app.kubernetes.io/name: lakom-seed
         app.kubernetes.io/part-of: shoot-lakom-service
+        networking.gardener.cloud/to-blocked-cidrs: allowed
         networking.gardener.cloud/to-dns: allowed
         networking.gardener.cloud/to-public-networks: allowed
         networking.gardener.cloud/to-runtime-apiserver: allowed
@@ -469,6 +470,7 @@ spec:
                   app.kubernetes.io/part-of: shoot-lakom-service
               topologyKey: kubernetes.io/hostname
             weight: 100
+      automountServiceAccountToken: true
       containers:
       - args:
         - --cache-ttl=10m0s
@@ -512,7 +514,7 @@ spec:
           name: lakom-server-tls
           readOnly: true
       priorityClassName: gardener-system-900
-      serviceAccountName: extension-shoot-lakom-service
+      serviceAccountName: extension-shoot-lakom-service-seed
       volumes:
       - name: lakom-public-keys
         secret:
@@ -533,7 +535,7 @@ metadata:
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
-  name: extension-shoot-lakom-service
+  name: extension-shoot-lakom-service-seed
   namespace: ` + namespace + `
 spec:
   maxUnavailable: 1
@@ -585,7 +587,7 @@ metadata:
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
-  name: extension-shoot-lakom-service
+  name: extension-shoot-lakom-service-seed
   namespace: ` + namespace + `
 spec:
   ports:
@@ -615,7 +617,7 @@ metadata:
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
-  name: extension-shoot-lakom-service
+  name: extension-shoot-lakom-service-seed
   namespace: ` + namespace + `
 `
 }
@@ -628,18 +630,18 @@ metadata:
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
-  name: extension-shoot-lakom-service
+  name: extension-shoot-lakom-service-seed
   namespace: ` + namespace + `
 spec:
   resourcePolicy:
     containerPolicies:
-    - containerName: lakom
+    - containerName: lakom-seed
       minAllowed:
         memory: 32Mi
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: extension-shoot-lakom-service
+    name: extension-shoot-lakom-service-seed
   updatePolicy:
     updateMode: Auto
 status: {}

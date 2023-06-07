@@ -15,7 +15,7 @@ import (
 
 const (
 	// ManagerIdentity is the identity used for the secrets manager.
-	ManagerIdentity = "extension-" + constants.ExtensionType + "-seed"
+	ManagerIdentity = constants.SeedExtensionServiceName
 	// CAName is the name of the CA secret.
 	CAName = "ca-" + ManagerIdentity
 )
@@ -33,9 +33,9 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 		},
 		{
 			Config: &secretutils.CertificateSecretConfig{
-				Name:                        constants.WebhookTLSSecretName,
-				CommonName:                  constants.ExtensionServiceName,
-				DNSNames:                    kutil.DNSNamesForService(constants.ExtensionServiceName, namespace),
+				Name:                        constants.SeedWebhookTLSSecretName,
+				CommonName:                  constants.SeedExtensionServiceName,
+				DNSNames:                    kutil.DNSNamesForService(constants.SeedExtensionServiceName, namespace),
 				CertType:                    secretutils.ServerCert,
 				SkipPublishingCACertificate: true,
 			},
