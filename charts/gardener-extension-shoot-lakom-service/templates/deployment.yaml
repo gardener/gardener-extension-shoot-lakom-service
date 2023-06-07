@@ -80,6 +80,10 @@ spec:
         - --heartbeat-renew-interval-seconds={{ .Values.controllers.heartbeat.renewIntervalSeconds }}
         - --health-bind-address=:{{ .Values.controllers.healthPort }}
         - --metrics-bind-address=:{{ .Values.controllers.metricsPort }}
+        ports:
+        - containerPort: {{ .Values.controllers.metricsPort }}
+          name: metrics
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /healthz
