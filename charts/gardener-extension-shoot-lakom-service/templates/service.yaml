@@ -20,4 +20,8 @@ spec:
   selector:
     app.kubernetes.io/name: gardener-extension-{{ .Values.serviceName }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-  ports: []
+  ports:
+  - name: metrics
+    port: {{ .Values.controllers.metricsPort }}
+    protocol: TCP
+    targetPort: {{ .Values.controllers.metricsPort }}
