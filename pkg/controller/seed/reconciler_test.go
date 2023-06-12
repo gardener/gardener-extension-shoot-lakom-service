@@ -110,7 +110,6 @@ var _ = Describe("Reconciler", func() {
 			clusterRoleKey        = "clusterrole____extension-shoot-lakom-service-seed.yaml"
 			clusterRoleBindingKey = "clusterrolebinding____extension-shoot-lakom-service-seed.yaml"
 			cosignSecretNameKey   = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
-			configMapKey          = "configmap__" + namespace + "__extension-shoot-lakom-service-seed-monitoring.yaml"
 			deploymentKey         = "deployment__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
 			pdbKey                = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
 			serviceKey            = "service__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
@@ -149,18 +148,18 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				image,
 				cosignPublicKeys,
 				caBundle,
-				failurePolicy, seedK8SVersion,
+				failurePolicy,
+				seedK8SVersion,
 			)
 
 			Expect(err).ToNot(HaveOccurred())
-			Expect(resources).To(HaveLen(11))
+			Expect(resources).To(HaveLen(10))
 
 			expectedResources := map[string]string{
 				validatingWebhookKey:  expectedValidatingWebhook(caBundle, failurePolicy),
 				mutatingWebhookKey:    expectedMutatingWebhook(caBundle, failurePolicy),
 				clusterRoleKey:        expectedClusterRole(),
 				clusterRoleBindingKey: expectedClusterRoleBinding(),
-				configMapKey:          expectedConfigMap(namespace),
 				deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName),
 				pdbKey:                expectedPDB(namespace),
 				cosignSecretNameKey:   expectedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
@@ -373,45 +372,6 @@ subjects:
 `
 }
 
-func expectedConfigMap(namespace string) string {
-	return `apiVersion: v1
-data:
-  scrape_config: |
-    - job_name: extension-shoot-lakom-service-seed
-      honor_labels: false
-      kubernetes_sd_configs:
-      - role: endpoints
-        namespaces:
-          names: [` + namespace + `]
-      relabel_configs:
-      - source_labels:
-        - __meta_kubernetes_service_name
-        - __meta_kubernetes_endpoint_port_name
-        action: keep
-        regex: extension-shoot-lakom-service-seed;metrics
-      # common metrics
-      - action: drop
-        regex: __meta_kubernetes_service_label_(.+)
-      - source_labels: [ __meta_kubernetes_pod_name ]
-        target_label: pod
-      - source_labels: [ __meta_kubernetes_pod_container_name ]
-        target_label: container
-      metric_relabel_configs:
-      - source_labels: [ __name__ ]
-        regex: ^lakom.*$
-        action: keep
-kind: ConfigMap
-metadata:
-  creationTimestamp: null
-  labels:
-    app.kubernetes.io/name: lakom-seed
-    app.kubernetes.io/part-of: shoot-lakom-service
-    extensions.gardener.cloud/configuration: monitoring
-  name: extension-shoot-lakom-service-seed-monitoring
-  namespace: ` + namespace + `
-`
-}
-
 func expectedDeployment(namespace, image, cosignPublicKeysSecretName, serverTLSSecretName string) string {
 	var (
 		serverTLSSecretNameAnnotationKey        = references.AnnotationKey("secret", serverTLSSecretName)
@@ -580,9 +540,7 @@ func expectedService(namespace string) string {
 kind: Service
 metadata:
   annotations:
-    networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports: '[{"protocol":"TCP","port":8080}]'
     networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports: '[{"protocol":"TCP","port":10250}]'
-    networking.resources.gardener.cloud/pod-label-selector-namespace-alias: extensions
   creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
