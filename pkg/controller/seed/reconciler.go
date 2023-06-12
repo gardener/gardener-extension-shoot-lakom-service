@@ -60,10 +60,13 @@ func (kcr *kubeSystemReconciler) Reconcile(ctx context.Context, request reconcil
 	}
 
 	logger := log.FromContext(ctx)
+	logger.Info("kube-system namespace reconciliation starting")
 	if err := kcr.reconcile(ctx, logger); err != nil {
+		logger.Error(err, "kube-system namespace reconciliation failed")
 		return reconcile.Result{Requeue: true}, err
 	}
 
+	logger.Info("kube-system namespace reconciliation succeeded")
 	return reconcile.Result{}, nil
 }
 
