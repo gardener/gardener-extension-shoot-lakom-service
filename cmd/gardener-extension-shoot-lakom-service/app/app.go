@@ -7,8 +7,11 @@ package app
 import (
 	"context"
 	"fmt"
+	"runtime"
 
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/cmd"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
@@ -16,6 +19,8 @@ import (
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/heartbeat"
 	"github.com/gardener/gardener/extensions/pkg/util"
+	"github.com/gardener/gardener/pkg/controllerutils/routes"
+	gardenerhealthz "github.com/gardener/gardener/pkg/healthz"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +28,7 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -102,5 +108,37 @@ func (o *Options) run(ctx context.Context) error {
 		return fmt.Errorf("could not add controllers to manager: %s", err)
 	}
 
+	if err := configureHealthCheck(mgr, ctrlConfig); err != nil {
+		return fmt.Errorf("failed to setup webhook server")
+	}
+
 	return mgr.Start(ctx)
+}
+
+// configureHealthCheck configures the healthiness and readiness checkers.
+// Also, if enabled, sets the profiling endpoints.
+func configureHealthCheck(mgr manager.Manager, lakomConfig *cmd.LakomServiceConfig) error {
+	log.Info("Setting up health check endpoints")
+	if err := mgr.AddReadyzCheck("informer-sync", gardenerhealthz.NewCacheSyncHealthz(mgr.GetCache())); err != nil {
+		return err
+	}
+
+	if err := mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
+		return err
+	}
+
+	debugConfig := &config.Config{}
+	lakomConfig.Apply(debugConfig)
+	if debugConfig.DebugConfig.EnableProfiling {
+		log.Info("Setting up profiling endpoints")
+		if err := (routes.Profiling{}).AddToManager(mgr); err != nil {
+			return err
+		}
+
+		if debugConfig.DebugConfig.EnableContentionProfiling {
+			runtime.SetBlockProfileRate(1)
+		}
+	}
+
+	return nil
 }
