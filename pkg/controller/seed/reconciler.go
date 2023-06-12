@@ -351,9 +351,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 			Namespace: kubeSystemNamespace,
 			Labels:    getLabels(),
 			Annotations: map[string]string{
-				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
 				"networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports": `[{"protocol":"TCP","port":` + serverPort.String() + `}]`,
-				"networking.resources.gardener.cloud/pod-label-selector-namespace-alias":     "extensions", // TODO(vpnachev): does this work from the kube-system namespace?
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -414,39 +412,6 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 				UpdatePolicy: &vpaautoscalingv1.PodUpdatePolicy{
 					UpdateMode: &vpaUpdateMode,
 				},
-			},
-		},
-		&corev1.ConfigMap{ // TODO(vpnachev): Is this working outside of shoot namespaces?
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.SeedExtensionServiceName + "-monitoring",
-				Namespace: kubeSystemNamespace,
-				Labels:    utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExtensionConfiguration: v1beta1constants.LabelMonitoring}),
-			},
-			Data: map[string]string{
-				v1beta1constants.PrometheusConfigMapScrapeConfig: `- job_name: ` + constants.SeedExtensionServiceName + `
-  honor_labels: false
-  kubernetes_sd_configs:
-  - role: endpoints
-    namespaces:
-      names: [` + kubeSystemNamespace + `]
-  relabel_configs:
-  - source_labels:
-    - __meta_kubernetes_service_name
-    - __meta_kubernetes_endpoint_port_name
-    action: keep
-    regex: ` + constants.SeedExtensionServiceName + `;metrics
-  # common metrics
-  - action: drop
-    regex: __meta_kubernetes_service_label_(.+)
-  - source_labels: [ __meta_kubernetes_pod_name ]
-    target_label: pod
-  - source_labels: [ __meta_kubernetes_pod_container_name ]
-    target_label: container
-  metric_relabel_configs:
-  - source_labels: [ __name__ ]
-    regex: ^lakom.*$
-    action: keep
-`,
 			},
 		},
 
