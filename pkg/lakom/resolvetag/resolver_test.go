@@ -37,7 +37,7 @@ var _ = Describe("Resolver", func() {
 		ttl            = time.Second
 		kcr            = &anonymousKeyChainReader{}
 		directResolver = resolvetag.NewDirectResolver()
-		ctx            = context.TODO()
+		ctx            = context.Background()
 	)
 
 	BeforeEach(func() {

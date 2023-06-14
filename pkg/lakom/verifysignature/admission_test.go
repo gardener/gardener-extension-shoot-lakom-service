@@ -57,7 +57,7 @@ var _ = BeforeSuite(func() {
 
 var _ = Describe("Admission Handler", func() {
 	var (
-		ctx     = context.TODO()
+		ctx     = context.Background()
 		logger  logr.Logger
 		handler admission.Handler
 		pod     = &corev1.Pod{

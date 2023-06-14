@@ -50,7 +50,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 	)
 
 	BeforeEach(func() {
-		ctx = logf.IntoContext(context.TODO(), logger)
+		ctx = logf.IntoContext(context.Background(), logger)
 	})
 
 	Describe("Direct Verifier", func() {
