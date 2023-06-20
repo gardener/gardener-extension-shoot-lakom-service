@@ -52,18 +52,26 @@ type kubeSystemReconciler struct {
 
 // Reconcile installs the lakom admission controller in the kube-system namespace.
 func (kcr *kubeSystemReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	if request.Name != metav1.NamespaceSystem {
-		return reconcile.Result{}, nil
-	}
-
 	logger := log.FromContext(ctx)
-	logger.Info("kube-system namespace reconciliation starting")
-	if err := kcr.reconcile(ctx, logger); err != nil {
-		logger.Error(err, "kube-system namespace reconciliation failed")
+	logger.Info(`"kube-system" namespace reconciliation starting`)
+
+	ns := corev1.Namespace{}
+	if err := kcr.client.Get(ctx, request.NamespacedName, &ns); err != nil {
+		logger.Error(err, "failed to get namespace", "namespace", request.NamespacedName)
 		return reconcile.Result{Requeue: true}, err
 	}
 
-	logger.Info("kube-system namespace reconciliation succeeded")
+	if ns.Name != metav1.NamespaceSystem {
+		logger.Info(`namespace name is not "kube-system", skipping reconciliation`, "namespace", ns)
+		return reconcile.Result{}, nil
+	}
+
+	if err := kcr.reconcile(ctx, logger); err != nil {
+		logger.Error(err, `"kube-system" namespace reconciliation failed`)
+		return reconcile.Result{Requeue: true}, err
+	}
+
+	logger.Info(`"kube-system" namespace reconciliation succeeded`)
 	return reconcile.Result{}, nil
 }
 
