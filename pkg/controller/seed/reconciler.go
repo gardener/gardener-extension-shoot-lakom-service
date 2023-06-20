@@ -14,7 +14,6 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 
-	"github.com/Masterminds/semver"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
@@ -31,7 +30,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +47,6 @@ import (
 type kubeSystemReconciler struct {
 	client         client.Client
 	serviceConfig  config.Configuration
-	serverVersion  string
 	ownerNamespace string
 }
 
@@ -89,11 +86,6 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		return fmt.Errorf("secret %q not found", CAName)
 	}
 
-	serverVersion, err := semver.NewVersion(kcr.serverVersion)
-	if err != nil {
-		return err
-	}
-
 	image, err := imagevector.ImageVector().FindImage(constants.ImageName)
 	if err != nil {
 		return fmt.Errorf("failed to find image version for %s: %v", constants.ImageName, err)
@@ -116,7 +108,6 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		kcr.serviceConfig.CosignPublicKeys,
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		failurePolicy,
-		serverVersion,
 	)
 	if err != nil {
 		return err
@@ -153,7 +144,7 @@ func getLabels() map[string]string {
 	}
 }
 
-func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType, serverVersion *semver.Version) (map[string][]byte, error) {
+func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -343,11 +334,6 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		return nil, err
 	}
 
-	lakomPDB, err := getPDB(kubeSystemNamespace, serverVersion)
-	if err != nil {
-		return nil, err
-	}
-
 	lakomService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      constants.SeedExtensionServiceName,
@@ -379,7 +365,17 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
-		lakomPDB,
+		&policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      constants.SeedExtensionServiceName,
+				Namespace: kubeSystemNamespace,
+				Labels:    getLabels(),
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				MaxUnavailable: intstr.ValueOrDefault(nil, intstr.FromInt(1)),
+				Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
+			},
+		},
 		&cosignPublicKeysSecret,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -504,42 +500,4 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 	}
 
 	return resources, nil
-}
-
-func getPDB(namespaceName string, k8sVersion *semver.Version) (client.Object, error) {
-	var (
-		maxUnavailable = intstr.FromInt(1)
-		labels         = getLabels()
-	)
-
-	constraintK8sLess121, err := semver.NewConstraint("< 1.21-0")
-	if err != nil {
-		return nil, err
-	}
-
-	if constraintK8sLess121.Check(k8sVersion) {
-		return &policyv1beta1.PodDisruptionBudget{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.SeedExtensionServiceName,
-				Namespace: namespaceName,
-				Labels:    getLabels(),
-			},
-			Spec: policyv1beta1.PodDisruptionBudgetSpec{
-				MaxUnavailable: &maxUnavailable,
-				Selector:       &metav1.LabelSelector{MatchLabels: labels},
-			},
-		}, nil
-	}
-
-	return &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.SeedExtensionServiceName,
-			Namespace: namespaceName,
-			Labels:    getLabels(),
-		},
-		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable: &maxUnavailable,
-			Selector:       &metav1.LabelSelector{MatchLabels: labels},
-		},
-	}, nil
 }

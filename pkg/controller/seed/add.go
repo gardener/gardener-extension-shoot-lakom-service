@@ -9,7 +9,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -38,19 +37,9 @@ type AddOptions struct {
 
 // AddToManager adds a Lakom Service seed bootstrap controller to the given Controller Manager.
 func AddToManager(mgr manager.Manager) error {
-	k8sClient, err := kubernetes.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		return err
-	}
-	serverVersion, err := k8sClient.ServerVersion()
-	if err != nil {
-		return err
-	}
-
 	r := &kubeSystemReconciler{
 		client:         mgr.GetClient(),
 		serviceConfig:  DefaultAddOptions.ServiceConfig.Configuration,
-		serverVersion:  serverVersion.GitVersion,
 		ownerNamespace: DefaultAddOptions.OwnerNamespace,
 	}
 
