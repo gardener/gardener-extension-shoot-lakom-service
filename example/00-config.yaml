@@ -11,6 +11,8 @@ cosignPublicKeys:
   hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
   -----END PUBLIC KEY-----
 failurePolicy: Fail
+seedBootstrap:
+  ownerNamespace: garden
 debugConfig:
   enableProfiling: false
   enableContentionProfiling: false

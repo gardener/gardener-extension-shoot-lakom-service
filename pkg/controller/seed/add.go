@@ -30,17 +30,13 @@ type AddOptions struct {
 	ControllerOptions controller.Options
 	// ServiceConfig contains configuration for the shoot Lakom service.
 	ServiceConfig controllerconfig.Config
-	// OwnerNamespace is the name of the namespace set as owner
-	// of the resources deployed during seed bootstrapping.
-	OwnerNamespace string
 }
 
 // AddToManager adds a Lakom Service seed bootstrap controller to the given Controller Manager.
 func AddToManager(mgr manager.Manager) error {
 	r := &kubeSystemReconciler{
-		client:         mgr.GetClient(),
-		serviceConfig:  DefaultAddOptions.ServiceConfig.Configuration,
-		ownerNamespace: DefaultAddOptions.OwnerNamespace,
+		client:        mgr.GetClient(),
+		serviceConfig: DefaultAddOptions.ServiceConfig.Configuration,
 	}
 
 	DefaultAddOptions.ControllerOptions.Reconciler = r

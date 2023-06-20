@@ -91,6 +91,19 @@ DebugConfig
 <p>DebugConfig contains debug configurations for the controller.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>seedBootstrap</code></br>
+<em>
+<a href="#lakom.extensions.config.gardener.cloud/v1alpha1.SeedBootstrap">
+SeedBootstrap
+</a>
+</em>
+</td>
+<td>
+<p>SeedBootstrap configures the seed bootstrap controller.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="lakom.extensions.config.gardener.cloud/v1alpha1.DebugConfig">DebugConfig
@@ -131,6 +144,37 @@ bool
 <td>
 <p>EnableContentionProfiling enables lock contention profiling, if
 enableProfiling is true.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="lakom.extensions.config.gardener.cloud/v1alpha1.SeedBootstrap">SeedBootstrap
+</h3>
+<p>
+(<em>Appears on:</em>
+<a href="#lakom.extensions.config.gardener.cloud/v1alpha1.Configuration">Configuration</a>)
+</p>
+<p>
+<p>SeedBootstrap holds configurations for the seed bootstrap controller.</p>
+</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ownerNamespace</code></br>
+<em>
+string
+</em>
+</td>
+<td>
+<p>OwnerNamespace is the name of the namespace owning the resources related
+to the seed bootstrap, as well as where the managed resources are deployed.</p>
 </td>
 </tr>
 </tbody>
