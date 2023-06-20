@@ -102,7 +102,6 @@ func (o *Options) run(ctx context.Context) error {
 	o.seedBootstrapOptions.Completed().Apply(&seed.DefaultAddOptions.ControllerOptions)
 	o.healthOptions.Completed().Apply(&healthcheck.DefaultAddOptions.Controller)
 	o.heartbeatOptions.Completed().Apply(&heartbeat.DefaultAddOptions)
-	seed.DefaultAddOptions.OwnerNamespace = mgrOpts.LeaderElectionNamespace
 
 	if err := o.controllerSwitches.Completed().AddToManager(mgr); err != nil {
 		return fmt.Errorf("could not add controllers to manager: %s", err)

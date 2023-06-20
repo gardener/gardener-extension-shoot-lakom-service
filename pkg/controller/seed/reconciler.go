@@ -45,9 +45,8 @@ import (
 )
 
 type kubeSystemReconciler struct {
-	client         client.Client
-	serviceConfig  config.Configuration
-	ownerNamespace string
+	client        client.Client
+	serviceConfig config.Configuration
 }
 
 // Reconcile installs the lakom admission controller in the kube-system namespace.
@@ -121,14 +120,18 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		return err
 	}
 
-	if err := managedresources.CreateForSeed(ctx, kcr.client, kcr.ownerNamespace, constants.ManagedResourceNamesSeed, false, resources); err != nil {
+	var (
+		ownerNamespace = kcr.serviceConfig.SeedBootstrap.OwnerNamespace
+	)
+
+	if err := managedresources.CreateForSeed(ctx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeed, false, resources); err != nil {
 		return err
 	}
 
 	twoMinutes := 2 * time.Minute
 	timeoutHealthCtx, cancelHealthCtx := context.WithTimeout(ctx, twoMinutes)
 	defer cancelHealthCtx()
-	if err := managedresources.WaitUntilHealthy(timeoutHealthCtx, kcr.client, kcr.ownerNamespace, constants.ManagedResourceNamesSeed); err != nil {
+	if err := managedresources.WaitUntilHealthy(timeoutHealthCtx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeed); err != nil {
 		return err
 	}
 
@@ -137,9 +140,9 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	}
 
 	// TODO(vpnachev): Remove the clean up secret manager in a future version of the extension.
-	legacySecretManager, err := secretsmanager.New(ctx, logger.WithName("legacy-seed-secretsmanager"), clock.RealClock{}, kcr.client, kcr.ownerNamespace, "gardener-extension-shoot-lakom-service-seed-webhook", secretsmanager.Config{})
+	legacySecretManager, err := secretsmanager.New(ctx, logger.WithName("legacy-seed-secretsmanager"), clock.RealClock{}, kcr.client, ownerNamespace, "gardener-extension-shoot-lakom-service-seed-webhook", secretsmanager.Config{})
 	if err != nil {
-		return fmt.Errorf("failed to create legacy secret manager in namespace: %q, err: %w", kcr.ownerNamespace, err)
+		return fmt.Errorf("failed to create legacy secret manager in namespace: %q, err: %w", ownerNamespace, err)
 	}
 
 	return legacySecretManager.Cleanup(ctx)
