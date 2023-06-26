@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ---
-apiVersion: {{ include "poddisruptionbudgetversion" .}}
+apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: gardener-extension-{{ .Values.serviceName }}

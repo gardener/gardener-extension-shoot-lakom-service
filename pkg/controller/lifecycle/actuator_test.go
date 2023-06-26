@@ -9,14 +9,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Masterminds/semver"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	policyv1 "k8s.io/api/policy/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	"k8s.io/utils/pointer"
 )
 
 var _ = Describe("Actuator", func() {
@@ -46,73 +42,6 @@ var _ = Describe("Actuator", func() {
 		appPartOf, appPartOfOK := labels["app.kubernetes.io/part-of"]
 		Expect(appPartOfOK).To(BeTrue())
 		Expect(appPartOf).To(Equal("shoot-lakom-service"))
-	})
-
-	Context("getPDB", func() {
-		It("Should return PDB even when replicas is zero or unset", func() {
-			var (
-				replicas  *int32
-				namespace = "default"
-			)
-
-			version, err := semver.NewVersion("v1.22.0")
-			Expect(err).ToNot(HaveOccurred())
-			Expect(version).ToNot(BeNil())
-
-			pdb, err := getPDB(replicas, namespace, version)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(pdb).ToNot(BeNil())
-
-			policyv1PDB, ok := pdb.(*policyv1.PodDisruptionBudget)
-			Expect(ok).To(BeTrue())
-			Expect(policyv1PDB.Spec.MaxUnavailable.IntValue()).To(Equal(1))
-
-			version, err = semver.NewVersion("v1.20.0")
-			Expect(err).ToNot(HaveOccurred())
-			Expect(version).ToNot(BeNil())
-
-			replicas = pointer.Int32(0)
-			pdb, err = getPDB(replicas, namespace, version)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(pdb).ToNot(BeNil())
-
-			policyv1beta1PDB, ok := pdb.(*policyv1beta1.PodDisruptionBudget)
-			Expect(ok).To(BeTrue())
-			Expect(policyv1beta1PDB.Spec.MaxUnavailable.IntValue()).To(Equal(1))
-		})
-
-		DescribeTable("Should use the right apiVersion for PodDisruptionBudgets depending on k8s version",
-			func(k8sVersion string, expectedType interface{}) {
-				var (
-					replicas  = pointer.Int32(3)
-					namespace = "default"
-				)
-
-				version, err := semver.NewVersion(k8sVersion)
-				Expect(err).ToNot(HaveOccurred())
-
-				pdb, err := getPDB(replicas, namespace, version)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(pdb).ToNot(BeNil())
-				Expect(pdb).To(BeAssignableToTypeOf(expectedType))
-
-			},
-			Entry("Should use policy/v1beta1 for 1.19.0", "1.19.0", &policyv1beta1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1beta1 for v1.19.0", "v1.19.0", &policyv1beta1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1beta1 for v1.20.0", "v1.20.0", &policyv1beta1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1beta1 for v1.20.1", "v1.20.1", &policyv1beta1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1beta1 for v1.20.0-gke.100", "v1.20.0-gke.100", &policyv1beta1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1beta1 for v1.20.0-0.0.0", "v1.20.0-0.0.0", &policyv1beta1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1beta1 for v1.20.1-0.0.0", "v1.20.1-0.0.0", &policyv1beta1.PodDisruptionBudget{}),
-
-			Entry("Should use policy/v1 for 1.21.0", "1.21.0", &policyv1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1 for v1.21.0", "v1.21.0", &policyv1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1 for v1.21.1", "v1.21.1", &policyv1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1 for v1.21.0-gke.100", "v1.21.0-gke.100", &policyv1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1 for v1.21.0-0.0.0", "v1.21.0-0.0.0", &policyv1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1 for v1.21.1-0.0.0", "v1.21.1-0.0.0", &policyv1.PodDisruptionBudget{}),
-			Entry("Should use policy/v1 for v1.22.0", "v1.22.0", &policyv1.PodDisruptionBudget{}),
-		)
 	})
 
 	Context("getShootResources", func() {
@@ -205,7 +134,6 @@ var _ = Describe("Actuator", func() {
 		var (
 			replicas         int32
 			cosignPublicKeys []string
-			seedK8SVersion   *semver.Version
 		)
 
 		BeforeEach(func() {
@@ -223,9 +151,6 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 `,
 			}
 
-			var err error
-			seedK8SVersion, err = semver.NewVersion("v1.24.0")
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("Should ensure the correct seed resources are created", func() {
@@ -237,7 +162,6 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				serverTLSSecretName,
 				cosignPublicKeys,
 				image,
-				seedK8SVersion,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).To(HaveLen(7))
