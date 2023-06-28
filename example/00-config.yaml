@@ -12,7 +12,7 @@ cosignPublicKeys:
   -----END PUBLIC KEY-----
 failurePolicy: Fail
 seedBootstrap:
-  ownerNamespace: garden
+  ownerNamespace: lakom-extension
 debugConfig:
   enableProfiling: false
   enableContentionProfiling: false
