@@ -80,7 +80,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	)
 
 	secretsConfig := ConfigsFor(kubeSystemNamespaceName)
-	secretsManager, err := secretsmanager.New(ctx, logger.WithName("seed-secretsmanager"), clock.RealClock{}, kcr.client, kubeSystemNamespaceName, ManagerIdentity, secretsmanager.Config{})
+	secretsManager, err := secretsmanager.New(ctx, logger.WithName("seed-secretsmanager"), clock.RealClock{}, kcr.client, kubeSystemNamespaceName, ManagerIdentity, secretsmanager.Config{CASecretAutoRotation: true})
 	if err != nil {
 		return err
 	}

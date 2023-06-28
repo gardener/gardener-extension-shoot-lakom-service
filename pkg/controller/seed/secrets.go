@@ -35,7 +35,10 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 				CertType:   secretutils.CACert,
 				Validity:   &year,
 			},
-			Options: []secretsmanager.GenerateOption{secretsmanager.Persist()},
+			Options: []secretsmanager.GenerateOption{
+				secretsmanager.Rotate(secretsmanager.KeepOld),
+				secretsmanager.IgnoreOldSecretsAfter(day),
+			},
 		},
 		{
 			Config: &secretutils.CertificateSecretConfig{
@@ -46,9 +49,14 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 				SkipPublishingCACertificate: true,
 				Validity:                    &threeMonths,
 			},
-			// use current CA for signing server cert to prevent mismatches when dropping the old CA from the webhook
-			// config in phase Completing
-			Options: []secretsmanager.GenerateOption{secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA)},
+
+			Options: []secretsmanager.GenerateOption{
+				secretsmanager.SignedByCA(
+					CAName,
+					secretsmanager.UseOldCA,
+				),
+				secretsmanager.Rotate(secretsmanager.KeepOld),
+			},
 		},
 	}
 }
