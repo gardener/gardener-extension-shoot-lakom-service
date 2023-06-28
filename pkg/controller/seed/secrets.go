@@ -5,6 +5,8 @@
 package seed
 
 import (
+	"time"
+
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
@@ -22,12 +24,16 @@ const (
 
 // ConfigsFor returns configurations for the secrets manager for the given namespace.
 func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOptions {
+	day := time.Hour * 24
+	year := day * 365
+	threeMonths := day * 90
 	return []extensionssecretsmanager.SecretConfigWithOptions{
 		{
 			Config: &secretutils.CertificateSecretConfig{
 				Name:       CAName,
 				CommonName: CAName,
 				CertType:   secretutils.CACert,
+				Validity:   &year,
 			},
 			Options: []secretsmanager.GenerateOption{secretsmanager.Persist()},
 		},
@@ -38,6 +44,7 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 				DNSNames:                    kutil.DNSNamesForService(constants.SeedExtensionServiceName, namespace),
 				CertType:                    secretutils.ServerCert,
 				SkipPublishingCACertificate: true,
+				Validity:                    &threeMonths,
 			},
 			// use current CA for signing server cert to prevent mismatches when dropping the old CA from the webhook
 			// config in phase Completing
