@@ -139,6 +139,10 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		return err
 	}
 
+	if err := kcr.setOwnerReferenceToSecrets(ctx, ownerNamespace); err != nil {
+		return err
+	}
+
 	// TODO(vpnachev): Remove the clean up secret manager in a future version of the extension.
 	legacySecretManager, err := secretsmanager.New(ctx, logger.WithName("legacy-seed-secretsmanager"), clock.RealClock{}, kcr.client, ownerNamespace, "gardener-extension-shoot-lakom-service-seed-webhook", secretsmanager.Config{})
 	if err != nil {
@@ -153,6 +157,34 @@ func getLabels() map[string]string {
 		"app.kubernetes.io/name":    constants.SeedApplicationName,
 		"app.kubernetes.io/part-of": constants.ExtensionType,
 	}
+}
+
+func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context, ownerNamespaceName string) error {
+	secretList := &corev1.SecretList{}
+	if err := kcr.client.List(ctx, secretList, client.InNamespace(metav1.NamespaceSystem), client.MatchingLabels{
+		secretsmanager.LabelKeyManagedBy:       secretsmanager.LabelValueSecretsManager,
+		secretsmanager.LabelKeyManagerIdentity: ManagerIdentity,
+	}); err != nil {
+		return err
+	}
+
+	owner := corev1.Namespace{}
+	if err := kcr.client.Get(ctx, client.ObjectKey{Name: ownerNamespaceName}, &owner); err != nil {
+		return err
+	}
+
+	ownerRef := metav1.NewControllerRef(&owner, corev1.SchemeGroupVersion.WithKind("Namespace"))
+	ownerRef.BlockOwnerDeletion = pointer.Bool(false)
+
+	for _, secret := range secretList.Items {
+		patch := client.StrategicMergeFrom(secret.DeepCopy(), client.MergeFromWithOptimisticLock{})
+		secret.SetOwnerReferences(kutil.MergeOwnerReferences(secret.GetOwnerReferences(), *ownerRef))
+		if err := kcr.client.Patch(ctx, &secret, patch); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType) (map[string][]byte, error) {
