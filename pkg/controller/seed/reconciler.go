@@ -88,7 +88,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	if err != nil {
 		return err
 	}
-	caBundleSecret, found := secretsManager.Get(CAName)
+	caBundleSecret, found := secretsManager.Get(CAName, secretsmanager.Bundle)
 	if !found {
 		return fmt.Errorf("secret %q not found", CAName)
 	}
