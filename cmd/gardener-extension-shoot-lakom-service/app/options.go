@@ -18,16 +18,17 @@ const ExtensionName = "shoot-lakom-service"
 
 // Options holds configuration passed to the Lakom Service controller.
 type Options struct {
-	generalOptions     *controllercmd.GeneralOptions
-	lakomOptions       *lakomcmd.LakomServiceOptions
-	restOptions        *controllercmd.RESTOptions
-	managerOptions     *controllercmd.ManagerOptions
-	lifecycleOptions   *controllercmd.ControllerOptions
-	healthOptions      *controllercmd.ControllerOptions
-	heartbeatOptions   *heartbeatcmd.Options
-	controllerSwitches *controllercmd.SwitchOptions
-	reconcileOptions   *controllercmd.ReconcilerOptions
-	optionAggregator   controllercmd.OptionAggregator
+	generalOptions       *controllercmd.GeneralOptions
+	lakomOptions         *lakomcmd.LakomServiceOptions
+	restOptions          *controllercmd.RESTOptions
+	managerOptions       *controllercmd.ManagerOptions
+	lifecycleOptions     *controllercmd.ControllerOptions
+	seedBootstrapOptions *controllercmd.ControllerOptions
+	healthOptions        *controllercmd.ControllerOptions
+	heartbeatOptions     *heartbeatcmd.Options
+	controllerSwitches   *controllercmd.SwitchOptions
+	reconcileOptions     *controllercmd.ReconcilerOptions
+	optionAggregator     controllercmd.OptionAggregator
 }
 
 // NewOptions creates a new Options instance.
@@ -46,6 +47,10 @@ func NewOptions() *Options {
 		lifecycleOptions: &controllercmd.ControllerOptions{
 			// This is a default value.
 			MaxConcurrentReconciles: 5,
+		},
+		seedBootstrapOptions: &controllercmd.ControllerOptions{
+			// This is a default value.
+			MaxConcurrentReconciles: 1,
 		},
 		healthOptions: &controllercmd.ControllerOptions{
 			// This is a default value.
@@ -67,6 +72,7 @@ func NewOptions() *Options {
 		options.restOptions,
 		options.managerOptions,
 		controllercmd.PrefixOption("lifecycle-", options.lifecycleOptions),
+		controllercmd.PrefixOption("seed-bootstrap-", options.seedBootstrapOptions),
 		controllercmd.PrefixOption("healthcheck-", options.healthOptions),
 		controllercmd.PrefixOption("heartbeat-", options.heartbeatOptions),
 		options.controllerSwitches,

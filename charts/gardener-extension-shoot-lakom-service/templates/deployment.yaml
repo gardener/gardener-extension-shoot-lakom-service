@@ -16,7 +16,7 @@ metadata:
     app.kubernetes.io/name: gardener-extension-{{ .Values.serviceName }}
     helm.sh/chart: gardener-extension-{{ .Values.serviceName }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    high-availability-config.resources.gardener.cloud/type: server
+    high-availability-config.resources.gardener.cloud/type: controller
 spec:
   revisionHistoryLimit: 5
   replicas: {{ .Values.replicaCount }}
@@ -78,10 +78,12 @@ spec:
         - --leader-election-id={{ include "leaderelectionid" . }}
         - --heartbeat-namespace={{ .Release.Namespace }}
         - --heartbeat-renew-interval-seconds={{ .Values.controllers.heartbeat.renewIntervalSeconds }}
-        - --webhook-config-cert-dir=/tmp/gardener-extension-{{ .Values.serviceName }}/certs
-        - --webhook-config-server-port={{ .Values.controllers.serverPort }}
         - --health-bind-address=:{{ .Values.controllers.healthPort }}
         - --metrics-bind-address=:{{ .Values.controllers.metricsPort }}
+        ports:
+        - containerPort: {{ .Values.controllers.metricsPort }}
+          name: metrics
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /healthz

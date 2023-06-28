@@ -47,7 +47,6 @@ controllers:
     #   abcd
     #   -----END PUBLIC KEY-----
   failurePolicy: Fail
-  serverPort: 10250
   healthPort: 8080
   metricsPort: 8081
   debugConfig:

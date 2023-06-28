@@ -21,8 +21,14 @@ const (
 	ManagedResourceNamesShoot = ExtensionServiceName + "-shoot"
 	// WebhookConfigurationName is the name of the webhook configuration(s) deployed in the shoot cluster.
 	WebhookConfigurationName = GardenerExtensionName + "-shoot"
-	// WebhookTLSSecretName is the name of the TLS secret resource used by the Lakom webhook in the seed cluster.
+	// WebhookTLSSecretName is the name of the TLS secret resource used by the shoot lakom webhook.
 	WebhookTLSSecretName = ExtensionServiceName + "-tls"
+	// SeedApplicationName is the name for resource describing the components bootstrapping the seed by the extension controller.
+	SeedApplicationName = ApplicationName + "-seed"
+	// SeedExtensionServiceName is the extension service name bootstrapping the seed.
+	SeedExtensionServiceName = ExtensionServiceName + "-seed"
+	// SeedWebhookTLSSecretName is the name of the TLS secret resource used by the lakom webhook in the seed cluster.
+	SeedWebhookTLSSecretName = SeedExtensionServiceName + "-tls"
 	// LakomResourceReader is the name of the RBAC resources created in the shoot cluster that allow reading image pull secrets
 	LakomResourceReader = GardenerExtensionName + "-resource-reader"
 	// LakomResolveTagPath is the URL path to the hook resolving image tag to digest.
