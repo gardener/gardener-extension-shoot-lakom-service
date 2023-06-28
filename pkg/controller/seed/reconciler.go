@@ -176,10 +176,11 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	ownerRef := metav1.NewControllerRef(&owner, corev1.SchemeGroupVersion.WithKind("Namespace"))
 	ownerRef.BlockOwnerDeletion = pointer.Bool(false)
 
-	for _, secret := range secretList.Items {
+	for _, s := range secretList.Items {
+		secret := s.DeepCopy()
 		patch := client.StrategicMergeFrom(secret.DeepCopy(), client.MergeFromWithOptimisticLock{})
 		secret.SetOwnerReferences(kutil.MergeOwnerReferences(secret.GetOwnerReferences(), *ownerRef))
-		if err := kcr.client.Patch(ctx, &secret, patch); err != nil {
+		if err := kcr.client.Patch(ctx, secret, patch); err != nil {
 			return err
 		}
 	}
