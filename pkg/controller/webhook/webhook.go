@@ -133,7 +133,7 @@ type webhookCABundleReconciler struct {
 }
 
 // AddWebhookCABundleReconcilerToManager adds the webhookCABundleReconciler to the manager.
-func AddWebhookCABundleReconcilerToManager(ctx context.Context, mgr manager.Manager, sourceName, targetName string) error {
+func AddWebhookCABundleReconcilerToManager(_ context.Context, mgr manager.Manager, sourceName, targetName string) error {
 	r := &webhookCABundleReconciler{
 		client:     mgr.GetClient(),
 		sourceName: sourceName,

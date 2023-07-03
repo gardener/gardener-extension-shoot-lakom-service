@@ -15,7 +15,6 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/secrets"
 
-	"github.com/Masterminds/semver"
 	"github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
@@ -37,7 +36,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -121,11 +119,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return fmt.Errorf("missing or empty `cluster.seed.status.kubernetesVersion`")
 	}
 
-	seedK8SVersion, err := semver.NewVersion(*cluster.Seed.Status.KubernetesVersion)
-	if err != nil {
-		return err
-	}
-
 	image, err := imagevector.ImageVector().FindImage(constants.ImageName)
 	if err != nil {
 		return fmt.Errorf("failed to find image version for %s: %v", constants.ImageName, err)
@@ -143,7 +136,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		generatedSecrets[constants.WebhookTLSSecretName].Name,
 		a.serviceConfig.CosignPublicKeys,
 		image.String(),
-		seedK8SVersion,
 	)
 	if err != nil {
 		return err
@@ -271,7 +263,7 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string, seedK8SVersion *semver.Version) (map[string][]byte, error) {
+func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -445,11 +437,6 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 		return nil, err
 	}
 
-	lakomPDB, err := getPDB(lakomReplicas, namespace, seedK8SVersion)
-	if err != nil {
-		return nil, err
-	}
-
 	lakomService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      constants.ExtensionServiceName,
@@ -482,7 +469,17 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
-		lakomPDB,
+		&policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      constants.ExtensionServiceName,
+				Namespace: namespace,
+				Labels:    getLabels(),
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				MaxUnavailable: intstr.ValueOrDefault(nil, intstr.FromInt(1)),
+				Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
+			},
+		},
 		&cosignPublicKeysSecret,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -560,45 +557,6 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	}
 
 	return resources, nil
-}
-
-func getPDB(replicas *int32, namespaceName string, k8sVersion *semver.Version) (client.Object, error) {
-
-	var (
-		maxUnavailable = intstr.FromInt(1)
-		labels         = getLabels()
-	)
-
-	constraintK8sLess121, err := semver.NewConstraint("< 1.21-0")
-	if err != nil {
-		return nil, err
-	}
-
-	if constraintK8sLess121.Check(k8sVersion) {
-		return &policyv1beta1.PodDisruptionBudget{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
-				Namespace: namespaceName,
-				Labels:    getLabels(),
-			},
-			Spec: policyv1beta1.PodDisruptionBudgetSpec{
-				MaxUnavailable: &maxUnavailable,
-				Selector:       &metav1.LabelSelector{MatchLabels: labels},
-			},
-		}, nil
-	}
-
-	return &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespaceName,
-			Labels:    getLabels(),
-		},
-		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable: &maxUnavailable,
-			Selector:       &metav1.LabelSelector{MatchLabels: labels},
-		},
-	}, nil
 }
 
 func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAccountName string, failurePolicy admissionregistration.FailurePolicyType) (map[string][]byte, error) {

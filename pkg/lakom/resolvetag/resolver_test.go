@@ -168,7 +168,7 @@ type fakeCacheResolver struct {
 }
 
 // Resolve implements fake cache resolver that just counts the cache hits and misses
-func (r *fakeCacheResolver) Resolve(ctx context.Context, tagRef name.Tag) (string, error) {
+func (r *fakeCacheResolver) Resolve(_ context.Context, tagRef name.Tag) (string, error) {
 	image := tagRef.String()
 	digest, found := r.cache.GetDigest(image)
 	if found {

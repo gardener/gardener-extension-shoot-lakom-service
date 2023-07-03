@@ -3,9 +3,8 @@ module github.com/gardener/gardener-extension-shoot-lakom-service
 go 1.20
 
 require (
-	github.com/Masterminds/semver v1.5.0
 	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
-	github.com/gardener/gardener v1.71.3
+	github.com/gardener/gardener v1.74.0
 	github.com/gardener/service-account-issuer-discovery v0.2.0
 	github.com/go-logr/logr v1.2.4
 	github.com/google/go-containerregistry v0.14.1-0.20230409045903-ed5c185df419
@@ -43,6 +42,7 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/BurntSushi/toml v1.2.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
+	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.18.0 // indirect
@@ -84,7 +84,7 @@ require (
 	github.com/fluent/fluent-operator/v2 v2.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
-	github.com/gardener/etcd-druid v0.15.3 // indirect
+	github.com/gardener/etcd-druid v0.18.1 // indirect
 	github.com/gardener/hvpa-controller/api v0.5.0 // indirect
 	github.com/gardener/machine-controller-manager v0.48.1 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -209,7 +209,6 @@ require (
 	istio.io/api v0.0.0-20230217221049-9d422bf48675 // indirect
 	istio.io/client-go v1.17.1 // indirect
 	k8s.io/apiextensions-apiserver v0.26.3 // indirect
-	k8s.io/apiserver v0.26.3 // indirect
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d // indirect
 	k8s.io/helm v2.16.1+incompatible // indirect
 	k8s.io/klog v1.0.0 // indirect

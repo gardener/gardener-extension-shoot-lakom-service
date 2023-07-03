@@ -108,7 +108,7 @@ spec:
         - name: kubeconfig
           mountPath: /etc/lakom/client
           readOnly: true
-        {{- else if semverCompare ">= 1.20-0" .Capabilities.KubeVersion.GitVersion }}
+        {{- else }}
         - name: kube-api-access-lakom
           mountPath: /var/run/secrets/kubernetes.io/serviceaccount
           readOnly: true
@@ -124,7 +124,7 @@ spec:
       - name: kubeconfig
         secret:
           secretName: lakom-target-kubeconfig
-      {{- else if semverCompare ">= 1.20-0" .Capabilities.KubeVersion.GitVersion }}
+      {{- else }}
       - name: kube-api-access-lakom
         projected:
           defaultMode: 420
