@@ -11,6 +11,7 @@ Comment:
 Files:
   .gitignore
   .golangci.yaml
+  .docforge/**
   CODEOWNERS
   VERSION
   charts/gardener-extension-shoot-lakom-service/.helmignore
