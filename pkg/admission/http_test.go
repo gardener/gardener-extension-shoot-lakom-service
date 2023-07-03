@@ -281,6 +281,6 @@ type brokenWriter struct {
 	http.ResponseWriter
 }
 
-func (bw *brokenWriter) Write(buf []byte) (int, error) {
+func (bw *brokenWriter) Write(_ []byte) (int, error) {
 	return 0, fmt.Errorf("mock: write: broken pipe")
 }

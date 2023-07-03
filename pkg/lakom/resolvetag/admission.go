@@ -58,7 +58,7 @@ func (hb HandleBuilder) WithLogger(logger logr.Logger) HandleBuilder {
 }
 
 // Build builds a handler from the HandleBuilder.
-func (hb HandleBuilder) Build(ctx context.Context) (*handler, error) {
+func (hb HandleBuilder) Build(_ context.Context) (*handler, error) {
 	var (
 		h        = handler{logger: hb.logger}
 		resolver Resolver
@@ -199,7 +199,7 @@ func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logg
 	return nil
 }
 
-func (h *handler) handleContainer(ctx context.Context, containerName, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
+func (h *handler) handleContainer(ctx context.Context, _, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
 	logger = logger.WithValues("originalImage", image)
 
 	imageRef, err := name.ParseReference(image)
