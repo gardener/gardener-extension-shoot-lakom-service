@@ -467,6 +467,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 		},
 	}
 
+	maxUnavailable := intstr.FromInt(1)
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
 		&policyv1.PodDisruptionBudget{
@@ -476,7 +477,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 				Labels:    getLabels(),
 			},
 			Spec: policyv1.PodDisruptionBudgetSpec{
-				MaxUnavailable: intstr.ValueOrDefault(nil, intstr.FromInt(1)),
+				MaxUnavailable: &maxUnavailable,
 				Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
 			},
 		},
