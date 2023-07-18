@@ -200,8 +200,8 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		cosignPublicKeysSecretName = constants.SeedExtensionServiceName + "-cosign-public-keys"
 		webhookTLSCertDir          = "/etc/lakom/tls"
 		registry                   = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestCPU, _              = resource.ParseQuantity("50m")
-		requestMemory, _           = resource.ParseQuantity("64Mi")
+		requestCPU                 = resource.MustParse("50m")
+		requestMemory              = resource.MustParse("64Mi")
 		vpaUpdateMode              = vpaautoscalingv1.UpdateModeAuto
 		kubeSystemNamespace        = metav1.NamespaceSystem
 		matchPolicy                = admissionregistration.Equivalent
@@ -416,7 +416,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 				Labels:    getLabels(),
 			},
 			Spec: policyv1.PodDisruptionBudgetSpec{
-				MaxUnavailable: intstr.ValueOrDefault(nil, intstr.FromInt(1)),
+				MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
 				Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
 			},
 		},
