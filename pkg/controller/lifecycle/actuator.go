@@ -275,8 +275,8 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 		cosignPublicKeysSecretName = constants.ExtensionServiceName + "-cosign-public-keys"
 		webhookTLSCertDir          = "/etc/lakom/tls"
 		registry                   = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestCPU, _              = resource.ParseQuantity("50m")
-		requestMemory, _           = resource.ParseQuantity("64Mi")
+		requestCPU                 = resource.MustParse("50m")
+		requestMemory              = resource.MustParse("64Mi")
 		vpaUpdateMode              = vpaautoscalingv1.UpdateModeAuto
 	)
 

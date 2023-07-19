@@ -27,6 +27,8 @@ type Configuration struct {
 	// DebugConfig contains debug configurations for the controller.
 	// +optional
 	DebugConfig *DebugConfig `json:"debugConfig,omitempty"`
+	// SeedBootstrap configures the seed bootstrap controller.
+	SeedBootstrap SeedBootstrap `json:"seedBootstrap"`
 }
 
 // DebugConfig contains debug configurations for the controller.
@@ -36,4 +38,11 @@ type DebugConfig struct {
 	// EnableContentionProfiling enables lock contention profiling, if
 	// enableProfiling is true.
 	EnableContentionProfiling bool `json:"enableContentionProfiling"`
+}
+
+// SeedBootstrap holds configurations for the seed bootstrap controller.
+type SeedBootstrap struct {
+	// OwnerNamespace is the name of the namespace owning the resources related
+	// to the seed bootstrap, as well as where the managed resources are deployed.
+	OwnerNamespace string `json:"ownerNamespace"`
 }

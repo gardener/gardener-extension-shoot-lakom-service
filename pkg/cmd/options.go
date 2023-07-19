@@ -13,7 +13,7 @@ import (
 	controllerconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/config"
 	healthcheckcontroller "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/webhook"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
 
 	healthcheckconfig "github.com/gardener/gardener/extensions/pkg/apis/config"
 	"github.com/gardener/gardener/extensions/pkg/controller/cmd"
@@ -94,20 +94,11 @@ func (c *LakomServiceConfig) ApplyHealthCheckConfig(config *healthcheckconfig.He
 	}
 }
 
-// ApplyWebhookConfig applies the lakom service configuration to the webhook config.
-func (c *LakomServiceConfig) ApplyWebhookConfig(config *webhook.Config) {
-	config.CosignPublicKeys = c.config.CosignPublicKeys
-	config.FailurePolicy = *c.config.FailurePolicy
-	if c.config.DebugConfig != nil {
-		config.EnableProfiling = c.config.DebugConfig.EnableProfiling
-		config.EnableContentionProfiling = c.config.DebugConfig.EnableContentionProfiling
-	}
-}
-
 // ControllerSwitches are the cmd.ControllerSwitches for the extension controllers.
 func ControllerSwitches() *cmd.SwitchOptions {
 	return cmd.NewSwitchOptions(
 		cmd.Switch(lifecycle.Name, lifecycle.AddToManager),
+		cmd.Switch(seed.Name, seed.AddToManager),
 		cmd.Switch(extensionshealthcheckcontroller.ControllerName, healthcheckcontroller.AddToManager),
 		cmd.Switch(extensionsheartbeatcontroller.ControllerName, extensionsheartbeatcontroller.AddToManager),
 	)
