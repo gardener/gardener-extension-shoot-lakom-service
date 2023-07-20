@@ -78,7 +78,7 @@ var _ = Describe("Admission Handler", func() {
 			WithLogger(logger.WithName("test-image-tag-resolver")).
 			WithCacheTTL(time.Minute * 10).
 			WithCacheRefreshInterval(time.Second * 30).
-			Build(ctx)
+			Build()
 		Expect(err).ToNot(HaveOccurred())
 
 		err = h.InjectDecoder(decoder)
