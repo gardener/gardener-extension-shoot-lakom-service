@@ -5,6 +5,8 @@
 package seed
 
 import (
+	"context"
+
 	controllerconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/config"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +35,7 @@ type AddOptions struct {
 }
 
 // AddToManager adds a Lakom Service seed bootstrap controller to the given Controller Manager.
-func AddToManager(mgr manager.Manager) error {
+func AddToManager(ctx context.Context, mgr manager.Manager) error {
 	r := &kubeSystemReconciler{
 		client:        mgr.GetClient(),
 		serviceConfig: DefaultAddOptions.ServiceConfig.Configuration,

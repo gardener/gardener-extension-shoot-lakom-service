@@ -7,6 +7,7 @@ require (
 	github.com/gardener/gardener v1.75.0
 	github.com/gardener/service-account-issuer-discovery v0.2.0
 	github.com/go-logr/logr v1.2.4
+	github.com/golang/mock v1.6.0
 	github.com/google/go-containerregistry v0.14.1-0.20230409045903-ed5c185df419
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20220927211808-7268da01c46e
 	github.com/onsi/ginkgo/v2 v2.9.2
@@ -109,7 +110,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/certificate-transparency-go v1.1.4 // indirect

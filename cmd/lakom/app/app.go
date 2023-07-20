@@ -193,6 +193,7 @@ func (o *Options) Run(ctx context.Context) error {
 	}
 
 	imageTagResolverHandler, err := resolvetag.NewHandleBuilder().
+		WithManager(mgr).
 		WithLogger(log.WithName("image-tag-resolver")).
 		WithCacheTTL(o.CacheTTL).
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
@@ -212,6 +213,7 @@ func (o *Options) Run(ctx context.Context) error {
 	}()
 
 	cosignSignatureVerifyHandler, err := verifysignature.NewHandleBuilder().
+		WithManager(mgr).
 		WithLogger(log.WithName("cosign-signature-verifier")).
 		WithCosignPublicKeysReader(reader).
 		WithCacheTTL(o.CacheTTL).

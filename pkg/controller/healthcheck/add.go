@@ -5,6 +5,7 @@
 package healthcheck
 
 import (
+	"context"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
@@ -30,8 +31,9 @@ var (
 
 // RegisterHealthChecks registers health checks for each extension resource
 // HealthChecks are grouped by extension (e.g worker), extension.type (e.g aws) and  Health Check Type (e.g SystemComponentsHealthy)
-func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) error {
+func RegisterHealthChecks(ctx context.Context, mgr manager.Manager, opts healthcheck.DefaultAddArgs) error {
 	return healthcheck.DefaultRegistration(
+		ctx,
 		constants.ExtensionType,
 		extensionsv1alpha1.SchemeGroupVersion.WithKind(extensionsv1alpha1.ExtensionResource),
 		func() client.ObjectList { return &extensionsv1alpha1.ExtensionList{} },
@@ -50,6 +52,6 @@ func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) 
 }
 
 // AddToManager adds a controller with the default Options.
-func AddToManager(mgr manager.Manager) error {
-	return RegisterHealthChecks(mgr, DefaultAddOptions)
+func AddToManager(ctx context.Context, mgr manager.Manager) error {
+	return RegisterHealthChecks(ctx, mgr, DefaultAddOptions)
 }

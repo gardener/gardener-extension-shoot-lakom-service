@@ -14,7 +14,10 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
 
+	mockclient "github.com/gardener/gardener/pkg/mock/controller-runtime/client"
+	mockmanager "github.com/gardener/gardener/pkg/mock/controller-runtime/manager"
 	"github.com/go-logr/logr"
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -35,16 +38,15 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 -----END PUBLIC KEY-----
 `
 
-	scheme  *runtime.Scheme
-	decoder *admission.Decoder
+	scheme    *runtime.Scheme
+	ctrl      *gomock.Controller
+	mgr       *mockmanager.MockManager
+	apiReader *mockclient.MockReader
 )
 
 var _ = BeforeSuite(func() {
 	scheme = runtime.NewScheme()
 	err := corev1.AddToScheme(scheme)
-	Expect(err).ToNot(HaveOccurred())
-
-	decoder, err = admission.NewDecoder(scheme)
 	Expect(err).ToNot(HaveOccurred())
 
 	dirPath, err := os.MkdirTemp("", "verifysignature_test")
@@ -85,19 +87,24 @@ var _ = Describe("Admission Handler", func() {
 	)
 
 	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		mgr = mockmanager.NewMockManager(ctrl)
+		apiReader = mockclient.NewMockReader(ctrl)
+
+		mgr.EXPECT().GetAPIReader().Return(apiReader)
+		mgr.EXPECT().GetScheme().Return(scheme)
+
 		logger = logzap.New(logzap.WriteTo(GinkgoWriter))
 		reader := strings.NewReader(cosignPublicKey)
 		h, err := verifysignature.
 			NewHandleBuilder().
+			WithManager(mgr).
 			WithLogger(logger.WithName("test-cosign-signature-verifier")).
 			WithCosignPublicKeysReader(reader).
 			WithCacheTTL(time.Minute * 10).
 			WithCacheRefreshInterval(time.Second * 30).
 			Build()
 
-		Expect(err).ToNot(HaveOccurred())
-
-		err = h.InjectDecoder(decoder)
 		Expect(err).ToNot(HaveOccurred())
 
 		handler = h

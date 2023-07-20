@@ -308,6 +308,8 @@ github.com/gardener/gardener/pkg/gardenlet/apis/config
 github.com/gardener/gardener/pkg/gardenlet/apis/config/v1alpha1
 github.com/gardener/gardener/pkg/healthz
 github.com/gardener/gardener/pkg/logger
+github.com/gardener/gardener/pkg/mock/controller-runtime/client
+github.com/gardener/gardener/pkg/mock/controller-runtime/manager
 github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references
 github.com/gardener/gardener/pkg/utils
 github.com/gardener/gardener/pkg/utils/chart
@@ -468,6 +470,7 @@ github.com/golang-jwt/jwt/v4
 github.com/golang/groupcache/lru
 # github.com/golang/mock v1.6.0
 ## explicit; go 1.11
+github.com/golang/mock/gomock
 github.com/golang/mock/mockgen
 github.com/golang/mock/mockgen/model
 # github.com/golang/protobuf v1.5.3
