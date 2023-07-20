@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -123,7 +124,7 @@ var _ = Describe("Resolver", func() {
 			Expect(err).ToNot(HaveOccurred())
 			f.cache.StoreDigest(cachedImage, cachedDigest)
 
-			resolved, err := f.Resolve(ctx, imageRef)
+			resolved, err := f.Resolve(ctx, imageRef, kcr)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resolved).To(Equal(cachedDigest))
 			Expect(f.cacheHits).To(BeNumerically("==", 1))
@@ -132,7 +133,7 @@ var _ = Describe("Resolver", func() {
 			imageRef, err = name.NewTag(uncachedImage)
 			Expect(err).ToNot(HaveOccurred())
 
-			resolved, err = f.Resolve(ctx, imageRef)
+			resolved, err = f.Resolve(ctx, imageRef, kcr)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resolved).To(Equal("unresolved"))
 			Expect(f.cacheHits).To(BeNumerically("==", 1))
@@ -167,8 +168,10 @@ type fakeCacheResolver struct {
 	cacheMisses uint
 }
 
+var _ resolvetag.Resolver = &fakeCacheResolver{} // ensure fakeCacheResolver implements the Resolver interface
+
 // Resolve implements fake cache resolver that just counts the cache hits and misses
-func (r *fakeCacheResolver) Resolve(_ context.Context, tagRef name.Tag) (string, error) {
+func (r *fakeCacheResolver) Resolve(_ context.Context, tagRef name.Tag, _ utils.KeyChainReader) (string, error) {
 	image := tagRef.String()
 	digest, found := r.cache.GetDigest(image)
 	if found {
