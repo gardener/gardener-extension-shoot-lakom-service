@@ -167,7 +167,7 @@ func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logg
 	})
 
 	for idx, ic := range p.Spec.InitContainers {
-		image, err := h.handleContainer(ctx, ic.Name, ic.Image, kcr, logger.WithValues("initContainer", ic.Name))
+		image, err := h.handleContainer(ctx, ic.Image, kcr, logger.WithValues("initContainer", ic.Name))
 		if err != nil {
 			return err
 		}
@@ -177,7 +177,7 @@ func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logg
 	}
 
 	for idx, c := range p.Spec.Containers {
-		image, err := h.handleContainer(ctx, c.Name, c.Image, kcr, logger.WithValues("container", c.Name))
+		image, err := h.handleContainer(ctx, c.Image, kcr, logger.WithValues("container", c.Name))
 		if err != nil {
 			return err
 		}
@@ -187,7 +187,7 @@ func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logg
 	}
 
 	for idx, ec := range p.Spec.EphemeralContainers {
-		image, err := h.handleContainer(ctx, ec.Name, ec.Image, kcr, logger.WithValues("ephemeralContainer", ec.Name))
+		image, err := h.handleContainer(ctx, ec.Image, kcr, logger.WithValues("ephemeralContainer", ec.Name))
 		if err != nil {
 			return err
 		}
@@ -199,7 +199,7 @@ func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logg
 	return nil
 }
 
-func (h *handler) handleContainer(ctx context.Context, _, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
+func (h *handler) handleContainer(ctx context.Context, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
 	logger = logger.WithValues("originalImage", image)
 
 	imageRef, err := name.ParseReference(image)

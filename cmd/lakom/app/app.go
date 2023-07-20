@@ -216,7 +216,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithCosignPublicKeysReader(reader).
 		WithCacheTTL(o.CacheTTL).
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
-		Build(ctx)
+		Build()
 	if err != nil {
 		return err
 	}
