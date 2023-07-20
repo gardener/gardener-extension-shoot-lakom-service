@@ -67,7 +67,7 @@ func (hb HandleBuilder) WithLogger(logger logr.Logger) HandleBuilder {
 }
 
 // Build builds a handler from the HandleBuilder.
-func (hb HandleBuilder) Build(ctx context.Context) (*handler, error) {
+func (hb HandleBuilder) Build() (*handler, error) {
 	var (
 		h        = handler{logger: hb.logger}
 		verifier Verifier

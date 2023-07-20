@@ -247,10 +247,10 @@ github.com/gabriel-vasile/mimetype
 github.com/gabriel-vasile/mimetype/internal/charset
 github.com/gabriel-vasile/mimetype/internal/json
 github.com/gabriel-vasile/mimetype/internal/magic
-# github.com/gardener/etcd-druid v0.15.3
-## explicit; go 1.19
+# github.com/gardener/etcd-druid v0.18.1
+## explicit; go 1.20
 github.com/gardener/etcd-druid/api/v1alpha1
-# github.com/gardener/gardener v1.71.3
+# github.com/gardener/gardener v1.74.0
 ## explicit; go 1.20
 github.com/gardener/gardener/cmd/utils
 github.com/gardener/gardener/extensions/pkg/apis/config
@@ -275,7 +275,6 @@ github.com/gardener/gardener/pkg/apis/authentication
 github.com/gardener/gardener/pkg/apis/authentication/v1alpha1
 github.com/gardener/gardener/pkg/apis/core
 github.com/gardener/gardener/pkg/apis/core/install
-github.com/gardener/gardener/pkg/apis/core/v1alpha1
 github.com/gardener/gardener/pkg/apis/core/v1beta1
 github.com/gardener/gardener/pkg/apis/core/v1beta1/constants
 github.com/gardener/gardener/pkg/apis/core/v1beta1/helper
@@ -1335,10 +1334,6 @@ k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.26.3
-## explicit; go 1.19
-k8s.io/apiserver/pkg/apis/config
-k8s.io/apiserver/pkg/apis/config/v1
 # k8s.io/autoscaler/vertical-pod-autoscaler v0.13.0
 ## explicit; go 1.19
 k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1

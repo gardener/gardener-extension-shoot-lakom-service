@@ -196,7 +196,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithLogger(log.WithName("image-tag-resolver")).
 		WithCacheTTL(o.CacheTTL).
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
-		Build(ctx)
+		Build()
 	if err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithCosignPublicKeysReader(reader).
 		WithCacheTTL(o.CacheTTL).
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
-		Build(ctx)
+		Build()
 	if err != nil {
 		return err
 	}
