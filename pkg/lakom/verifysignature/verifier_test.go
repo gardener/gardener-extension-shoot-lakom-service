@@ -85,10 +85,8 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 
 		It("Should fail image verification when context is canceled", func() {
 			canceledCtx, cancel := context.WithCancel(ctx)
-			go func() {
-				time.Sleep(time.Millisecond * 10)
-				cancel()
-			}()
+			cancel()
+
 			verified, err := directVerifier.Verify(canceledCtx, "eu.gcr.io/gardener-project/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", kcr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("context canceled"))
@@ -156,10 +154,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 
 		It("Should not cache failed image verification when context is canceled", func() {
 			canceledCtx, cancel := context.WithCancel(ctx)
-			go func() {
-				time.Sleep(time.Millisecond * 10)
-				cancel()
-			}()
+			cancel()
 
 			image := "eu.gcr.io/gardener-project/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e"
 			verified, err := cachedVerifier.Verify(canceledCtx, image, kcr)
