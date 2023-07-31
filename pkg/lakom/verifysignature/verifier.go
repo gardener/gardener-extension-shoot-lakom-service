@@ -159,9 +159,8 @@ func IsNoMatchingSignature(err error) bool {
 	var verErr *cosign.VerificationError
 	if errors.As(err, &verErr) {
 		return verErr.ErrorType() == cosign.ErrNoMatchingSignaturesType
-	} else {
-		return false
 	}
+	return false
 }
 
 // IsNoSignaturesFound checks if error is of type
@@ -170,7 +169,6 @@ func IsNoSignaturesFound(err error) bool {
 	var verErr *cosign.VerificationError
 	if errors.As(err, &verErr) {
 		return verErr.ErrorType() == cosign.ErrNoSignaturesFoundType
-	} else {
-		return false
 	}
+	return false
 }
