@@ -7,8 +7,8 @@ package verifysignature
 import (
 	"context"
 	"crypto"
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
@@ -87,7 +87,7 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 			}
 
 			if IsNoMatchingSignature(err) {
-				if strings.Contains(err.Error(), "context canceled") {
+				if errors.Is(err, context.Canceled) {
 					// Mitigation for https://github.com/gardener/gardener-extension-shoot-lakom-service/issues/25
 					// TODO(vpnachev): remove when https://github.com/sigstore/cosign/issues/3133 is fixed and vendored
 					return false, err
