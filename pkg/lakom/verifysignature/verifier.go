@@ -7,6 +7,7 @@ package verifysignature
 import (
 	"context"
 	"crypto"
+	"errors"
 	"fmt"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
@@ -155,19 +156,19 @@ func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyC
 // IsNoMatchingSignature checks if error is of type
 // [cosign.ErrNoMatchingSignaturesType].
 func IsNoMatchingSignature(err error) bool {
-	noMatchingSignatureErr, ok := err.(*cosign.VerificationError)
-	if !ok {
-		return false
+	var verErr *cosign.VerificationError
+	if errors.As(err, &verErr) {
+		return verErr.ErrorType() == cosign.ErrNoMatchingSignaturesType
 	}
-	return noMatchingSignatureErr.ErrorType() == cosign.ErrNoMatchingSignaturesType
+	return false
 }
 
 // IsNoSignaturesFound checks if error is of type
 // [cosign.ErrNoSignaturesFoundType].
 func IsNoSignaturesFound(err error) bool {
-	noMatchingSignatureErr, ok := err.(*cosign.VerificationError)
-	if !ok {
-		return false
+	var verErr *cosign.VerificationError
+	if errors.As(err, &verErr) {
+		return verErr.ErrorType() == cosign.ErrNoSignaturesFoundType
 	}
-	return noMatchingSignatureErr.ErrorType() == cosign.ErrNoSignaturesFoundType
+	return false
 }
