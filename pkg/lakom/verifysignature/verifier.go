@@ -87,6 +87,12 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 			}
 
 			if IsNoMatchingSignature(err) {
+				if errors.Is(err, context.Canceled) {
+					// Mitigation for https://github.com/gardener/gardener-extension-shoot-lakom-service/issues/25
+					// TODO(vpnachev): remove when https://github.com/sigstore/cosign/issues/3133 is fixed and vendored
+					return false, err
+				}
+
 				log.Info("no matching signatures found for current public key", "error", err.Error())
 				continue
 			}
