@@ -139,17 +139,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		return err
 	}
 
-	if err := kcr.setOwnerReferenceToSecrets(ctx, ownerNamespace); err != nil {
-		return err
-	}
-
-	// TODO(vpnachev): Remove the clean up secret manager in a future version of the extension.
-	legacySecretManager, err := secretsmanager.New(ctx, logger.WithName("legacy-seed-secretsmanager"), clock.RealClock{}, kcr.client, ownerNamespace, "gardener-extension-shoot-lakom-service-seed-webhook", secretsmanager.Config{})
-	if err != nil {
-		return fmt.Errorf("failed to create legacy secret manager in namespace: %q, err: %w", ownerNamespace, err)
-	}
-
-	return legacySecretManager.Cleanup(ctx)
+	return kcr.setOwnerReferenceToSecrets(ctx, ownerNamespace)
 }
 
 func getLabels() map[string]string {
