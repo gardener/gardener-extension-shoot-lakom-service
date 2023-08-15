@@ -46,8 +46,7 @@ func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) 
 				HealthCheck:   general.CheckManagedResource(constants.ManagedResourceNamesSeed),
 			},
 		},
-		sets.New(gardencorev1beta1.ShootSystemComponentsHealthy), // TODO(vpnachev), remove this condition removal in a future version.
-	)
+		sets.New[gardencorev1beta1.ConditionType]())
 }
 
 // AddToManager adds a controller with the default Options.
