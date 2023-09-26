@@ -33,7 +33,6 @@ import (
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admission/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	cradmission "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -48,7 +47,7 @@ var _ = Describe("Admission Webhooks", func() {
 		var (
 			logger       logr.Logger
 			respRecorder *httptest.ResponseRecorder
-			server       = &admission.Server{}
+			server       *admission.Server
 		)
 
 		BeforeEach(func() {
@@ -56,8 +55,10 @@ var _ = Describe("Admission Webhooks", func() {
 			respRecorder = &httptest.ResponseRecorder{
 				Body: bytes.NewBuffer(nil),
 			}
-			_, err := inject.LoggerInto(logger.WithName("test-webhook"), server)
-			Expect(err).NotTo(HaveOccurred())
+
+			server = &admission.Server{
+				Log: logger,
+			}
 		})
 
 		It("should return bad-request when given an empty body", func() {
@@ -107,9 +108,8 @@ var _ = Describe("Admission Webhooks", func() {
 				Webhook: cradmission.Webhook{
 					Handler: &fakeHandler{},
 				},
+				Log: logger.WithName("server"),
 			}
-			err := server.InjectLogger(logger.WithName("server"))
-			Expect(err).ToNot(HaveOccurred())
 
 			expected := fmt.Sprintf(`{%s,"response":{"uid":"","allowed":true,"status":{"metadata":{},"code":200}}}
 `, gvkJSONv1)
@@ -127,9 +127,8 @@ var _ = Describe("Admission Webhooks", func() {
 				Webhook: cradmission.Webhook{
 					Handler: &fakeHandler{},
 				},
+				Log: logger.WithName("server"),
 			}
-			err := server.InjectLogger(logger.WithName("server"))
-			Expect(err).ToNot(HaveOccurred())
 
 			expected := fmt.Sprintf(`{%s,"response":{"uid":"","allowed":true,"status":{"metadata":{},"code":200}}}
 `, gvkJSONv1)
@@ -147,9 +146,8 @@ var _ = Describe("Admission Webhooks", func() {
 				Webhook: cradmission.Webhook{
 					Handler: &fakeHandler{},
 				},
+				Log: logger.WithName("server"),
 			}
-			err := server.InjectLogger(logger.WithName("server"))
-			Expect(err).ToNot(HaveOccurred())
 
 			expected := fmt.Sprintf(`{%s,"response":{"uid":"","allowed":true,"status":{"metadata":{},"code":200}}}
 `, gvkJSONv1beta1)
@@ -175,9 +173,8 @@ var _ = Describe("Admission Webhooks", func() {
 						},
 					},
 				},
+				Log: logger.WithName("server"),
 			}
-			err := server.InjectLogger(logger.WithName("server"))
-			Expect(err).ToNot(HaveOccurred())
 
 			expected := fmt.Sprintf(`{%s,"response":{"uid":"","allowed":true,"status":{"metadata":{},"reason":%q,"code":200}}}
 `, gvkJSONv1, value)
@@ -207,9 +204,8 @@ var _ = Describe("Admission Webhooks", func() {
 						return context.WithValue(ctx, key, r.Header["Content-Type"][0])
 					},
 				},
+				Log: logger.WithName("server"),
 			}
-			err := server.InjectLogger(logger.WithName("server"))
-			Expect(err).ToNot(HaveOccurred())
 
 			expected := fmt.Sprintf(`{%s,"response":{"uid":"","allowed":true,"status":{"metadata":{},"reason":%q,"code":200}}}
 `, gvkJSONv1, "application/json")
@@ -230,9 +226,8 @@ var _ = Describe("Admission Webhooks", func() {
 				Webhook: cradmission.Webhook{
 					Handler: &fakeHandler{},
 				},
+				Log: logger.WithName("server"),
 			}
-			err := server.InjectLogger(logger.WithName("server"))
-			Expect(err).ToNot(HaveOccurred())
 
 			bw := &brokenWriter{ResponseWriter: respRecorder}
 			Eventually(func() int {

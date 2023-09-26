@@ -127,6 +127,10 @@ var (
 	controlledOperations = sets.NewString(string(admissionv1.Create), string(admissionv1.Update))
 )
 
+func (h *handler) GetLogger() logr.Logger {
+	return h.logger
+}
+
 // Handle handles admission requests. It works only on create/update v1.Pods and ignores anything else.
 // Ensures that each initContainer, container and ephemeral container is using images signed by
 // at least one of the provided public cosign keys.

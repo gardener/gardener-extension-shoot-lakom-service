@@ -225,11 +225,17 @@ func (o *Options) Run(ctx context.Context) error {
 
 	server.Register(
 		constants.LakomResolveTagPath,
-		&admission.Server{Webhook: webhook.Admission{Handler: imageTagResolverHandler}},
+		&admission.Server{
+			Webhook: webhook.Admission{Handler: imageTagResolverHandler},
+			Log:     imageTagResolverHandler.GetLogger(),
+		},
 	)
 	server.Register(
 		constants.LakomVerifyCosignSignaturePath,
-		&admission.Server{Webhook: webhook.Admission{Handler: cosignSignatureVerifyHandler}},
+		&admission.Server{
+			Webhook: webhook.Admission{Handler: cosignSignatureVerifyHandler},
+			Log:     cosignSignatureVerifyHandler.GetLogger(),
+		},
 	)
 
 	log.Info("Starting manager")
