@@ -7,7 +7,6 @@ require (
 	github.com/gardener/gardener v1.77.0
 	github.com/gardener/service-account-issuer-discovery v0.2.0
 	github.com/go-logr/logr v1.2.4
-	github.com/golang/mock v1.6.0
 	github.com/google/go-containerregistry v0.14.1-0.20230409045903-ed5c185df419
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20220927211808-7268da01c46e
 	github.com/onsi/ginkgo/v2 v2.9.2
@@ -17,6 +16,7 @@ require (
 	github.com/sigstore/sigstore v1.6.4
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
+	go.uber.org/mock v0.2.0
 	golang.org/x/sync v0.2.0
 	golang.org/x/tools v0.8.0
 	k8s.io/api v0.26.3
@@ -184,7 +184,6 @@ require (
 	go.opentelemetry.io/otel v1.14.0 // indirect
 	go.opentelemetry.io/otel/trace v1.14.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/mock v0.2.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
