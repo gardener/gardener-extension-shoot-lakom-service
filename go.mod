@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
-	github.com/gardener/gardener v1.75.0
+	github.com/gardener/gardener v1.77.0
 	github.com/gardener/service-account-issuer-discovery v0.2.0
 	github.com/go-logr/logr v1.2.4
 	github.com/golang/mock v1.6.0
@@ -22,7 +22,7 @@ require (
 	k8s.io/api v0.26.3
 	k8s.io/apimachinery v0.26.3
 	k8s.io/autoscaler/vertical-pod-autoscaler v0.14.0
-	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
+	k8s.io/client-go v0.26.3
 	k8s.io/code-generator v0.26.3
 	k8s.io/component-base v0.26.3
 	k8s.io/utils v0.0.0-20230115233650-391b47cb4029
@@ -84,7 +84,7 @@ require (
 	github.com/fluent/fluent-operator/v2 v2.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
-	github.com/gardener/etcd-druid v0.18.1 // indirect
+	github.com/gardener/etcd-druid v0.19.1 // indirect
 	github.com/gardener/hvpa-controller/api v0.5.0 // indirect
 	github.com/gardener/machine-controller-manager v0.48.1 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -184,6 +184,7 @@ require (
 	go.opentelemetry.io/otel v1.14.0 // indirect
 	go.opentelemetry.io/otel/trace v1.14.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/mock v0.2.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
@@ -222,5 +223,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-replace k8s.io/client-go => k8s.io/client-go v0.26.3
