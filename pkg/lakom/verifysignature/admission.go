@@ -78,18 +78,12 @@ func (hb HandleBuilder) WithLogger(logger logr.Logger) HandleBuilder {
 func (hb HandleBuilder) Build() (*handler, error) {
 	var (
 		h = handler{
-			logger: hb.logger,
-			reader: hb.mgr.GetAPIReader(),
+			logger:  hb.logger,
+			reader:  hb.mgr.GetAPIReader(),
+			decoder: admission.NewDecoder(hb.mgr.GetScheme()),
 		}
 		verifier Verifier
 	)
-
-	decoder, err := admission.NewDecoder(hb.mgr.GetScheme())
-	if err != nil {
-		return nil, err
-	}
-
-	h.decoder = decoder
 
 	rawKeys, err := io.ReadAll(hb.cosignPublicKeysReader)
 	if err != nil {

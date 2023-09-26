@@ -35,7 +35,7 @@ type AddOptions struct {
 }
 
 // AddToManager adds a Lakom Service seed bootstrap controller to the given Controller Manager.
-func AddToManager(ctx context.Context, mgr manager.Manager) error {
+func AddToManager(_ context.Context, mgr manager.Manager) error {
 	r := &kubeSystemReconciler{
 		client:        mgr.GetClient(),
 		serviceConfig: DefaultAddOptions.ServiceConfig.Configuration,
@@ -62,7 +62,7 @@ func AddToManager(ctx context.Context, mgr manager.Manager) error {
 	}
 
 	return ctrl.Watch(
-		source.NewKindWithCache(&corev1.Namespace{}, mgr.GetCache()),
+		source.Kind(mgr.GetCache(), &corev1.Namespace{}),
 		&handler.EnqueueRequestForObject{},
 		kubeSystemNamespacePredicate,
 	)

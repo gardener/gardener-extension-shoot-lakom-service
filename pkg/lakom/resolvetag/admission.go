@@ -69,18 +69,12 @@ func (hb HandleBuilder) WithLogger(logger logr.Logger) HandleBuilder {
 func (hb HandleBuilder) Build() (*handler, error) {
 	var (
 		h = handler{
-			logger: hb.logger,
-			reader: hb.mgr.GetAPIReader(),
+			logger:  hb.logger,
+			reader:  hb.mgr.GetAPIReader(),
+			decoder: admission.NewDecoder(hb.mgr.GetScheme()),
 		}
 		resolver Resolver
 	)
-
-	decoder, err := admission.NewDecoder(hb.mgr.GetScheme())
-	if err != nil {
-		return nil, err
-	}
-
-	h.decoder = decoder
 
 	resolver = NewDirectResolver()
 	if hb.cacheTTL != 0 {
