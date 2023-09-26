@@ -146,12 +146,6 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	// TODO: Remove namespace population once support for k8s <1.24 is dropped
-	// Ref: https://github.com/kubernetes/kubernetes/pull/94637
-	if pod.GetNamespace() == "" {
-		pod.SetNamespace(request.Namespace)
-	}
-
 	logger := h.logger.WithValues("pod", client.ObjectKeyFromObject(pod))
 
 	if err := h.validatePod(ctx, logger, pod); err != nil {
