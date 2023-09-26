@@ -156,7 +156,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			canceledCtx, cancel := context.WithCancel(ctx)
 			cancel()
 
-			image := "eu.gcr.io/gardener-project/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e"
+			image := "eu.gcr.io/gardener-project/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e" // #nosec G101
 			verified, err := cachedVerifier.Verify(canceledCtx, image, kcr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("context canceled"))
