@@ -7,9 +7,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"runtime"
 
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/cmd"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
@@ -78,7 +78,22 @@ func (o *Options) run(ctx context.Context) error {
 		Burst: 130,
 	}, o.restOptions.Completed().Config)
 
-	mgrOpts := o.managerOptions.Completed().Options()
+	var (
+		extraHandlers map[string]http.Handler
+		ctrlConfig    = o.lakomOptions.Completed()
+		debugConfig   = &config.Config{}
+		mgrOpts       = o.managerOptions.Completed().Options()
+	)
+
+	ctrlConfig.Apply(debugConfig)
+	if debugConfig.DebugConfig.EnableProfiling {
+		extraHandlers = routes.ProfilingHandlers
+
+		if debugConfig.DebugConfig.EnableContentionProfiling {
+			runtime.SetBlockProfileRate(1)
+		}
+	}
+	mgrOpts.Metrics.ExtraHandlers = extraHandlers
 
 	mgrOpts.Client = client.Options{
 		Cache: &client.CacheOptions{
@@ -98,7 +113,6 @@ func (o *Options) run(ctx context.Context) error {
 		return fmt.Errorf("could not update manager scheme: %s", err)
 	}
 
-	ctrlConfig := o.lakomOptions.Completed()
 	ctrlConfig.ApplyHealthCheckConfig(&healthcheck.DefaultAddOptions.HealthCheckConfig)
 	ctrlConfig.Apply(&lifecycle.DefaultAddOptions.ServiceConfig)
 	ctrlConfig.Apply(&seed.DefaultAddOptions.ServiceConfig)
@@ -111,7 +125,7 @@ func (o *Options) run(ctx context.Context) error {
 		return fmt.Errorf("could not add controllers to manager: %s", err)
 	}
 
-	if err := configureHealthCheck(mgr, ctrlConfig); err != nil {
+	if err := configureHealthCheck(mgr); err != nil {
 		return fmt.Errorf("failed to setup webhook server")
 	}
 
@@ -120,7 +134,7 @@ func (o *Options) run(ctx context.Context) error {
 
 // configureHealthCheck configures the healthiness and readiness checkers.
 // Also, if enabled, sets the profiling endpoints.
-func configureHealthCheck(mgr manager.Manager, lakomConfig *cmd.LakomServiceConfig) error {
+func configureHealthCheck(mgr manager.Manager) error {
 	log.Info("Setting up health check endpoints")
 	if err := mgr.AddReadyzCheck("informer-sync", gardenerhealthz.NewCacheSyncHealthz(mgr.GetCache())); err != nil {
 		return err
@@ -128,19 +142,6 @@ func configureHealthCheck(mgr manager.Manager, lakomConfig *cmd.LakomServiceConf
 
 	if err := mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
 		return err
-	}
-
-	debugConfig := &config.Config{}
-	lakomConfig.Apply(debugConfig)
-	if debugConfig.DebugConfig.EnableProfiling {
-		log.Info("Setting up profiling endpoints")
-		if err := (routes.Profiling{}).AddToManager(mgr); err != nil {
-			return err
-		}
-
-		if debugConfig.DebugConfig.EnableContentionProfiling {
-			runtime.SetBlockProfileRate(1)
-		}
 	}
 
 	return nil

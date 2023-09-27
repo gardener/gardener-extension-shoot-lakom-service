@@ -8,6 +8,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	goruntime "runtime"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -155,28 +157,32 @@ func (o *Options) Run(ctx context.Context) error {
 		return err
 	}
 
+	var extraHandlers map[string]http.Handler
+	if o.EnableProfiling {
+		extraHandlers = routes.ProfilingHandlers
+		if o.EnableContentionProfiling {
+			goruntime.SetBlockProfileRate(1)
+		}
+	}
+
 	log.Info("Setting up manager")
 	mgr, err := manager.New(restConfig, manager.Options{
-		Scheme:                  scheme,
-		LeaderElection:          false,
-		Host:                    o.BindAddress,
-		MetricsBindAddress:      o.MetricsBindAddress,
+		Scheme:         scheme,
+		LeaderElection: false,
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    o.Port,
+			Host:    o.BindAddress,
+			CertDir: o.ServerCertDir,
+		}),
+		Metrics: metricsserver.Options{
+			BindAddress:   o.MetricsBindAddress,
+			ExtraHandlers: extraHandlers,
+		},
 		HealthProbeBindAddress:  o.HealthBindAddress,
-		Port:                    o.Port,
-		CertDir:                 o.ServerCertDir,
 		GracefulShutdownTimeout: &gracefulShutdownTimeout,
 	})
 	if err != nil {
 		return err
-	}
-
-	if o.EnableProfiling {
-		if err := (routes.Profiling{}).AddToManager(mgr); err != nil {
-			return fmt.Errorf("failed adding profiling handlers to manager: %w", err)
-		}
-		if o.EnableContentionProfiling {
-			goruntime.SetBlockProfileRate(1)
-		}
 	}
 
 	log.Info("Setting up healthiness check endpoints")
