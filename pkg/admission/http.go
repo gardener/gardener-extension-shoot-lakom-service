@@ -50,13 +50,7 @@ var _ http.Handler = &Server{}
 type Server struct {
 	admission.Webhook
 
-	log logr.Logger
-}
-
-// InjectLogger injects logger in Server.
-func (s *Server) InjectLogger(l logr.Logger) error {
-	s.log = l
-	return s.Webhook.InjectLogger(l)
+	Log logr.Logger
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +64,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var reviewResponse admission.Response
 	if r.Body == nil {
 		err = errors.New("request body is empty")
-		s.log.Error(err, "bad request")
+		s.Log.Error(err, "bad request")
 		reviewResponse = admission.Errored(http.StatusBadRequest, err)
 		s.writeResponse(w, reviewResponse)
 		return
@@ -81,7 +75,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	if body, err = io.ReadAll(r.Body); err != nil {
-		s.log.Error(err, "unable to read the body from the incoming request")
+		s.Log.Error(err, "unable to read the body from the incoming request")
 		reviewResponse = admission.Errored(http.StatusBadRequest, err)
 		s.writeResponse(w, reviewResponse)
 		return
@@ -90,7 +84,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// verify the content type is accurate
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
 		err = fmt.Errorf("contentType=%s, expected application/json", contentType)
-		s.log.Error(err, "unable to process a request with an unknown content type", "content type", contentType)
+		s.Log.Error(err, "unable to process a request with an unknown content type", "content type", contentType)
 		reviewResponse = admission.Errored(http.StatusBadRequest, err)
 		s.writeResponse(w, reviewResponse)
 		return
@@ -109,12 +103,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ar.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("AdmissionReview"))
 	_, actualAdmRevGVK, err := admissionCodecs.UniversalDeserializer().Decode(body, nil, &ar)
 	if err != nil {
-		s.log.Error(err, "unable to decode the request")
+		s.Log.Error(err, "unable to decode the request")
 		reviewResponse = admission.Errored(http.StatusBadRequest, err)
 		s.writeResponse(w, reviewResponse)
 		return
 	}
-	s.log.V(1).Info("received request", "UID", req.UID, "kind", req.Kind, "resource", req.Resource)
+	s.Log.V(1).Info("received request", "UID", req.UID, "kind", req.Kind, "resource", req.Resource)
 
 	reviewResponse = s.Webhook.Handle(ctx, req)
 	s.writeResponseTyped(w, reviewResponse, actualAdmRevGVK)
@@ -146,7 +140,7 @@ func (s *Server) writeResponseTyped(w http.ResponseWriter, response admission.Re
 func (s *Server) writeAdmissionResponse(w http.ResponseWriter, ar v1.AdmissionReview) {
 	w.WriteHeader(int(ar.Response.Result.Code))
 	if err := json.NewEncoder(w).Encode(ar); err != nil {
-		s.log.Error(err, "unable to encode and write the response")
+		s.Log.Error(err, "unable to encode and write the response")
 		// Since the `ar v1.AdmissionReview` is a clear and legal object,
 		// it should not have problem to be marshalled into bytes.
 		// The error here is probably caused by the abnormal HTTP connection,
@@ -155,11 +149,11 @@ func (s *Server) writeAdmissionResponse(w http.ResponseWriter, ar v1.AdmissionRe
 		serverError := admission.Errored(http.StatusInternalServerError, err)
 		w.WriteHeader(int(serverError.Result.Code))
 		if err = json.NewEncoder(w).Encode(v1.AdmissionReview{Response: &serverError.AdmissionResponse}); err != nil {
-			s.log.Error(err, "still unable to encode and write the InternalServerError response")
+			s.Log.Error(err, "still unable to encode and write the InternalServerError response")
 		}
 	} else {
 		res := ar.Response
-		if log := s.log; log.V(1).Enabled() {
+		if log := s.Log; log.V(1).Enabled() {
 			if res.Result != nil {
 				log = log.WithValues("code", res.Result.Code, "reason", res.Result.Reason)
 			}

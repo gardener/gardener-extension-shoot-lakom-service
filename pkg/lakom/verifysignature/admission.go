@@ -25,11 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // HandleBuilder implements builder pattern that builds admission handle.
 type HandleBuilder struct {
+	mgr                    manager.Manager
 	logger                 logr.Logger
 	cosignPublicKeysReader io.Reader
 	cacheTTL               time.Duration
@@ -39,6 +41,12 @@ type HandleBuilder struct {
 // NewHandleBuilder returns new handle builder.
 func NewHandleBuilder() HandleBuilder {
 	hb := HandleBuilder{}
+	return hb
+}
+
+// WithManager sets the manager.
+func (hb HandleBuilder) WithManager(mgr manager.Manager) HandleBuilder {
+	hb.mgr = mgr
 	return hb
 }
 
@@ -69,7 +77,11 @@ func (hb HandleBuilder) WithLogger(logger logr.Logger) HandleBuilder {
 // Build builds a handler from the HandleBuilder.
 func (hb HandleBuilder) Build() (*handler, error) {
 	var (
-		h        = handler{logger: hb.logger}
+		h = handler{
+			logger:  hb.logger,
+			reader:  hb.mgr.GetAPIReader(),
+			decoder: admission.NewDecoder(hb.mgr.GetScheme()),
+		}
 		verifier Verifier
 	)
 
@@ -104,22 +116,14 @@ type handler struct {
 	verifier Verifier
 }
 
-// InjectDecoder injects decoder into handler.
-func (h *handler) InjectDecoder(d *admission.Decoder) error {
-	h.decoder = d
-	return nil
-}
-
-// InjectAPIReader injects k8s readonly client into handler.
-func (h *handler) InjectAPIReader(r client.Reader) error {
-	h.reader = r
-	return nil
-}
-
 var (
 	podGVK               = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
 	controlledOperations = sets.NewString(string(admissionv1.Create), string(admissionv1.Update))
 )
+
+func (h *handler) GetLogger() logr.Logger {
+	return h.logger
+}
 
 // Handle handles admission requests. It works only on create/update v1.Pods and ignores anything else.
 // Ensures that each initContainer, container and ephemeral container is using images signed by
