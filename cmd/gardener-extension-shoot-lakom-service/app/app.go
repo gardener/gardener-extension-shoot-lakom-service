@@ -140,9 +140,5 @@ func configureHealthCheck(mgr manager.Manager) error {
 		return err
 	}
 
-	if err := mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
-		return err
-	}
-
-	return nil
+	return mgr.AddHealthzCheck("ping", healthz.Ping)
 }
