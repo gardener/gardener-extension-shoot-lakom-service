@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn/k8schain"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -177,6 +178,9 @@ func (h *handler) validatePod(ctx context.Context, logger logr.Logger, p *corev1
 			secretKey := client.ObjectKey{Namespace: p.GetNamespace(), Name: s.Name}
 
 			if err := h.reader.Get(ctx, secretKey, secret); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
 				return nil, err
 			}
 			imagePullSecrets = append(imagePullSecrets, *secret)
