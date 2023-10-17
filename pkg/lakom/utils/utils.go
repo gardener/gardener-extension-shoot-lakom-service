@@ -5,9 +5,14 @@
 package utils
 
 import (
+	"context"
 	"sync"
 
 	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/authn/k8schain"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // lazyKeyChainReader is implementation of utils.KeyChainReader which ensures
@@ -33,4 +38,27 @@ func NewLazyKeyChainReader(reader func() (authn.Keychain, error)) *lazyKeyChainR
 	return &lazyKeyChainReader{
 		keyChainReader: reader,
 	}
+}
+
+// NewLazyKeyChainReaderFromPod creates lazyKeyChainReader for given pod.
+func NewLazyKeyChainReaderFromPod(ctx context.Context, c client.Reader, pod *corev1.Pod) *lazyKeyChainReader {
+	return NewLazyKeyChainReader(
+		func() (authn.Keychain, error) {
+			var imagePullSecrets = make([]corev1.Secret, len(pod.Spec.ImagePullSecrets))
+			for _, sn := range pod.Spec.ImagePullSecrets {
+				secret := &corev1.Secret{}
+				secretKey := client.ObjectKey{Namespace: pod.GetNamespace(), Name: sn.Name}
+
+				if err := c.Get(ctx, secretKey, secret); err != nil {
+					if apierrors.IsNotFound(err) {
+						continue
+					}
+					return nil, err
+				}
+				imagePullSecrets = append(imagePullSecrets, *secret)
+			}
+
+			return k8schain.NewFromPullSecrets(ctx, imagePullSecrets)
+		},
+	)
 }
