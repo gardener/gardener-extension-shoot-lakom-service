@@ -5,13 +5,18 @@
 package utils_test
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
 	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/authn/k8schain"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var _ = Describe("Utils", func() {
@@ -93,6 +98,62 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEC0xfVLM3nSU6tlz2k1HZ91FNrzsZ
 			Expect(err).ToNot(HaveOccurred())
 			Expect(kc).ToNot(BeNil())
 			Expect(kc).To(BeIdenticalTo(authn.DefaultKeychain))
+		})
+
+		It("Should ignore missing secrets", func() {
+			var (
+				namespace = "default"
+				secret1   = corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "secret-1",
+					},
+					Data: make(map[string][]byte),
+					Type: corev1.SecretTypeDockerConfigJson,
+				}
+				secret2 = corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "secret-2",
+					},
+					Data: make(map[string][]byte),
+					Type: corev1.SecretTypeDockerConfigJson,
+				}
+
+				c = fakeclient.NewClientBuilder().WithObjects(
+					&secret1,
+					&secret2,
+				).Build()
+
+				pod = corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod",
+					},
+					Spec: corev1.PodSpec{
+						ImagePullSecrets: []corev1.LocalObjectReference{
+
+							{Name: secret1.GetName()},
+							{Name: "not-existing-1"},
+							{Name: secret2.GetName()},
+							{Name: "not-existing-2"},
+						},
+					},
+				}
+				ctx = context.Background()
+			)
+
+			kcr := utils.NewLazyKeyChainReaderFromPod(ctx, c, &pod)
+			Expect(kcr).ToNot(BeNil())
+
+			kc, err := kcr.GetKeyChain()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kc).ToNot(BeNil())
+
+			expectedKC, err := k8schain.NewFromPullSecrets(ctx, []corev1.Secret{secret1, secret2})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kc).To(BeEquivalentTo(expectedKC))
+			Expect(kc).ToNot(BeEquivalentTo(authn.DefaultKeychain))
 		})
 	})
 
