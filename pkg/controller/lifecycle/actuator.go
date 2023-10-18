@@ -227,6 +227,11 @@ func (a *actuator) Delete(ctx context.Context, logger logr.Logger, ex *extension
 	return secretsManager.Cleanup(ctx)
 }
 
+// ForceDelete the Extension resource.
+func (a *actuator) ForceDelete(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
+	return a.Delete(ctx, logger, ex)
+}
+
 // Restore the Extension resource.
 func (a *actuator) Restore(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
 	return a.Reconcile(ctx, logger, ex)
