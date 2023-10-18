@@ -16,8 +16,6 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
 	"github.com/go-logr/logr"
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/authn/k8schain"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -169,21 +167,7 @@ func (h *handler) validatePod(ctx context.Context, logger logr.Logger, p *corev1
 
 	logger.Info("Handling new pod request")
 
-	kcr := utils.NewLazyKeyChainReader(func() (authn.Keychain, error) {
-		secretRefs := p.Spec.ImagePullSecrets
-		var imagePullSecrets = make([]corev1.Secret, len(secretRefs))
-		for _, s := range secretRefs {
-			secret := &corev1.Secret{}
-			secretKey := client.ObjectKey{Namespace: p.GetNamespace(), Name: s.Name}
-
-			if err := h.reader.Get(ctx, secretKey, secret); err != nil {
-				return nil, err
-			}
-			imagePullSecrets = append(imagePullSecrets, *secret)
-		}
-
-		return k8schain.NewFromPullSecrets(ctx, imagePullSecrets)
-	})
+	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, p)
 
 	for idx, ic := range p.Spec.InitContainers {
 		fldPath := specPath.Child("initContainers").Index(idx).Child("image")
