@@ -100,10 +100,6 @@ clean:
 check-generate:
 	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/check-generate.sh $(REPO_ROOT)
 
-.PHONY: check-docforge
-check-docforge: $(DOCFORGE)
-	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/check-docforge.sh $(REPO_ROOT) $(REPO_ROOT)/.docforge/manifest.yaml ".docforge/;docs/" "gardener-extension-shoot-lakom-service" false
-
 .PHONY: check
 check: $(GOIMPORTS) $(GOLANGCI_LINT) $(HELM)
 	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/check.sh --golangci-lint-config=./.golangci.yaml ./cmd/... ./pkg/... # ./test/... # TODO(vpnachev): uncomment when tests are implemented
@@ -133,7 +129,7 @@ test-clean:
 	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/test-cover-clean.sh
 
 .PHONY: verify
-verify: check check-docforge format test
+verify: check format test
 
 .PHONY: verify-extended
-verify-extended: check-generate check check-docforge format test test-cov test-clean
+verify-extended: check-generate check format test test-cov test-clean
