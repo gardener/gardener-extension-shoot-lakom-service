@@ -7,6 +7,7 @@ package seed
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -115,6 +116,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		kcr.serviceConfig.CosignPublicKeys,
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		failurePolicy,
+		kcr.serviceConfig.UseOnlyImagePullSecrets,
 	)
 	if err != nil {
 		return err
@@ -178,7 +180,7 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	return nil
 }
 
-func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType) (map[string][]byte, error) {
+func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType, useOnlyImagePullSecrets bool) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -287,6 +289,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 							"--health-bind-address=:" + healthPort.String(),
 							"--metrics-bind-address=:" + metricsPort.String(),
 							"--port=" + serverPort.String(),
+							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
 						},
 						Ports: []corev1.ContainerPort{
 							{

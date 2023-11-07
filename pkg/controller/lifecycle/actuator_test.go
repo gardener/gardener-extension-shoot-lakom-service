@@ -120,6 +120,7 @@ var _ = Describe("Actuator", func() {
 			shootAccessServiceAccountName = "extension-shoot-lakom-service"
 			serverTLSSecretName           = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
 			image                         = "eu.gcr.io/gardener-project/gardener/extensions/lakom:v0.0.0"
+			useOnlyImagePullSecrets       = true
 			cosignSecretName              = "extension-shoot-lakom-service-cosign-public-keys-e3b0c442"
 
 			cosignSecretNameKey = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
@@ -162,6 +163,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				serverTLSSecretName,
 				cosignPublicKeys,
 				image,
+				useOnlyImagePullSecrets,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).To(HaveLen(7))
@@ -444,6 +446,7 @@ spec:
         - --metrics-bind-address=:8080
         - --port=10250
         - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
+        - --use-only-image-pull-secrets=true
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:

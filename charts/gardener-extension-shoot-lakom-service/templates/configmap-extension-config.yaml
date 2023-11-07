@@ -17,6 +17,7 @@ data:
     failurePolicy: {{ .Values.controllers.failurePolicy }}
     seedBootstrap:
       ownerNamespace: {{ .Release.Namespace }}
+    useOnlyImagePullSecrets: {{ .Values.useOnlyImagePullSecrets }}
     debugConfig:
       enableProfiling: {{ .Values.controllers.debugConfig.enableProfiling | default false }}
       enableContentionProfiling: {{ .Values.controllers.debugConfig.enableContentionProfiling | default false }}

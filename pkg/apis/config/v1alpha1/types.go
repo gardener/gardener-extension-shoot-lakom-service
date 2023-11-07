@@ -29,6 +29,9 @@ type Configuration struct {
 	DebugConfig *DebugConfig `json:"debugConfig,omitempty"`
 	// SeedBootstrap configures the seed bootstrap controller.
 	SeedBootstrap SeedBootstrap `json:"seedBootstrap"`
+	// UseOnlyImagePullSecrets sets lakom to use only the image pull secrets of the pod to access the OCI registry.
+	// Otherwise, also the node identity and docker config file are used.
+	UseOnlyImagePullSecrets bool `json:"useOnlyImagePullSecrets"`
 }
 
 // DebugConfig contains debug configurations for the controller.

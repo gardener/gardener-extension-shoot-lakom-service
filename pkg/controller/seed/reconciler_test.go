@@ -31,12 +31,13 @@ var _ = Describe("Reconciler", func() {
 
 	Context("getResources", func() {
 		const (
-			namespace           = "kube-system"
-			ownerNamespace      = "garden"
-			failurePolicy       = admissionregistrationv1.Ignore
-			cosignSecretName    = "extension-shoot-lakom-service-seed-cosign-public-keys-e3b0c442"
-			serverTLSSecretName = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
-			image               = "eu.gcr.io/gardener-project/gardener/extensions/lakom:v0.0.0"
+			namespace               = "kube-system"
+			ownerNamespace          = "garden"
+			failurePolicy           = admissionregistrationv1.Ignore
+			cosignSecretName        = "extension-shoot-lakom-service-seed-cosign-public-keys-e3b0c442"
+			serverTLSSecretName     = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
+			image                   = "eu.gcr.io/gardener-project/gardener/extensions/lakom:v0.0.0"
+			useOnlyImagePullSecrets = true
 
 			validatingWebhookKey  = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
 			mutatingWebhookKey    = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
@@ -78,6 +79,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				cosignPublicKeys,
 				caBundle,
 				failurePolicy,
+				useOnlyImagePullSecrets,
 			)
 
 			Expect(err).ToNot(HaveOccurred())
@@ -113,6 +115,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					cosignPublicKeys,
 					ca,
 					fp,
+					useOnlyImagePullSecrets,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -132,6 +135,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					cosignPublicKeys,
 					ca,
 					fp,
+					useOnlyImagePullSecrets,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -150,6 +154,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				cosignPublicKeys,
 				caBundle,
 				failurePolicy,
+				useOnlyImagePullSecrets,
 			)
 
 			Expect(err).ToNot(HaveOccurred())
@@ -365,6 +370,7 @@ spec:
         - --health-bind-address=:8081
         - --metrics-bind-address=:8080
         - --port=10250
+        - --use-only-image-pull-secrets=true
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:
