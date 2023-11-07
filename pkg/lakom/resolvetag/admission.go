@@ -27,10 +27,11 @@ import (
 
 // HandleBuilder implements builder pattern that builds admission handle.
 type HandleBuilder struct {
-	mgr                  manager.Manager
-	logger               logr.Logger
-	cacheTTL             time.Duration
-	cacheRefreshInterval time.Duration
+	mgr                     manager.Manager
+	logger                  logr.Logger
+	cacheTTL                time.Duration
+	cacheRefreshInterval    time.Duration
+	useOnlyImagePullSecrets bool
 }
 
 // NewHandleBuilder returns new handle builder.
@@ -42,6 +43,12 @@ func NewHandleBuilder() HandleBuilder {
 // WithManager sets the manager.
 func (hb HandleBuilder) WithManager(mgr manager.Manager) HandleBuilder {
 	hb.mgr = mgr
+	return hb
+}
+
+// WithUseOnlyImagePullSecrets sets only the image pull secrets to be used to access the OCI Registry.
+func (hb HandleBuilder) WithUseOnlyImagePullSecrets(useOnlyImagePullSecrets bool) HandleBuilder {
+	hb.useOnlyImagePullSecrets = useOnlyImagePullSecrets
 	return hb
 }
 
@@ -67,9 +74,10 @@ func (hb HandleBuilder) WithLogger(logger logr.Logger) HandleBuilder {
 func (hb HandleBuilder) Build() (*handler, error) {
 	var (
 		h = handler{
-			logger:  hb.logger,
-			reader:  hb.mgr.GetAPIReader(),
-			decoder: admission.NewDecoder(hb.mgr.GetScheme()),
+			logger:                  hb.logger,
+			reader:                  hb.mgr.GetAPIReader(),
+			decoder:                 admission.NewDecoder(hb.mgr.GetScheme()),
+			useOnlyImagePullSecrets: hb.useOnlyImagePullSecrets,
 		}
 		resolver Resolver
 	)
@@ -92,7 +100,8 @@ type handler struct {
 	decoder *admission.Decoder
 	logger  logr.Logger
 
-	resolver Resolver
+	resolver                Resolver
+	useOnlyImagePullSecrets bool
 }
 
 var (
@@ -146,7 +155,7 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logger) error {
 	logger.Info("Handling new pod request")
 
-	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, p)
+	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, p, h.useOnlyImagePullSecrets)
 
 	for idx, ic := range p.Spec.InitContainers {
 		image, err := h.handleContainer(ctx, ic.Image, kcr, logger.WithValues("initContainer", ic.Name))

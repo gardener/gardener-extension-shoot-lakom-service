@@ -30,6 +30,7 @@ cosign:
   #   -----BEGIN PUBLIC KEY-----
   #   abcd
   #   -----END PUBLIC KEY-----
+useOnlyImagePullSecrets: false
 kubeconfig: {}
 admissionConfig:
   objectSelector: {}

@@ -96,6 +96,9 @@ type Options struct {
 	CacheTTL time.Duration
 	// CacheRefreshInterval is the duration between cache evaluations if a given object needs to dropped from the cache or not.
 	CacheRefreshInterval time.Duration
+	// UseOnlyImagePullSecrets sets only the image pull secrets of the pod to be used to access the OCI registry.
+	// Otherwise, also the node identity and docker config file are used.
+	UseOnlyImagePullSecrets bool
 }
 
 // AddFlags adds lakom admission controller's flags to the specified FlagSet.
@@ -110,6 +113,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.CosignPublicKeyPath, "cosign-public-key-path", "", "Path to file with cosign public key used to verify the image signatures")
 	fs.DurationVar(&o.CacheTTL, "cache-ttl", time.Minute*10, "TTL for the cached objects. Set to 0, if cache has to be disabled")
 	fs.DurationVar(&o.CacheRefreshInterval, "cache-refresh-interval", time.Second*30, "Refresh interval for the cached objects")
+	fs.BoolVar(&o.UseOnlyImagePullSecrets, "use-only-image-pull-secrets", false, "If set, only the credentials from the image pull secrets of the pod are used to access the OCI registry. Otherwise, the node identity and docker config are also used.")
 }
 
 // validate validates all the required options.
@@ -203,6 +207,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithLogger(log.WithName("image-tag-resolver")).
 		WithCacheTTL(o.CacheTTL).
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
+		WithUseOnlyImagePullSecrets(o.UseOnlyImagePullSecrets).
 		Build()
 	if err != nil {
 		return err
@@ -224,6 +229,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithCosignPublicKeysReader(reader).
 		WithCacheTTL(o.CacheTTL).
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
+		WithUseOnlyImagePullSecrets(o.UseOnlyImagePullSecrets).
 		Build()
 	if err != nil {
 		return err

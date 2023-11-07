@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/authn/k8schain"
+	kauth "github.com/google/go-containerregistry/pkg/authn/kubernetes"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,7 +42,7 @@ func NewLazyKeyChainReader(reader func() (authn.Keychain, error)) *lazyKeyChainR
 }
 
 // NewLazyKeyChainReaderFromPod creates lazyKeyChainReader for given pod.
-func NewLazyKeyChainReaderFromPod(ctx context.Context, c client.Reader, pod *corev1.Pod) *lazyKeyChainReader {
+func NewLazyKeyChainReaderFromPod(ctx context.Context, c client.Reader, pod *corev1.Pod, useOnlyImagePullSecrets bool) *lazyKeyChainReader {
 	return NewLazyKeyChainReader(
 		func() (authn.Keychain, error) {
 			var imagePullSecrets = make([]corev1.Secret, len(pod.Spec.ImagePullSecrets))
@@ -56,6 +57,10 @@ func NewLazyKeyChainReaderFromPod(ctx context.Context, c client.Reader, pod *cor
 					return nil, err
 				}
 				imagePullSecrets = append(imagePullSecrets, *secret)
+			}
+
+			if useOnlyImagePullSecrets {
+				return kauth.NewFromPullSecrets(ctx, imagePullSecrets)
 			}
 
 			return k8schain.NewFromPullSecrets(ctx, imagePullSecrets)

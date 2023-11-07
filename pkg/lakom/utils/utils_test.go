@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/authn/k8schain"
+	kauth "github.com/google/go-containerregistry/pkg/authn/kubernetes"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -143,7 +144,8 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEC0xfVLM3nSU6tlz2k1HZ91FNrzsZ
 				ctx = context.Background()
 			)
 
-			kcr := utils.NewLazyKeyChainReaderFromPod(ctx, c, &pod)
+			By("Use image pull secrets as well as node identity and docker config")
+			kcr := utils.NewLazyKeyChainReaderFromPod(ctx, c, &pod, false)
 			Expect(kcr).ToNot(BeNil())
 
 			kc, err := kcr.GetKeyChain()
@@ -151,6 +153,19 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEC0xfVLM3nSU6tlz2k1HZ91FNrzsZ
 			Expect(kc).ToNot(BeNil())
 
 			expectedKC, err := k8schain.NewFromPullSecrets(ctx, []corev1.Secret{secret1, secret2})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kc).To(BeEquivalentTo(expectedKC))
+			Expect(kc).ToNot(BeEquivalentTo(authn.DefaultKeychain))
+
+			By("Use only image pull secret")
+			kcr = utils.NewLazyKeyChainReaderFromPod(ctx, c, &pod, true)
+			Expect(kcr).ToNot(BeNil())
+
+			kc, err = kcr.GetKeyChain()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kc).ToNot(BeNil())
+
+			expectedKC, err = kauth.NewFromPullSecrets(ctx, []corev1.Secret{secret1, secret2})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(kc).To(BeEquivalentTo(expectedKC))
 			Expect(kc).ToNot(BeEquivalentTo(authn.DefaultKeychain))
