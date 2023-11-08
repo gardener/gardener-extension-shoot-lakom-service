@@ -67,6 +67,7 @@ func autoConvert_v1alpha1_Configuration_To_config_Configuration(in *Configuratio
 	if err := Convert_v1alpha1_SeedBootstrap_To_config_SeedBootstrap(&in.SeedBootstrap, &out.SeedBootstrap, s); err != nil {
 		return err
 	}
+	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
 	return nil
 }
 
@@ -83,6 +84,7 @@ func autoConvert_config_Configuration_To_v1alpha1_Configuration(in *config.Confi
 	if err := Convert_config_SeedBootstrap_To_v1alpha1_SeedBootstrap(&in.SeedBootstrap, &out.SeedBootstrap, s); err != nil {
 		return err
 	}
+	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
 	return nil
 }
 

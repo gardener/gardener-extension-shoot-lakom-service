@@ -13,6 +13,7 @@ cosignPublicKeys:
 failurePolicy: Fail
 seedBootstrap:
   ownerNamespace: lakom-extension
+useOnlyImagePullSecrets: true
 debugConfig:
   enableProfiling: false
   enableContentionProfiling: false

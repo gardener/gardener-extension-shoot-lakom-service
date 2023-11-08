@@ -104,6 +104,18 @@ SeedBootstrap
 <p>SeedBootstrap configures the seed bootstrap controller.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>useOnlyImagePullSecrets</code></br>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>UseOnlyImagePullSecrets sets lakom to use only the image pull secrets of the pod to access the OCI registry.
+Otherwise, also the node identity and docker config file are used.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="lakom.extensions.config.gardener.cloud/v1alpha1.DebugConfig">DebugConfig

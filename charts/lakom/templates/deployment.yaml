@@ -81,6 +81,7 @@ spec:
         {{- if .Values.kubeconfig }}
         - --kubeconfig=/etc/lakom/client/kubeconfig
         {{- end }}
+        - --use-only-image-pull-secrets={{ .Values.useOnlyImagePullSecrets }}
         {{- if .Values.resources }}
         resources:
 {{ toYaml .Values.resources | trim | indent 10 }}

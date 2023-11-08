@@ -7,6 +7,7 @@ package lifecycle
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -140,6 +141,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		generatedSecrets[constants.WebhookTLSSecretName].Name,
 		a.serviceConfig.CosignPublicKeys,
 		image.String(),
+		a.serviceConfig.UseOnlyImagePullSecrets,
 	)
 	if err != nil {
 		return err
@@ -254,7 +256,7 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string) (map[string][]byte, error) {
+func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string, useOnlyImagePullSecrets bool) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -343,6 +345,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 							"--metrics-bind-address=:" + metricsPort.String(),
 							"--port=" + serverPort.String(),
 							"--kubeconfig=" + gutil.PathGenericKubeconfig,
+							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
 						},
 						Ports: []corev1.ContainerPort{
 							{
