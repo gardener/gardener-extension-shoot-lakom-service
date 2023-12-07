@@ -69,7 +69,7 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 
 		verifier, err := signature.LoadVerifier(k, crypto.SHA256)
 		if err != nil {
-			log.Info("failed creating verifier", "error", err.Error())
+			log.Info("Failed creating verifier", "error", err.Error())
 			continue
 		}
 
@@ -82,7 +82,7 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 		})
 		if err != nil {
 			if IsNoSignaturesFound(err) {
-				log.Info("no signatures found for the image", "error", err.Error())
+				log.Info("No signatures found for the image", "error", err.Error())
 				return false, nil
 			}
 
@@ -90,11 +90,11 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 				if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 					// Mitigation for https://github.com/gardener/gardener-extension-shoot-lakom-service/issues/25
 					// TODO(vpnachev): remove when https://github.com/sigstore/cosign/issues/3133 is fixed and vendored
-					log.Info("no matching signatures error detected as canceled or deadline exceeded context", "error", err)
+					log.Info("No matching signatures error detected as canceled or deadline exceeded context", "error", err)
 					return false, err
 				}
 
-				log.Info("no matching signatures found for current public key", "error", err.Error())
+				log.Info("No matching signatures found for current public key", "error", err.Error())
 				continue
 			}
 
@@ -104,15 +104,15 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 		if len(checkedSignatures) == 0 {
 			// the cosign library is returning an error if the checkedSignatures are 0
 			// but this can changed in a future version and break us
-			log.Info("found no valid signatures")
+			log.Info("Found no valid signatures")
 			continue
 		}
 
-		log.Info("image signature successfully verified")
+		log.Info("Image signature successfully verified")
 		return true, nil
 	}
 
-	logger.Info("image signature verification failed for all configured keys")
+	logger.Info("Image signature verification failed for all configured keys")
 	return false, nil
 }
 
