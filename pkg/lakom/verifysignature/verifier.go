@@ -163,19 +163,21 @@ func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyC
 // IsNoMatchingSignature checks if error is of type
 // [cosign.ErrNoMatchingSignaturesType].
 func IsNoMatchingSignature(err error) bool {
-	var verErr *cosign.VerificationError
-	if errors.As(err, &verErr) {
-		return verErr.ErrorType() == cosign.ErrNoMatchingSignaturesType
+	switch err.(type) {
+	case *cosign.ErrNoMatchingSignatures:
+		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // IsNoSignaturesFound checks if error is of type
 // [cosign.ErrNoSignaturesFoundType].
 func IsNoSignaturesFound(err error) bool {
-	var verErr *cosign.VerificationError
-	if errors.As(err, &verErr) {
-		return verErr.ErrorType() == cosign.ErrNoSignaturesFoundType
+	switch err.(type) {
+	case *cosign.ErrNoSignaturesFound:
+		return true
+	default:
+		return false
 	}
-	return false
 }

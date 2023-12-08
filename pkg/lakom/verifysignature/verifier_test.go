@@ -169,16 +169,14 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 	})
 
 	It("Should detect NoMatchingSignature error", func() {
-		noMathcingSignatureErr := &cosign.VerificationError{}
-		noMathcingSignatureErr.SetErrorType(cosign.ErrNoMatchingSignaturesType)
+		noMathcingSignatureErr := &cosign.ErrNoMatchingSignatures{}
 
 		Expect(verifysignature.IsNoMatchingSignature(noMathcingSignatureErr)).To(BeTrue())
 		Expect(verifysignature.IsNoMatchingSignature(fmt.Errorf("some other error"))).To(BeFalse())
 	})
 
 	It("Should detect NoSignaturesFoundType error", func() {
-		noSignatureFound := &cosign.VerificationError{}
-		noSignatureFound.SetErrorType(cosign.ErrNoSignaturesFoundType)
+		noSignatureFound := &cosign.ErrNoSignaturesFound{}
 
 		Expect(verifysignature.IsNoSignaturesFound(noSignatureFound)).To(BeTrue())
 		Expect(verifysignature.IsNoSignaturesFound(fmt.Errorf("some other error"))).To(BeFalse())
