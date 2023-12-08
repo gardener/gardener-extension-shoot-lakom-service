@@ -87,9 +87,10 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 			}
 
 			if IsNoMatchingSignature(err) {
-				if errors.Is(err, context.Canceled) {
+				if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 					// Mitigation for https://github.com/gardener/gardener-extension-shoot-lakom-service/issues/25
 					// TODO(vpnachev): remove when https://github.com/sigstore/cosign/issues/3133 is fixed and vendored
+					log.Info("no matching signatures error detected as canceled or deadline exceeded context", "error", err)
 					return false, err
 				}
 
