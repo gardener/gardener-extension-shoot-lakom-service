@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 gardener-extension-shoot-lakom-service:
-  template: 'default'
   base_definition:
     traits:
       version:
@@ -15,12 +14,10 @@ gardener-extension-shoot-lakom-service:
         - linux/arm64
         dockerimages:
           gardener-extension-shoot-lakom-service:
-            registry: 'gcr-readwrite'
             image: 'eu.gcr.io/gardener-project/gardener/extensions/shoot-lakom-service'
             dockerfile: 'Dockerfile'
             target: gardener-extension-shoot-lakom-service
           lakom:
-            registry: 'gcr-readwrite'
             image: 'eu.gcr.io/gardener-project/gardener/extensions/lakom'
             dockerfile: 'Dockerfile'
             target: lakom
