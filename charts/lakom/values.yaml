@@ -7,7 +7,7 @@ name: lakom-admission-controller
 image:
   pullPolicy: IfNotPresent
   tag: latest
-  repository: eu.gcr.io/gardener-project/gardener/extensions/lakom
+  repository: europe-docker.pkg.dev/gardener-project/public/gardener/extensions/lakom
 
 replicaCount: 3
 resources:

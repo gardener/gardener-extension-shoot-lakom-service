@@ -6,4 +6,4 @@
 images:
 - name: lakom
   sourceRepository: github.com/gardener/gardener-extension-shoot-lakom-service
-  repository: eu.gcr.io/gardener-project/gardener/extensions/lakom
+  repository: europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom

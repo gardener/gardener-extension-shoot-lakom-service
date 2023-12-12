@@ -80,14 +80,14 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", false, true, "could not parse reference"),
 			Entry("Refuse to verify image not using digest", "k8s.gcr.io/pause:3.7", false, true, "image reference is not a digest"),
 			Entry("Successfully verify signed image", "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429", true, false, ""),
-			Entry("Successfully verify unsigned image", "eu.gcr.io/gardener-project/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", false, false, ""),
+			Entry("Successfully verify unsigned image", "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", false, false, ""),
 		)
 
 		It("Should fail image verification when context is canceled", func() {
 			canceledCtx, cancel := context.WithCancel(ctx)
 			cancel()
 
-			verified, err := directVerifier.Verify(canceledCtx, "eu.gcr.io/gardener-project/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", kcr)
+			verified, err := directVerifier.Verify(canceledCtx, "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", kcr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("context canceled"))
 			Expect(verified).To(BeFalse())
@@ -136,7 +136,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", false, true, "could not parse reference"),
 			Entry("Refuse to verify image not using digest", "k8s.gcr.io/pause:3.7", false, true, "image reference is not a digest"),
 			Entry("Successfully verify signed image", "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429", true, false, ""),
-			Entry("Successfully verify unsigned image", "eu.gcr.io/gardener-project/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", false, false, ""),
+			Entry("Successfully verify unsigned image", "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", false, false, ""),
 		)
 
 		It("Should not run real validation for cached result", func() {
@@ -156,7 +156,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			canceledCtx, cancel := context.WithCancel(ctx)
 			cancel()
 
-			image := "eu.gcr.io/gardener-project/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e" // #nosec G101
+			image := "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e" // #nosec G101
 			verified, err := cachedVerifier.Verify(canceledCtx, image, kcr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("context canceled"))
