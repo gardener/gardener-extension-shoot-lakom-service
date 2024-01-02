@@ -8,6 +8,7 @@ import (
 	b64 "encoding/base64"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -54,6 +55,9 @@ var _ = Describe("Reconciler", func() {
 		var (
 			cosignPublicKeys []string
 			caBundle         = []byte("caBundle")
+			err              error
+			resources        map[string][]byte
+			k8sVersion       *semver.Version
 		)
 
 		BeforeEach(func() {
@@ -71,40 +75,68 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 
 		})
 
-		It("Should ensure the correct resources are created", func() {
+		Context("different kubernetes versions", func() {
 
-			resources, err := getResources(
-				serverTLSSecretName,
-				image,
-				cosignPublicKeys,
-				caBundle,
-				failurePolicy,
-				useOnlyImagePullSecrets,
-			)
+			JustBeforeEach(func() {
+				resources, err = getResources(
+					serverTLSSecretName,
+					image,
+					cosignPublicKeys,
+					caBundle,
+					failurePolicy,
+					useOnlyImagePullSecrets,
+					k8sVersion,
+				)
 
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resources).To(HaveLen(10))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resources).To(HaveLen(10))
 
-			expectedResources := map[string]string{
-				validatingWebhookKey:  expectedValidatingWebhook(caBundle, failurePolicy),
-				mutatingWebhookKey:    expectedMutatingWebhook(caBundle, failurePolicy),
-				clusterRoleKey:        expectedClusterRole(),
-				clusterRoleBindingKey: expectedClusterRoleBinding(),
-				deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName),
-				pdbKey:                expectedPDB(namespace),
-				cosignSecretNameKey:   expectedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
-				serviceKey:            expectedService(namespace),
-				serviceAccountKey:     expectedServiceAccount(namespace),
-				vpaKey:                expectedVPA(namespace),
-			}
+				expectedResources := map[string]string{
+					validatingWebhookKey:  expectedValidatingWebhook(caBundle, failurePolicy),
+					mutatingWebhookKey:    expectedMutatingWebhook(caBundle, failurePolicy),
+					clusterRoleKey:        expectedClusterRole(),
+					clusterRoleBindingKey: expectedClusterRoleBinding(),
+					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName),
+					cosignSecretNameKey:   expectedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
+					serviceKey:            expectedService(namespace),
+					serviceAccountKey:     expectedServiceAccount(namespace),
+					vpaKey:                expectedVPA(namespace),
+				}
 
-			for key, expectedResource := range expectedResources {
-				resource, ok := resources[key]
-				Expect(ok).To(BeTrue())
+				for key, expectedResource := range expectedResources {
+					resource, ok := resources[key]
+					Expect(ok).To(BeTrue())
 
-				strResource := string(resource)
-				Expect(strResource).To(Equal(expectedResource), key, string(resource))
-			}
+					strResource := string(resource)
+					Expect(strResource).To(Equal(expectedResource), key, string(resource))
+				}
+			})
+
+			Context("kubernetes version < 1.26", func() {
+				BeforeEach(func() {
+					k8sVersion = semver.MustParse("1.25.0")
+				})
+
+				It("Should ensure the correct resources are created", func() {
+					pdb, ok := resources[pdbKey]
+					Expect(ok).To(BeTrue())
+
+					Expect(string(pdb)).To(Equal(expectedPDB(namespace, false)), pdbKey)
+				})
+			})
+
+			Context("kubernetes version >= 1.26", func() {
+				BeforeEach(func() {
+					k8sVersion = semver.MustParse("1.26.0")
+				})
+
+				It("Should ensure the correct resources are created", func() {
+					pdb, ok := resources[pdbKey]
+					Expect(ok).To(BeTrue())
+
+					Expect(string(pdb)).To(Equal(expectedPDB(namespace, true)), pdbKey)
+				})
+			})
 		})
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
@@ -116,6 +148,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					fp,
 					useOnlyImagePullSecrets,
+					semver.MustParse("1.27.0"),
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -136,6 +169,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					fp,
 					useOnlyImagePullSecrets,
+					semver.MustParse("1.27.0"),
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -155,6 +189,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				caBundle,
 				failurePolicy,
 				useOnlyImagePullSecrets,
+				semver.MustParse("1.27.0"),
 			)
 
 			Expect(err).ToNot(HaveOccurred())
@@ -417,9 +452,8 @@ status: {}
 `
 }
 
-func expectedPDB(namespace string) string {
-
-	return `apiVersion: policy/v1
+func expectedPDB(namespace string, k8sGreaterEqual126 bool) string {
+	out := `apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   creationTimestamp: null
@@ -434,12 +468,18 @@ spec:
     matchLabels:
       app.kubernetes.io/name: lakom-seed
       app.kubernetes.io/part-of: shoot-lakom-service
-status:
+`
+	if k8sGreaterEqual126 {
+		out += `  unhealthyPodEvictionPolicy: AlwaysAllow
+`
+	}
+	out += `status:
   currentHealthy: 0
   desiredHealthy: 0
   disruptionsAllowed: 0
   expectedPods: 0
 `
+	return out
 }
 
 func expectedSecretCosign(namespace, cosignSecretName string, cosignPublicKeys []string) string {

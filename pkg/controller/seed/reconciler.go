@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
@@ -25,6 +26,7 @@ import (
 	"github.com/gardener/gardener/pkg/utils/managedresources"
 	secretutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
+	versionutils "github.com/gardener/gardener/pkg/utils/version"
 	"github.com/go-logr/logr"
 	admissionregistration "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -46,8 +48,9 @@ import (
 )
 
 type kubeSystemReconciler struct {
-	client        client.Client
-	serviceConfig config.Configuration
+	client         client.Client
+	seedK8sVersion *semver.Version
+	serviceConfig  config.Configuration
 }
 
 // Reconcile installs the lakom admission controller in the kube-system namespace.
@@ -117,6 +120,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		failurePolicy,
 		kcr.serviceConfig.UseOnlyImagePullSecrets,
+		kcr.seedK8sVersion,
 	)
 	if err != nil {
 		return err
@@ -180,7 +184,7 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	return nil
 }
 
-func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType, useOnlyImagePullSecrets bool) (map[string][]byte, error) {
+func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType, useOnlyImagePullSecrets bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -400,19 +404,25 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		},
 	}
 
+	unhealthyPodEvictionPolicyAlwaysAllow := policyv1.AlwaysAllow
+	pdb := &policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      constants.SeedExtensionServiceName,
+			Namespace: kubeSystemNamespace,
+			Labels:    getLabels(),
+		},
+		Spec: policyv1.PodDisruptionBudgetSpec{
+			MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
+		},
+	}
+	if versionutils.ConstraintK8sGreaterEqual126.Check(k8sVersion) {
+		pdb.Spec.UnhealthyPodEvictionPolicy = &unhealthyPodEvictionPolicyAlwaysAllow
+	}
+
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
-		&policyv1.PodDisruptionBudget{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.SeedExtensionServiceName,
-				Namespace: kubeSystemNamespace,
-				Labels:    getLabels(),
-			},
-			Spec: policyv1.PodDisruptionBudgetSpec{
-				MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-				Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
-			},
-		},
+		pdb,
 		&cosignPublicKeysSecret,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
