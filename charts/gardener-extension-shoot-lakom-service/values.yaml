@@ -8,7 +8,7 @@ replicaCount: 3
 image:
   pullPolicy: IfNotPresent
   tag: latest
-  repository: eu.gcr.io/gardener-project/gardener/extensions/shoot-lakom-service
+  repository: europe-docker.pkg.dev/gardener-project/public/gardener/extensions/shoot-lakom-service
 
 imageVectorOverwrite: {}
   # images:

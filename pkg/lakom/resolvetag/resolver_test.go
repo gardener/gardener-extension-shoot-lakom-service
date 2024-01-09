@@ -74,7 +74,7 @@ var _ = Describe("Resolver", func() {
 			Entry("Do not run actual resolving of image with digest", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", true, false, ""),
 			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", "", true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
 			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", "", true, false, "tag can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-.ABCDEFGHIJKLMNOPQRSTUVWXYZ`"),
-			Entry("Fail to get non-existing image", "eu.gcr.io/gardener-project/non-existing-image:123", "", false, true, "unexpected status code 404 Not Found"),
+			Entry("Fail to get non-existing image", "europe-docker.pkg.dev/gardener-project/releases/non-existing-image:123", "", false, true, "unexpected status code 404 Not Found"),
 		)
 	})
 
@@ -107,7 +107,7 @@ var _ = Describe("Resolver", func() {
 			Entry("Do not run actual resolving of image with digest", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", true, false, ""),
 			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", "", true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
 			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", "", true, false, "tag can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-.ABCDEFGHIJKLMNOPQRSTUVWXYZ`"),
-			Entry("Fail to get non-existing image", "eu.gcr.io/gardener-project/non-existing-image:123", "", false, true, "unexpected status code 404 Not Found"),
+			Entry("Fail to get non-existing image", "europe-docker.pkg.dev/gardener-project/releases/non-existing-image:123", "", false, true, "unexpected status code 404 Not Found"),
 		)
 
 		It("Should uses the cache to resolve the image", func() {

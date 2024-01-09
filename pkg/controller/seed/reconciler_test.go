@@ -36,7 +36,7 @@ var _ = Describe("Reconciler", func() {
 			failurePolicy           = admissionregistrationv1.Ignore
 			cosignSecretName        = "extension-shoot-lakom-service-seed-cosign-public-keys-e3b0c442"
 			serverTLSSecretName     = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
-			image                   = "eu.gcr.io/gardener-project/gardener/extensions/lakom:v0.0.0"
+			image                   = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			useOnlyImagePullSecrets = true
 
 			validatingWebhookKey  = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"

@@ -119,7 +119,7 @@ var _ = Describe("Actuator", func() {
 			genericKubeconfigName         = "generic-kubeconfig"
 			shootAccessServiceAccountName = "extension-shoot-lakom-service"
 			serverTLSSecretName           = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
-			image                         = "eu.gcr.io/gardener-project/gardener/extensions/lakom:v0.0.0"
+			image                         = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			useOnlyImagePullSecrets       = true
 			cosignSecretName              = "extension-shoot-lakom-service-cosign-public-keys-e3b0c442"
 
