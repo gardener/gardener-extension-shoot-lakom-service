@@ -14,7 +14,7 @@
 #   command: [bash, -c]
 #   args:
 #   - >-
-#     go test -timeout=25m -mod=vendor ./test/system/lifecycle
+#     go test -timeout=25m ./test/system/lifecycle
 #     --v -ginkgo.v -ginkgo.progress -ginkgo.noColor
 #     --shoot-name=$SHOOT_NAME
 #     --project-namespace=$PROJECT_NAMESPACE

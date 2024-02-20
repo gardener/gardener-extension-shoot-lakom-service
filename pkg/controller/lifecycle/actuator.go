@@ -48,7 +48,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/version"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -78,10 +78,10 @@ type actuator struct {
 func getLakomReplicas(hibernated bool) *int32 {
 	// Scale to 0 if cluster is hibernated
 	if hibernated {
-		return pointer.Int32(0)
+		return ptr.To[int32](0)
 	}
 
-	return pointer.Int32(3)
+	return ptr.To[int32](3)
 }
 
 // Reconcile the Extension resource.
@@ -130,7 +130,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	}
 
 	if image.Tag == nil {
-		image.Tag = pointer.String(version.Get().GitVersion)
+		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
 	seedResources, err := getSeedResources(
@@ -311,7 +311,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas:             lakomReplicas,
-			RevisionHistoryLimit: pointer.Int32(2),
+			RevisionHistoryLimit: ptr.To[int32](2),
 			Selector:             &metav1.LabelSelector{MatchLabels: getLabels()},
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
@@ -342,7 +342,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 							}},
 						},
 					},
-					AutomountServiceAccountToken: pointer.Bool(false),
+					AutomountServiceAccountToken: ptr.To[bool](false),
 					ServiceAccountName:           constants.ExtensionServiceName,
 					Containers: []corev1.Container{{
 						Name:            constants.ApplicationName,
@@ -494,7 +494,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 				Namespace: namespace,
 				Labels:    getLabels(),
 			},
-			AutomountServiceAccountToken: pointer.Bool(false),
+			AutomountServiceAccountToken: ptr.To[bool](false),
 		},
 		lakomService,
 		&vpaautoscalingv1.VerticalPodAutoscaler{
@@ -570,7 +570,7 @@ func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAcco
 	var (
 		matchPolicy          = admissionregistration.Equivalent
 		sideEffectClass      = admissionregistration.SideEffectClassNone
-		timeOutSeconds       = pointer.Int32(25)
+		timeOutSeconds       = ptr.To[int32](25)
 		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, namespace)
 		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
 		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
