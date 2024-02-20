@@ -6,6 +6,7 @@ ENSURE_GARDENER_MOD         := $(shell go get github.com/gardener/gardener@$$(go
 GARDENER_HACK_DIR           := $(shell go list -m -f "{{.Dir}}" github.com/gardener/gardener)/hack
 EXTENSION_PREFIX            := gardener-extension
 EXTENSION_NAME              := shoot-lakom-service
+EXTENSION_FULL_NAME         := $(EXTENSION_PREFIX)-$(EXTENSION_NAME)
 ADMISSION_NAME              := lakom
 REGISTRY                    := europe-docker.pkg.dev/gardener-project/public
 IMAGE_PREFIX                := $(REGISTRY)/gardener/extensions
@@ -29,13 +30,14 @@ ifneq ($(strip $(shell git status --porcelain 2>/dev/null)),)
 	EFFECTIVE_VERSION := $(EFFECTIVE_VERSION)-dirty
 endif
 
-LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(EXTENSION_NAME))"
+EXTENSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(EXTENSION_NAME))"
+ADMISSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(ADMISSION_NAME))"
 
 .PHONY: start
 start:
 	@LEADER_ELECTION_NAMESPACE=$(LEADER_ELECTION_NAMESPACE) go run \
-		-ldflags $(LD_FLAGS) \
-		./cmd/$(EXTENSION_PREFIX)-$(EXTENSION_NAME) \
+		-ldflags $(EXTENSION_LD_FLAGS) \
+		./cmd/$(EXTENSION_FULL_NAME) \
 		--ignore-operation-annotation=$(IGNORE_OPERATION_ANNOTATION) \
 		--leader-election=$(LEADER_ELECTION) \
 		--leader-election-id=extension-shoot-lakom-service-leader-election \
@@ -44,7 +46,7 @@ start:
 .PHONY: start-lakom
 start-lakom:
 	@go run \
-		-ldflags $(LD_FLAGS) \
+		-ldflags $(ADMISSION_LD_FLAGS) \
 		./cmd/$(ADMISSION_NAME) \
 		--kubeconfig=$(KUBECONFIG) \
 		--tls-cert-dir=example/lakom/tls/ \
@@ -54,9 +56,9 @@ start-lakom:
 
 .PHONE: dev-setup
 dev-setup: $(COSIGN)
-	$(HACK_DIR)/generate-certificates.sh
-	$(HACK_DIR)/configure-webhook.sh
-	$(HACK_DIR)/generate-cosign-key-pair.sh
+	@$(HACK_DIR)/generate-certificates.sh
+	@$(HACK_DIR)/configure-webhook.sh
+	@$(HACK_DIR)/generate-cosign-key-pair.sh
 
 #################################################################
 # Rules related to binary build, Docker image build and release #
@@ -64,8 +66,10 @@ dev-setup: $(COSIGN)
 
 .PHONY: install
 install:
-	@LD_FLAGS=$(LD_FLAGS) \
-		bash $(GARDENER_HACK_DIR)/install.sh ./...
+	@LD_FLAGS=$(EXTENSION_LD_FLAGS) \
+		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(EXTENSION_FULL_NAME)
+	@LD_FLAGS=$(ADMISSION_LD_FLAGS) \
+		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(ADMISSION_NAME)
 
 .PHONY: docker-login
 docker-login:
@@ -73,7 +77,7 @@ docker-login:
 
 .PHONY: docker-images
 docker-images:
-	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):latest -f Dockerfile -m 6g --target $(EXTENSION_PREFIX)-$(EXTENSION_NAME) .
+	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):latest -f Dockerfile -m 6g --target $(EXTENSION_FULL_NAME) .
 	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):latest -f Dockerfile -m 6g --target $(ADMISSION_NAME) .
 
 #####################################################################
