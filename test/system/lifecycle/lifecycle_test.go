@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -59,10 +60,10 @@ var _ = Describe("Shoot lakom service testing", func() {
 
 	AfterEach(func() {
 		// Revert to initial extension configuration
-		f.UpdateShoot(context.Background(), func(shoot *gardencorev1beta1.Shoot) error {
+		Expect(f.UpdateShoot(context.Background(), func(shoot *gardencorev1beta1.Shoot) error {
 			shoot.Spec.Extensions = initialExtensionConfig
 			return nil
-		})
+		})).To(Succeed())
 	})
 
 	f.Serial().Beta().CIt("Should perform the common case scenario without any errors", func(ctx context.Context) {
@@ -182,7 +183,7 @@ var _ = Describe("Shoot lakom service testing", func() {
 		}
 
 		// Ensure that the Lakom service is disabled in order to verify the deletion process
-		f.UpdateShoot(ctx, ensureLakomServiceIsEnabled)
+		Expect(f.UpdateShoot(ctx, ensureLakomServiceIsDisabled)).To(Succeed())
 
 		// Ensure that lakom deployment is deleted
 		err = f.SeedClient.Client().Get(ctx, client.ObjectKeyFromObject(lakomDeployment), lakomDeployment)
@@ -211,7 +212,7 @@ func ensureLakomServiceIsEnabled(shoot *gardencorev1beta1.Shoot) error {
 	for i, e := range shoot.Spec.Extensions {
 		if e.Type == constants.ExtensionType {
 			if e.Disabled != nil && *e.Disabled == true {
-				shoot.Spec.Extensions[i].Disabled = ptr[bool](false)
+				shoot.Spec.Extensions[i].Disabled = ptr.To[bool](false)
 			}
 			return nil
 		}
@@ -219,7 +220,7 @@ func ensureLakomServiceIsEnabled(shoot *gardencorev1beta1.Shoot) error {
 
 	shoot.Spec.Extensions = append(shoot.Spec.Extensions, gardencorev1beta1.Extension{
 		Type:     constants.ExtensionType,
-		Disabled: ptr[bool](false),
+		Disabled: ptr.To[bool](false),
 	})
 	return nil
 }
@@ -227,7 +228,7 @@ func ensureLakomServiceIsEnabled(shoot *gardencorev1beta1.Shoot) error {
 func ensureLakomServiceIsDisabled(shoot *gardencorev1beta1.Shoot) error {
 	for i, e := range shoot.Spec.Extensions {
 		if e.Type == constants.ExtensionType {
-			shoot.Spec.Extensions[i].Disabled = ptr[bool](true)
+			shoot.Spec.Extensions[i].Disabled = ptr.To[bool](true)
 			return nil
 		}
 	}
@@ -265,7 +266,7 @@ func getJWKS(ctx context.Context, client rest.Interface, relativeUri string) ([]
 }
 
 func requestAPIServer(ctx context.Context, caBundle []byte, apiserverURL, bearerToken string) (*metav1.Status, error) {
-	req, err := http.NewRequest("GET", apiserverURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", apiserverURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +277,8 @@ func requestAPIServer(ctx context.Context, caBundle []byte, apiserverURL, bearer
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				RootCAs: caCertPool,
+				RootCAs:    caCertPool,
+				MinVersion: tls.VersionTLS12,
 			},
 		},
 	}

@@ -100,7 +100,7 @@ check-generate:
 
 .PHONY: check
 check: $(GOIMPORTS) $(GOLANGCI_LINT) $(HELM)
-	@bash $(GARDENER_HACK_DIR)/check.sh --golangci-lint-config=./.golangci.yaml ./cmd/... ./pkg/... # ./test/... # TODO(vpnachev): uncomment when tests are implemented
+	@bash $(GARDENER_HACK_DIR)/check.sh --golangci-lint-config=./.golangci.yaml ./cmd/... ./pkg/... ./test/...
 	@bash $(GARDENER_HACK_DIR)/check-charts.sh ./charts
 
 .PHONY: generate
