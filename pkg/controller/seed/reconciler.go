@@ -39,7 +39,7 @@ import (
 	vpaautoscalingv1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	"k8s.io/component-base/version"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -99,7 +99,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		return fmt.Errorf("failed to find image version for %s: %v", constants.ImageName, err)
 	}
 	if image.Tag == nil {
-		image.Tag = pointer.String(version.Get().GitVersion)
+		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
 	var (
@@ -166,7 +166,7 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	}
 
 	ownerRef := metav1.NewControllerRef(&owner, corev1.SchemeGroupVersion.WithKind("Namespace"))
-	ownerRef.BlockOwnerDeletion = pointer.Bool(false)
+	ownerRef.BlockOwnerDeletion = ptr.To[bool](false)
 
 	for _, s := range secretList.Items {
 		secret := s.DeepCopy()
@@ -198,7 +198,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		kubeSystemNamespace        = metav1.NamespaceSystem
 		matchPolicy                = admissionregistration.Equivalent
 		sideEffectClass            = admissionregistration.SideEffectClassNone
-		timeOutSeconds             = pointer.Int32(25)
+		timeOutSeconds             = ptr.To[int32](25)
 		namespaceSelector          = metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
@@ -244,8 +244,8 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 			}),
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas:             pointer.Int32(3),
-			RevisionHistoryLimit: pointer.Int32(2),
+			Replicas:             ptr.To[int32](3),
+			RevisionHistoryLimit: ptr.To[int32](2),
 			Selector:             &metav1.LabelSelector{MatchLabels: getLabels()},
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
@@ -276,7 +276,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 						},
 					},
 					ServiceAccountName:           constants.SeedExtensionServiceName,
-					AutomountServiceAccountToken: pointer.Bool(true),
+					AutomountServiceAccountToken: ptr.To[bool](true),
 					Containers: []corev1.Container{{
 						Name:            constants.SeedApplicationName,
 						Image:           image,
@@ -420,7 +420,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 				Namespace: kubeSystemNamespace,
 				Labels:    getLabels(),
 			},
-			AutomountServiceAccountToken: pointer.Bool(false),
+			AutomountServiceAccountToken: ptr.To[bool](false),
 		},
 		lakomService,
 		&vpaautoscalingv1.VerticalPodAutoscaler{
@@ -468,7 +468,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 					Service: &admissionregistration.ServiceReference{
 						Namespace: kubeSystemNamespace,
 						Name:      constants.SeedExtensionServiceName,
-						Path:      pointer.String(constants.LakomResolveTagPath),
+						Path:      ptr.To[string](constants.LakomResolveTagPath),
 					},
 					CABundle: webhookCaBundle,
 				},
@@ -492,7 +492,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 					Service: &admissionregistration.ServiceReference{
 						Namespace: kubeSystemNamespace,
 						Name:      constants.SeedExtensionServiceName,
-						Path:      pointer.String(constants.LakomVerifyCosignSignaturePath),
+						Path:      ptr.To[string](constants.LakomVerifyCosignSignaturePath),
 					},
 					CABundle: webhookCaBundle,
 				},
