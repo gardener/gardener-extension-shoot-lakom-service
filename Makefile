@@ -71,10 +71,6 @@ install:
 	@LD_FLAGS=$(ADMISSION_LD_FLAGS) \
 		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(ADMISSION_NAME)
 
-.PHONY: docker-login
-docker-login:
-	@gcloud auth activate-service-account --key-file .kube-secrets/gcr/gcr-readwrite.json
-
 .PHONY: docker-images
 docker-images:
 	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):latest -f Dockerfile -m 6g --target $(EXTENSION_FULL_NAME) .
@@ -108,9 +104,11 @@ check: $(GOIMPORTS) $(GOLANGCI_LINT) $(HELM)
 	@bash $(GARDENER_HACK_DIR)/check-charts.sh ./charts
 
 .PHONY: generate
-generate: $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ)
-	@hack/update-codegen.sh --parallel
-	@bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./pkg/... ./test/...
+generate: $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ) $(VGOPATH)
+	@VGOPATH=$(VGOPATH) REPO_ROOT=$(REPO_ROOT) GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) \
+		hack/update-codegen.sh --parallel
+	@VGOPATH=$(VGOPATH) REPO_ROOT=$(REPO_ROOT) GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) \
+		bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./pkg/... ./test/...
 	@$(HACK_DIR)/set-controller-deployment-policy-to-always.sh
 
 .PHONY: format
