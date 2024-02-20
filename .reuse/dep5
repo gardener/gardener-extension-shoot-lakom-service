@@ -9,8 +9,10 @@ Comment:
 # --------------------------------------------------
 # source code
 Files:
+  .ci/hack/*
   .gitignore
   .golangci.yaml
+  .github/dependabot.yaml
   CODEOWNERS
   VERSION
   charts/gardener-extension-shoot-lakom-service/.helmignore
@@ -21,6 +23,7 @@ Files:
   charts/lakom/templates/_versions.tpl
   config/lakom/cosign/password
   example/controller-registration.yaml
+  hack/cherry-pick-pull.sh
   go.mod
   go.sum
   *.json
@@ -34,6 +37,20 @@ Files:
   *.md
 Copyright: 2022 SAP SE or an SAP affiliate company and Gardener contributors
 License: CC-BY-4.0
+
+# --------------------------------------------------
+# third-party
+Files:
+  pkg/lakom/utils/cosign_utils.go
+Copyright: Copyright 2021 The Sigstore Authors.
+License: Apache-2.0
+
+Files:
+  pkg/admission/admission_suite_test.go
+  pkg/admission/http.go
+  pkg/admission/http_test.go
+Copyright: Copyright 2018 The Kubernetes Authors.
+License: Apache-2.0
 
 # --------------------------------------------------
 # source (vendored) dependencies
