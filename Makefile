@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+ENSURE_GARDENER_MOD         := $(shell go get github.com/gardener/gardener@$$(go list -m -f "{{.Version}}" github.com/gardener/gardener))
+GARDENER_HACK_DIR           := $(shell go list -m -f "{{.Dir}}" github.com/gardener/gardener)/hack
 EXTENSION_PREFIX            := gardener-extension
 EXTENSION_NAME              := shoot-lakom-service
 ADMISSION_NAME              := lakom
@@ -20,19 +22,18 @@ KUBECONFIG                  ?= $(HOME)/.kube/config
 GOARCH                      ?= $(shell go env GOARCH)
 
 TOOLS_DIR := $(HACK_DIR)/tools
-include $(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/tools.mk
+include $(GARDENER_HACK_DIR)/tools.mk
 include $(REPO_ROOT)/hack/tools.mk
 
 ifneq ($(strip $(shell git status --porcelain 2>/dev/null)),)
 	EFFECTIVE_VERSION := $(EFFECTIVE_VERSION)-dirty
 endif
 
-LD_FLAGS := "-w $(shell $(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(EXTENSION_PREFIX)-$(EXTENSION_NAME))"
+LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(EXTENSION_NAME))"
 
 .PHONY: start
 start:
-	@LEADER_ELECTION_NAMESPACE=$(LEADER_ELECTION_NAMESPACE) GO111MODULE=on go run \
-		-mod=vendor \
+	@LEADER_ELECTION_NAMESPACE=$(LEADER_ELECTION_NAMESPACE) go run \
 		-ldflags $(LD_FLAGS) \
 		./cmd/$(EXTENSION_PREFIX)-$(EXTENSION_NAME) \
 		--ignore-operation-annotation=$(IGNORE_OPERATION_ANNOTATION) \
@@ -42,8 +43,7 @@ start:
 
 .PHONY: start-lakom
 start-lakom:
-	GO111MODULE=on go run \
-		-mod=vendor \
+	@go run \
 		-ldflags $(LD_FLAGS) \
 		./cmd/$(ADMISSION_NAME) \
 		--kubeconfig=$(KUBECONFIG) \
@@ -65,7 +65,7 @@ dev-setup: $(COSIGN)
 .PHONY: install
 install:
 	@LD_FLAGS=$(LD_FLAGS) \
-		$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/install.sh ./...
+		bash $(GARDENER_HACK_DIR)/install.sh ./...
 
 .PHONY: docker-login
 docker-login:
@@ -80,53 +80,51 @@ docker-images:
 # Rules for verification, formatting, linting, testing and cleaning #
 #####################################################################
 
-.PHONY: revendor
-revendor:
-	@GO111MODULE=on go mod tidy
-	@GO111MODULE=on go mod vendor
-	@chmod +x $(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/*
-	@chmod +x $(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/.ci/*
+.PHONY: tidy
+tidy:
+	@go mod tidy
+	@mkdir -p $(REPO_ROOT)/.ci/hack
+	@cp $(GARDENER_HACK_DIR)/.ci/* $(REPO_ROOT)/.ci/hack/
+	@chmod +xw $(REPO_ROOT)/.ci/hack/*
+	@cp $(GARDENER_HACK_DIR)/cherry-pick-pull.sh $(HACK_DIR)/cherry-pick-pull.sh && chmod +xw $(HACK_DIR)/cherry-pick-pull.sh
 #	@$(HACK_DIR)/update-github-templates.sh
-	@rm -f $(REPO_ROOT)/vendor/github.com/go-openapi/validate/appveyor.yml \
-		$(REPO_ROOT)/vendor/github.com/go-openapi/analysis/appveyor.yml \
-		$(REPO_ROOT)/vendor/github.com/go-openapi/spec/appveyor.yml
 
 .PHONY: clean
 clean:
 	@$(shell find ./example -type f -name "controller-registration.yaml" -exec rm '{}' \;)
-	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/clean.sh ./cmd/... ./pkg/... ./test/...
+	@bash $(GARDENER_HACK_DIR)/clean.sh ./cmd/... ./pkg/... ./test/...
 
 .PHONY: check-generate
 check-generate:
-	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/check-generate.sh $(REPO_ROOT)
+	@bash $(GARDENER_HACK_DIR)/check-generate.sh $(REPO_ROOT)
 
 .PHONY: check
 check: $(GOIMPORTS) $(GOLANGCI_LINT) $(HELM)
-	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/check.sh --golangci-lint-config=./.golangci.yaml ./cmd/... ./pkg/... # ./test/... # TODO(vpnachev): uncomment when tests are implemented
-	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/check-charts.sh ./charts
+	@bash $(GARDENER_HACK_DIR)/check.sh --golangci-lint-config=./.golangci.yaml ./cmd/... ./pkg/... # ./test/... # TODO(vpnachev): uncomment when tests are implemented
+	@bash $(GARDENER_HACK_DIR)/check-charts.sh ./charts
 
 .PHONY: generate
 generate: $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ)
-	@GO111MODULE=off hack/update-codegen.sh --parallel
-	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/generate-sequential.sh ./charts/... ./cmd/... ./pkg/... ./test/...
+	@hack/update-codegen.sh --parallel
+	@bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./pkg/... ./test/...
 	@$(HACK_DIR)/set-controller-deployment-policy-to-always.sh
 
 .PHONY: format
 format: $(GOIMPORTSREVISER)
 	@GOIMPORTS_REVISER_OPTIONS="-imports-order std,project,general,company" \
-		$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/format.sh ./cmd ./pkg ./test
+		bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test
 
 .PHONY: test
 test: $(REPORT_COLLECTOR)
-	@SKIP_FETCH_TOOLS=1 $(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/test.sh ./cmd/... ./pkg/...
+	@SKIP_FETCH_TOOLS=1 bash $(GARDENER_HACK_DIR)/test.sh ./cmd/... ./pkg/...
 
 .PHONY: test-cov
 test-cov:
-	@SKIP_FETCH_TOOLS=1 $(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/test-cover.sh ./cmd/... ./pkg/...
+	@SKIP_FETCH_TOOLS=1 bash $(GARDENER_HACK_DIR)/test-cover.sh ./cmd/... ./pkg/...
 
 .PHONY: test-clean
 test-clean:
-	@$(REPO_ROOT)/vendor/github.com/gardener/gardener/hack/test-cover-clean.sh
+	@bash $(GARDENER_HACK_DIR)/test-cover-clean.sh
 
 .PHONY: verify
 verify: check format test
