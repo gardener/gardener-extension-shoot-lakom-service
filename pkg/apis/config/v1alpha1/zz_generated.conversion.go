@@ -68,6 +68,7 @@ func autoConvert_v1alpha1_Configuration_To_config_Configuration(in *Configuratio
 		return err
 	}
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
+	out.AllowUntrustedImages = in.AllowUntrustedImages
 	return nil
 }
 
@@ -85,6 +86,7 @@ func autoConvert_config_Configuration_To_v1alpha1_Configuration(in *config.Confi
 		return err
 	}
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
+	out.AllowUntrustedImages = in.AllowUntrustedImages
 	return nil
 }
 

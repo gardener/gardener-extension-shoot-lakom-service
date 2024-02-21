@@ -119,6 +119,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		failurePolicy,
 		kcr.serviceConfig.UseOnlyImagePullSecrets,
+		kcr.serviceConfig.AllowUntrustedImages,
 		kcr.seedK8sVersion,
 	)
 	if err != nil {
@@ -183,7 +184,7 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	return nil
 }
 
-func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType, useOnlyImagePullSecrets bool, k8sVersion *semver.Version) (map[string][]byte, error) {
+func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType, useOnlyImagePullSecrets, allowUntrustedImages bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -293,6 +294,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 							"--metrics-bind-address=:" + metricsPort.String(),
 							"--port=" + serverPort.String(),
 							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
+							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
 						},
 						Ports: []corev1.ContainerPort{
 							{

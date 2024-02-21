@@ -39,6 +39,7 @@ var _ = Describe("Reconciler", func() {
 			serverTLSSecretName     = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
 			image                   = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			useOnlyImagePullSecrets = true
+			allowUntrustedImages    = false
 
 			validatingWebhookKey  = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
 			mutatingWebhookKey    = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
@@ -83,6 +84,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					caBundle,
 					failurePolicy,
 					useOnlyImagePullSecrets,
+					allowUntrustedImages,
 					semver.MustParse(k8sVersion),
 				)
 
@@ -123,6 +125,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					fp,
 					useOnlyImagePullSecrets,
+					allowUntrustedImages,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
@@ -144,6 +147,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					fp,
 					useOnlyImagePullSecrets,
+					allowUntrustedImages,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
@@ -164,6 +168,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				caBundle,
 				failurePolicy,
 				useOnlyImagePullSecrets,
+				allowUntrustedImages,
 				k8sVersion,
 			)
 
@@ -381,6 +386,7 @@ spec:
         - --metrics-bind-address=:8080
         - --port=10250
         - --use-only-image-pull-secrets=true
+        - --insecure-allow-untrusted-images=false
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:

@@ -122,6 +122,7 @@ var _ = Describe("Actuator", func() {
 			serverTLSSecretName           = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
 			image                         = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			useOnlyImagePullSecrets       = true
+			allowUntrustedImages          = false
 			cosignSecretName              = "extension-shoot-lakom-service-cosign-public-keys-e3b0c442"
 
 			cosignSecretNameKey = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
@@ -165,6 +166,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					cosignPublicKeys,
 					image,
 					useOnlyImagePullSecrets,
+					allowUntrustedImages,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
@@ -452,6 +454,7 @@ spec:
         - --port=10250
         - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
         - --use-only-image-pull-secrets=true
+        - --insecure-allow-untrusted-images=false
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:

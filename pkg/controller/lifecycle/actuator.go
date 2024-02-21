@@ -148,6 +148,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.CosignPublicKeys,
 		image.String(),
 		a.serviceConfig.UseOnlyImagePullSecrets,
+		a.serviceConfig.AllowUntrustedImages,
 		seedK8sSemverVersion,
 	)
 	if err != nil {
@@ -275,7 +276,7 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string, useOnlyImagePullSecrets bool, k8sVersion *semver.Version) (map[string][]byte, error) {
+func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string, useOnlyImagePullSecrets, allowUntrustedImages bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -365,6 +366,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 							"--port=" + serverPort.String(),
 							"--kubeconfig=" + gutil.PathGenericKubeconfig,
 							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
+							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
 						},
 						Ports: []corev1.ContainerPort{
 							{

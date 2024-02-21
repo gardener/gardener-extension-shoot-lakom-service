@@ -28,6 +28,9 @@ type Configuration struct {
 	// UseOnlyImagePullSecrets sets lakom to use only the image pull secrets of the pod to access the OCI registry.
 	// Otherwise, also the node identity and docker config file are used.
 	UseOnlyImagePullSecrets bool
+	// AllowUntrustedImages sets lakom webhook to allow images without trusted signature.
+	// Instead to deny the request, the webhook will allow it with a warning.
+	AllowUntrustedImages bool
 }
 
 // DebugConfig contains debug configurations for the controller.
