@@ -12,7 +12,8 @@ limitations under the License.
 
 This file was copied and modified from the kubernetes-sigs/controller-runtime project
 https://github.com/kubernetes-sigs/controller-runtime/blob/4c9c9564e4652bbdec14a602d6196d8622500b51/pkg/webhook/admission/http_test.go
-Modifications Copyright (c) 2022 SAP SE or an SAP affiliate company. All rights reserved.
+
+Modifications Copyright 2022 SAP SE or an SAP affiliate company and Gardener contributors
 */
 
 package admission_test
