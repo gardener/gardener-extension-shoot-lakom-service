@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 COSIGN         := $(TOOLS_BIN_DIR)/cosign
-COSIGN_VERSION ?= v2.0.2
+COSIGN_VERSION ?= v2.2.3
 
 export TOOLS_BIN_DIR := $(TOOLS_BIN_DIR)
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
