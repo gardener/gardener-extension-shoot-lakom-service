@@ -35,6 +35,7 @@ type HandleBuilder struct {
 	cacheTTL                time.Duration
 	cacheRefreshInterval    time.Duration
 	useOnlyImagePullSecrets bool
+	allowUntrustedImages    bool
 }
 
 // NewHandleBuilder returns new handle builder.
@@ -52,6 +53,12 @@ func (hb HandleBuilder) WithManager(mgr manager.Manager) HandleBuilder {
 // WithUseOnlyImagePullSecrets sets only the image pull secrets to be used to access the OCI Registry.
 func (hb HandleBuilder) WithUseOnlyImagePullSecrets(useOnlyImagePullSecrets bool) HandleBuilder {
 	hb.useOnlyImagePullSecrets = useOnlyImagePullSecrets
+	return hb
+}
+
+// WithAllowUntrustedImages configures the webhook to allow images without trusted signature.
+func (hb HandleBuilder) WithAllowUntrustedImages(allowUntrustedImages bool) HandleBuilder {
+	hb.allowUntrustedImages = allowUntrustedImages
 	return hb
 }
 
@@ -87,6 +94,7 @@ func (hb HandleBuilder) Build() (*handler, error) {
 			reader:                  hb.mgr.GetAPIReader(),
 			decoder:                 admission.NewDecoder(hb.mgr.GetScheme()),
 			useOnlyImagePullSecrets: hb.useOnlyImagePullSecrets,
+			allowUntrustedImages:    hb.allowUntrustedImages,
 		}
 		verifier Verifier
 	)
@@ -121,6 +129,7 @@ type handler struct {
 
 	verifier                Verifier
 	useOnlyImagePullSecrets bool
+	allowUntrustedImages    bool
 }
 
 var (
@@ -160,6 +169,14 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 	logger := h.logger.WithValues("pod", client.ObjectKeyFromObject(pod))
 
 	if err := h.validatePod(ctx, logger, pod); err != nil {
+		if h.allowUntrustedImages {
+			logger.Info("pod validation failed but untrusted images are allowed", "error", err.Error())
+			warningsResponse := admission.Allowed("untrusted images are allowed")
+			warningsResponse.Warnings = []string{
+				fmt.Sprintf("Failed to admit pod with error: %q", err.Error()),
+			}
+			return warningsResponse
+		}
 		logger.Error(err, "pod validation failed")
 		return admission.Denied(err.Error())
 	}

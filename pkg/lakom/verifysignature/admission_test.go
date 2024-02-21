@@ -103,10 +103,9 @@ var _ = Describe("Admission Handler", func() {
 			WithCosignPublicKeysReader(reader).
 			WithCacheTTL(time.Minute * 10).
 			WithCacheRefreshInterval(time.Second * 30).
+			WithAllowUntrustedImages(false).
 			Build()
-
 		Expect(err).ToNot(HaveOccurred())
-
 		handler = h
 	})
 
@@ -137,6 +136,39 @@ var _ = Describe("Admission Handler", func() {
 		Expect(response.Result.Code).To(BeEquivalentTo(http.StatusOK))
 	})
 
+	It("Should allow untrusted images", func() {
+		mgr.EXPECT().GetAPIReader().Return(apiReader)
+		mgr.EXPECT().GetScheme().Return(scheme)
+		reader := strings.NewReader(cosignPublicKey)
+
+		allowUntrustedHandler, err := verifysignature.
+			NewHandleBuilder().
+			WithManager(mgr).
+			WithLogger(logger.WithName("test-cosign-untrusted-handler")).
+			WithCosignPublicKeysReader(reader).
+			WithCacheTTL(time.Minute * 10).
+			WithCacheRefreshInterval(time.Second * 30).
+			WithAllowUntrustedImages(true).
+			Build()
+		Expect(err).ToNot(HaveOccurred())
+
+		req := admissionRequestBuilder{
+			gvk:       podGVK,
+			operation: admissionv1.Update,
+			object:    podWithImage(pod, "alpine@sha256:11e21d7b981a59554b3f822c49f6e9f57b6068bb74f49c4cd5cc4c663c7e5160"),
+		}.Build()
+		ar := allowUntrustedHandler.Handle(ctx, req)
+		Expect(ar.Allowed).To(BeTrue())
+		Expect(ar.Result.Code).To(BeEquivalentTo(http.StatusOK))
+		Expect(ar.Warnings).To(ContainElement(ContainSubstring("Failed to admit pod with error")))
+		Expect(ar.Warnings).To(ContainElement(ContainSubstring("Forbidden: no valid signature found for image")))
+		Expect(ar.Result.Message).To(ContainSubstring("untrusted images are allowed"))
+
+		ar = handler.Handle(ctx, req)
+		Expect(ar.Allowed).To(BeFalse())
+		Expect(ar.Result.Code).To(Satisfy(isHTTPError))
+		Expect(ar.Result.Message).To(ContainSubstring("Forbidden: no valid signature found for image"))
+	})
 })
 
 func isHTTPError(code int32) bool {
