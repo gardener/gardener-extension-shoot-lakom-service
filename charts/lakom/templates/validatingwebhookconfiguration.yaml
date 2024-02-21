@@ -24,7 +24,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /lakom/verify-cosign-signature
 {{- end }}
-  failurePolicy: {{ .Values.admissionConfig.failurePolicy }}
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: verify-signature.lakom.service.gardener.cloud
 {{- if .Values.admissionConfig.namespaceSelector }}

@@ -42,7 +42,6 @@ admissionConfig:
       values:
       - "kube-system"
       - "lakom-system"
-  failurePolicy: Fail
   clientConfig:
     caBundle: foo
     urlHostname: ""
