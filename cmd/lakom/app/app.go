@@ -13,7 +13,6 @@ import (
 	goruntime "runtime"
 	"time"
 
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
@@ -242,16 +241,14 @@ func (o *Options) Run(ctx context.Context) error {
 
 	server.Register(
 		constants.LakomResolveTagPath,
-		&admission.Server{
-			Webhook: webhook.Admission{Handler: imageTagResolverHandler},
-			Log:     imageTagResolverHandler.GetLogger(),
+		&webhook.Admission{
+			Handler: imageTagResolverHandler,
 		},
 	)
 	server.Register(
 		constants.LakomVerifyCosignSignaturePath,
-		&admission.Server{
-			Webhook: webhook.Admission{Handler: cosignSignatureVerifyHandler},
-			Log:     cosignSignatureVerifyHandler.GetLogger(),
+		&webhook.Admission{
+			Handler: cosignSignatureVerifyHandler,
 		},
 	)
 

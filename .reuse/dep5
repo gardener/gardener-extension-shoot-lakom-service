@@ -50,14 +50,6 @@ Copyright: Copyright 2021 The Sigstore Authors.
 License: Apache-2.0
 
 Files:
-  pkg/admission/admission_suite_test.go
-  pkg/admission/http.go
-  pkg/admission/http_test.go
-Copyright: Copyright 2018 The Kubernetes Authors.
-           Modifications Copyright 2022 SAP SE or an SAP affiliate company and Gardener contributors
-License: Apache-2.0
-
-Files:
   hack/cherry-pick-pull.sh
 Copyright: Copyright 2015 The Kubernetes Authors.
            Modifications Copyright 2021 SAP SE or an SAP affiliate company and Gardener contributors
