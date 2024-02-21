@@ -46,6 +46,7 @@ License: Apache-2.0
 Files:
   pkg/lakom/utils/cosign_utils.go
 Copyright: Copyright 2021 The Sigstore Authors.
+           Modifications Copyright (c) 2022 SAP SE or an SAP affiliate company.
 License: Apache-2.0
 
 Files:
@@ -53,6 +54,7 @@ Files:
   pkg/admission/http.go
   pkg/admission/http_test.go
 Copyright: Copyright 2018 The Kubernetes Authors.
+           Modifications Copyright (c) 2022 SAP SE or an SAP affiliate company.
 License: Apache-2.0
 
 Files:
