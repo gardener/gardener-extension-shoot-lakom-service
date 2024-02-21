@@ -15,7 +15,8 @@
 
 // This file was copied and modified from the sigstore/policy-controller project
 // https://github.com/sigstore/policy-controller/blob/c0ba5b3bf3cd0ee928a5b7efdafdbc87a039888d/pkg/webhook/validation.go
-// Modifications Copyright (c) 2022 SAP SE or an SAP affiliate company. All rights reserved.
+//
+// Modifications Copyright 2022 SAP SE or an SAP affiliate company and Gardener contributors
 
 package utils
 
