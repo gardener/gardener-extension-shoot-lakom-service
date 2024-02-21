@@ -12,7 +12,6 @@ import (
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 var _ = Describe("Reconciler", func() {
@@ -34,7 +33,6 @@ var _ = Describe("Reconciler", func() {
 		const (
 			namespace               = "kube-system"
 			ownerNamespace          = "garden"
-			failurePolicy           = admissionregistrationv1.Ignore
 			cosignSecretName        = "extension-shoot-lakom-service-seed-cosign-public-keys-e3b0c442"
 			serverTLSSecretName     = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
 			image                   = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
@@ -82,7 +80,6 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					image,
 					cosignPublicKeys,
 					caBundle,
-					failurePolicy,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					semver.MustParse(k8sVersion),
@@ -92,8 +89,8 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				Expect(resources).To(HaveLen(10))
 
 				expectedResources := map[string]string{
-					validatingWebhookKey:  expectedValidatingWebhook(caBundle, failurePolicy),
-					mutatingWebhookKey:    expectedMutatingWebhook(caBundle, failurePolicy),
+					validatingWebhookKey:  expectedValidatingWebhook(caBundle),
+					mutatingWebhookKey:    expectedMutatingWebhook(caBundle),
 					clusterRoleKey:        expectedClusterRole(),
 					clusterRoleBindingKey: expectedClusterRoleBinding(),
 					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName),
@@ -117,13 +114,12 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		)
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
-			func(ca []byte, fp admissionregistrationv1.FailurePolicyType) {
+			func(ca []byte) {
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
 					cosignPublicKeys,
 					ca,
-					fp,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					k8sVersion,
@@ -132,20 +128,19 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 
 				mutatingWebhook, ok := resources[mutatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(mutatingWebhook)).To(Equal(expectedMutatingWebhook(ca, fp)))
+				Expect(string(mutatingWebhook)).To(Equal(expectedMutatingWebhook(ca)))
 			},
-			Entry("Failure policy Fail", caBundle, admissionregistrationv1.Fail),
-			Entry("Failure policy Ignore", []byte("anotherCABundle"), admissionregistrationv1.Ignore),
+			Entry("Global CA bundle", caBundle),
+			Entry("Custom CA bundle", []byte("anotherCABundle")),
 		)
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
-			func(ca []byte, fp admissionregistrationv1.FailurePolicyType) {
+			func(ca []byte) {
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
 					cosignPublicKeys,
 					ca,
-					fp,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					k8sVersion,
@@ -154,10 +149,10 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 
 				validatingWebhook, ok := resources[validatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(validatingWebhook)).To(Equal(expectedValidatingWebhook(ca, fp)))
+				Expect(string(validatingWebhook)).To(Equal(expectedValidatingWebhook(ca)))
 			},
-			Entry("Failure policy Fail", caBundle, admissionregistrationv1.Fail),
-			Entry("Failure policy Ignore", []byte("anotherCABundle"), admissionregistrationv1.Ignore),
+			Entry("Global CA bundle", caBundle),
+			Entry("Custom ca bundle", []byte("anotherCABundle")),
 		)
 
 		It("Should ensure the clusterrolebinding is correctly set", func() {
@@ -166,7 +161,6 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				image,
 				cosignPublicKeys,
 				caBundle,
-				failurePolicy,
 				useOnlyImagePullSecrets,
 				allowUntrustedImages,
 				k8sVersion,
@@ -181,10 +175,9 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 	})
 })
 
-func expectedMutatingWebhook(caBundle []byte, failurePolicy admissionregistrationv1.FailurePolicyType) string {
+func expectedMutatingWebhook(caBundle []byte) string {
 	var (
-		caBundleEncoded  = b64.StdEncoding.EncodeToString(caBundle)
-		strFailurePolicy = string(failurePolicy)
+		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
 	)
 
 	return `apiVersion: admissionregistration.k8s.io/v1
@@ -205,7 +198,7 @@ webhooks:
       name: extension-shoot-lakom-service-seed
       namespace: kube-system
       path: /lakom/resolve-tag-to-digest
-  failurePolicy: ` + strFailurePolicy + `
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: resolve-tag.seed.lakom.service.extensions.gardener.cloud
   namespaceSelector:
@@ -230,10 +223,9 @@ webhooks:
 `
 }
 
-func expectedValidatingWebhook(caBundle []byte, failurePolicy admissionregistrationv1.FailurePolicyType) string {
+func expectedValidatingWebhook(caBundle []byte) string {
 	var (
-		caBundleEncoded  = b64.StdEncoding.EncodeToString(caBundle)
-		strFailurePolicy = string(failurePolicy)
+		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
 	)
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -253,7 +245,7 @@ webhooks:
       name: extension-shoot-lakom-service-seed
       namespace: kube-system
       path: /lakom/verify-cosign-signature
-  failurePolicy: ` + strFailurePolicy + `
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: verify-signature.seed.lakom.service.extensions.gardener.cloud
   namespaceSelector:

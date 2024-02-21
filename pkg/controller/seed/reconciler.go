@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	vpaautoscalingv1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	"k8s.io/component-base/version"
 	"k8s.io/utils/clock"
@@ -104,20 +103,11 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
-	var (
-		failurePolicy          = admissionregistration.Fail
-		allowedFailurePolicies = sets.NewString(string(admissionregistration.Fail), string(admissionregistration.Ignore))
-	)
-	if kcr.serviceConfig.FailurePolicy != nil && allowedFailurePolicies.Has(*kcr.serviceConfig.FailurePolicy) {
-		failurePolicy = admissionregistration.FailurePolicyType(*kcr.serviceConfig.FailurePolicy)
-	}
-
 	resources, err := getResources(
 		generatedSecrets[constants.SeedWebhookTLSSecretName].Name,
 		image.String(),
 		kcr.serviceConfig.CosignPublicKeys,
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
-		failurePolicy,
 		kcr.serviceConfig.UseOnlyImagePullSecrets,
 		kcr.serviceConfig.AllowUntrustedImages,
 		kcr.seedK8sVersion,
@@ -184,7 +174,7 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	return nil
 }
 
-func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, failurePolicy admissionregistration.FailurePolicyType, useOnlyImagePullSecrets, allowUntrustedImages bool, k8sVersion *semver.Version) (map[string][]byte, error) {
+func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, useOnlyImagePullSecrets, allowUntrustedImages bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -202,6 +192,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		kubeSystemNamespace        = metav1.NamespaceSystem
 		matchPolicy                = admissionregistration.Equivalent
 		sideEffectClass            = admissionregistration.SideEffectClassNone
+		failurePolicy              = admissionregistration.Fail
 		timeOutSeconds             = ptr.To[int32](25)
 		namespaceSelector          = metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{

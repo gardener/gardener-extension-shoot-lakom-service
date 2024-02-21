@@ -46,7 +46,6 @@ controllers:
     #   -----BEGIN PUBLIC KEY-----
     #   abcd
     #   -----END PUBLIC KEY-----
-  failurePolicy: Fail
   healthPort: 8080
   metricsPort: 8081
   useOnlyImagePullSecrets: false

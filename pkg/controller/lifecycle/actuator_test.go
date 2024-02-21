@@ -13,7 +13,6 @@ import (
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 var _ = Describe("Actuator", func() {
@@ -49,7 +48,6 @@ var _ = Describe("Actuator", func() {
 		const (
 			namespace                     = "shoot--for--bar"
 			shootAccessServiceAccountName = "extension-shoot-lakom-service-access"
-			failurePolicy                 = admissionregistrationv1.Ignore
 			validatingWebhookKey          = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-shoot.yaml"
 			mutatingWebhookKey            = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-shoot.yaml"
 			roleKey                       = "role__kube-system__gardener-extension-shoot-lakom-service-resource-reader.yaml"
@@ -61,47 +59,47 @@ var _ = Describe("Actuator", func() {
 
 		It("Should ensure the correct shoot resources are created", func() {
 
-			resources, err := getShootResources(caBundle, namespace, shootAccessServiceAccountName, failurePolicy)
+			resources, err := getShootResources(caBundle, namespace, shootAccessServiceAccountName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).To(HaveLen(4))
 
 			Expect(resources).To(Equal(map[string][]byte{
-				validatingWebhookKey: []byte(expectedSeedValidatingWebhook(caBundle, namespace, failurePolicy)),
-				mutatingWebhookKey:   []byte(expectedShootMutatingWebhook(caBundle, namespace, failurePolicy)),
+				validatingWebhookKey: []byte(expectedSeedValidatingWebhook(caBundle, namespace)),
+				mutatingWebhookKey:   []byte(expectedShootMutatingWebhook(caBundle, namespace)),
 				roleKey:              []byte(expectedShootRole()),
 				roleBindingKey:       []byte(expectedShootRoleBinding(shootAccessServiceAccountName)),
 			}))
 		})
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
-			func(ca []byte, ns string, fp admissionregistrationv1.FailurePolicyType) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, fp)
+			func(ca []byte, ns string) {
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName)
 				Expect(err).ToNot(HaveOccurred())
 
 				mutatingWebhook, ok := resources[mutatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(mutatingWebhook)).To(Equal(expectedShootMutatingWebhook(ca, ns, fp)))
+				Expect(string(mutatingWebhook)).To(Equal(expectedShootMutatingWebhook(ca, ns)))
 			},
-			Entry("Failure policy Fail", caBundle, namespace, admissionregistrationv1.Fail),
-			Entry("Failure policy Ignore", []byte("anotherCABundle"), "different-namespace", admissionregistrationv1.Ignore),
+			Entry("Global CA bundle and namespace name", caBundle, namespace),
+			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
 		)
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
-			func(ca []byte, ns string, fp admissionregistrationv1.FailurePolicyType) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, fp)
+			func(ca []byte, ns string) {
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName)
 				Expect(err).ToNot(HaveOccurred())
 
 				validatingWebhook, ok := resources[validatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(validatingWebhook)).To(Equal(expectedSeedValidatingWebhook(ca, ns, fp)))
+				Expect(string(validatingWebhook)).To(Equal(expectedSeedValidatingWebhook(ca, ns)))
 			},
-			Entry("Failure policy Fail", caBundle, namespace, admissionregistrationv1.Fail),
-			Entry("Failure policy Ignore", []byte("anotherCABundle"), "different-namespace", admissionregistrationv1.Ignore),
+			Entry("Global CA bundle and namespace name", caBundle, namespace),
+			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
 		)
 
 		DescribeTable("Should ensure the rolebinding is correctly set",
 			func(saName string) {
-				resources, err := getShootResources(caBundle, namespace, saName, failurePolicy)
+				resources, err := getShootResources(caBundle, namespace, saName)
 				Expect(err).ToNot(HaveOccurred())
 
 				roleBinding, ok := resources[roleBindingKey]
@@ -196,10 +194,9 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 	})
 })
 
-func expectedShootMutatingWebhook(caBundle []byte, namespace string, failurePolicy admissionregistrationv1.FailurePolicyType) string {
+func expectedShootMutatingWebhook(caBundle []byte, namespace string) string {
 	var (
-		caBundleEncoded  = b64.StdEncoding.EncodeToString(caBundle)
-		strFailurePolicy = string(failurePolicy)
+		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
 	)
 
 	return `apiVersion: admissionregistration.k8s.io/v1
@@ -217,7 +214,7 @@ webhooks:
   clientConfig:
     caBundle: ` + caBundleEncoded + `
     url: https://extension-shoot-lakom-service.` + namespace + `/lakom/resolve-tag-to-digest
-  failurePolicy: ` + strFailurePolicy + `
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: resolve-tag.lakom.service.extensions.gardener.cloud
   namespaceSelector:
@@ -248,10 +245,9 @@ webhooks:
 `
 }
 
-func expectedSeedValidatingWebhook(caBundle []byte, namespace string, failurePolicy admissionregistrationv1.FailurePolicyType) string {
+func expectedSeedValidatingWebhook(caBundle []byte, namespace string) string {
 	var (
-		caBundleEncoded  = b64.StdEncoding.EncodeToString(caBundle)
-		strFailurePolicy = string(failurePolicy)
+		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
 	)
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -268,7 +264,7 @@ webhooks:
   clientConfig:
     caBundle: ` + caBundleEncoded + `
     url: https://extension-shoot-lakom-service.` + namespace + `/lakom/verify-cosign-signature
-  failurePolicy: ` + strFailurePolicy + `
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: verify-signature.lakom.service.extensions.gardener.cloud
   namespaceSelector:

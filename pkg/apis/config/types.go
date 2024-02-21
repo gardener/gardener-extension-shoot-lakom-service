@@ -19,8 +19,6 @@ type Configuration struct {
 	HealthCheckConfig *healthcheckconfig.HealthCheckConfig
 	// CosignPublicKeys is the cosign public keys used to verify image signatures.
 	CosignPublicKeys []string
-	// FailurePolicy is the failure policy used to configure the failurePolicy of the lakom admission webhooks.
-	FailurePolicy *string
 	// DebugConfig contains debug configurations for the controller.
 	DebugConfig *DebugConfig
 	// SeedBootstrap configures the seed bootstrap controller.

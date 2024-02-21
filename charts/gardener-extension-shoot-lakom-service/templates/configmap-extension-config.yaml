@@ -14,7 +14,6 @@ data:
     kind: Configuration
     cosignPublicKeys:
 {{ toYaml .Values.controllers.cosignPublicKeys | indent 6 }}
-    failurePolicy: {{ .Values.controllers.failurePolicy }}
     seedBootstrap:
       ownerNamespace: {{ .Release.Namespace }}
     useOnlyImagePullSecrets: {{ .Values.controllers.useOnlyImagePullSecrets }}

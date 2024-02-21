@@ -67,18 +67,6 @@ github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1.HealthCheckConf
 </tr>
 <tr>
 <td>
-<code>failurePolicy</code></br>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>FailurePolicy is the failure policy used to configure the failurePolicy of the lakom admission webhooks.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>debugConfig</code></br>
 <em>
 <a href="#lakom.extensions.config.gardener.cloud/v1alpha1.DebugConfig">

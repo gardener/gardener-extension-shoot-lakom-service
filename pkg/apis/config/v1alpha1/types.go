@@ -21,9 +21,6 @@ type Configuration struct {
 	HealthCheckConfig *healthcheckconfigv1alpha1.HealthCheckConfig `json:"healthCheckConfig,omitempty"`
 	// CosignPublicKeys is the cosign public keys used to verify image signatures.
 	CosignPublicKeys []string `json:"cosignPublicKeys,omitempty"`
-	// FailurePolicy is the failure policy used to configure the failurePolicy of the lakom admission webhooks.
-	// +optional
-	FailurePolicy *string `json:"failurePolicy,omitempty"`
 	// DebugConfig contains debug configurations for the controller.
 	// +optional
 	DebugConfig *DebugConfig `json:"debugConfig,omitempty"`

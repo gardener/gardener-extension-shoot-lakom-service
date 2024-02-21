@@ -44,7 +44,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	vpaautoscalingv1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/version"
@@ -155,20 +154,10 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
-	var (
-		failurePolicy          = admissionregistration.Fail
-		allowedFailurePolicies = sets.NewString(string(admissionregistration.Fail), string(admissionregistration.Ignore))
-	)
-
-	if a.serviceConfig.FailurePolicy != nil && allowedFailurePolicies.Has(*a.serviceConfig.FailurePolicy) {
-		failurePolicy = admissionregistration.FailurePolicyType(*a.serviceConfig.FailurePolicy)
-	}
-
 	shootResources, err := getShootResources(
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
-		failurePolicy,
 	)
 
 	if err != nil {
@@ -578,10 +567,11 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	return resources, nil
 }
 
-func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAccountName string, failurePolicy admissionregistration.FailurePolicyType) (map[string][]byte, error) {
+func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAccountName string) (map[string][]byte, error) {
 	var (
 		matchPolicy          = admissionregistration.Equivalent
 		sideEffectClass      = admissionregistration.SideEffectClassNone
+		failurePolicy        = admissionregistration.Fail
 		timeOutSeconds       = ptr.To[int32](25)
 		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, namespace)
 		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
