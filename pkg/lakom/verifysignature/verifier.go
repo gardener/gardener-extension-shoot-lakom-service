@@ -86,7 +86,7 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 				return false, nil
 			}
 
-			if IsNoMatchingSignature(err) {
+			if IsNoMatchingSignatures(err) {
 				if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 					// Mitigation for https://github.com/gardener/gardener-extension-shoot-lakom-service/issues/25
 					// TODO(vpnachev): remove when https://github.com/sigstore/cosign/issues/3133 is fixed and vendored
@@ -160,22 +160,16 @@ func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyC
 	return verified, nil
 }
 
-// IsNoMatchingSignature checks if error is of type
-// [cosign.ErrNoMatchingSignaturesType].
-func IsNoMatchingSignature(err error) bool {
-	var verErr *cosign.VerificationError
-	if errors.As(err, &verErr) {
-		return verErr.ErrorType() == cosign.ErrNoMatchingSignaturesType
-	}
-	return false
+// IsNoMatchingSignatures checks if error is of type
+// [cosign.ErrNoMatchingSignatures].
+func IsNoMatchingSignatures(err error) bool {
+	var t *cosign.ErrNoMatchingSignatures
+	return errors.As(err, &t)
 }
 
 // IsNoSignaturesFound checks if error is of type
-// [cosign.ErrNoSignaturesFoundType].
+// [cosign.ErrNoSignaturesFound].
 func IsNoSignaturesFound(err error) bool {
-	var verErr *cosign.VerificationError
-	if errors.As(err, &verErr) {
-		return verErr.ErrorType() == cosign.ErrNoSignaturesFoundType
-	}
-	return false
+	var t *cosign.ErrNoSignaturesFound
+	return errors.As(err, &t)
 }
