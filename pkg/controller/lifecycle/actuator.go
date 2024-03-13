@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
@@ -124,6 +125,11 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return fmt.Errorf("missing or empty `cluster.seed.status.kubernetesVersion`")
 	}
 
+	seedK8sSemverVersion, err := semver.NewVersion(*cluster.Seed.Status.KubernetesVersion)
+	if err != nil {
+		return fmt.Errorf("failed to parse the seed kubernetes version: %v", err)
+	}
+
 	image, err := imagevector.ImageVector().FindImage(constants.ImageName)
 	if err != nil {
 		return fmt.Errorf("failed to find image version for %s: %v", constants.ImageName, err)
@@ -142,6 +148,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.CosignPublicKeys,
 		image.String(),
 		a.serviceConfig.UseOnlyImagePullSecrets,
+		seedK8sSemverVersion,
 	)
 	if err != nil {
 		return err
@@ -268,7 +275,7 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string, useOnlyImagePullSecrets bool) (map[string][]byte, error) {
+func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string, useOnlyImagePullSecrets bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -473,20 +480,23 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 		},
 	}
 
-	maxUnavailable := intstr.FromInt(1)
+	pdb := &policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      constants.ExtensionServiceName,
+			Namespace: namespace,
+			Labels:    getLabels(),
+		},
+		Spec: policyv1.PodDisruptionBudgetSpec{
+			MaxUnavailable: utils.IntStrPtrFromInt32(1),
+			Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
+		},
+	}
+
+	kutil.SetAlwaysAllowEviction(pdb, k8sVersion)
+
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
-		&policyv1.PodDisruptionBudget{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
-				Namespace: namespace,
-				Labels:    getLabels(),
-			},
-			Spec: policyv1.PodDisruptionBudgetSpec{
-				MaxUnavailable: &maxUnavailable,
-				Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
-			},
-		},
+		pdb,
 		&cosignPublicKeysSecret,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{

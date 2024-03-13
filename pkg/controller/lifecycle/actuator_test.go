@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -151,41 +152,45 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 -----END PUBLIC KEY-----
 `,
 			}
-
 		})
 
-		It("Should ensure the correct seed resources are created", func() {
-			resources, err := getSeedResources(
-				&replicas,
-				namespace,
-				genericKubeconfigName,
-				shootAccessServiceAccountName,
-				serverTLSSecretName,
-				cosignPublicKeys,
-				image,
-				useOnlyImagePullSecrets,
-			)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resources).To(HaveLen(7))
+		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
+			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy bool) {
+				resources, err := getSeedResources(
+					&replicas,
+					namespace,
+					genericKubeconfigName,
+					shootAccessServiceAccountName,
+					serverTLSSecretName,
+					cosignPublicKeys,
+					image,
+					useOnlyImagePullSecrets,
+					k8sVersion,
+				)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resources).To(HaveLen(7))
 
-			expectedResources := map[string]string{
-				configMapKey:        expectedSeedConfigMap(namespace),
-				deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName),
-				pdbKey:              expectedSeedPDB(namespace),
-				cosignSecretNameKey: expectedSeedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
-				serviceKey:          expectedSeedService(namespace),
-				serviceAccountKey:   expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
-				vpaKey:              expectedSeedVPA(namespace),
-			}
+				expectedResources := map[string]string{
+					configMapKey:        expectedSeedConfigMap(namespace),
+					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName),
+					pdbKey:              expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					cosignSecretNameKey: expectedSeedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
+					serviceKey:          expectedSeedService(namespace),
+					serviceAccountKey:   expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
+					vpaKey:              expectedSeedVPA(namespace),
+				}
 
-			for key, expectedResource := range expectedResources {
-				resource, ok := resources[key]
-				Expect(ok).To(BeTrue())
+				for key, expectedResource := range expectedResources {
+					resource, ok := resources[key]
+					Expect(ok).To(BeTrue())
 
-				strResource := string(resource)
-				Expect(strResource).To(Equal(expectedResource), key)
-			}
-		})
+					strResource := string(resource)
+					Expect(strResource).To(Equal(expectedResource), key)
+				}
+			},
+			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false),
+			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true),
+		)
 	})
 })
 
@@ -512,9 +517,8 @@ status: {}
 `
 }
 
-func expectedSeedPDB(namespace string) string {
-
-	return `apiVersion: policy/v1
+func expectedSeedPDB(namespace string, withUnhealthyPodEvictionPolicy bool) string {
+	out := `apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   creationTimestamp: null
@@ -529,12 +533,18 @@ spec:
     matchLabels:
       app.kubernetes.io/name: lakom
       app.kubernetes.io/part-of: shoot-lakom-service
-status:
+`
+	if withUnhealthyPodEvictionPolicy {
+		out += `  unhealthyPodEvictionPolicy: AlwaysAllow
+`
+	}
+	out += `status:
   currentHealthy: 0
   desiredHealthy: 0
   disruptionsAllowed: 0
   expectedPods: 0
 `
+	return out
 }
 
 func expectedSeedSecretCosign(namespace, cosignSecretName string, cosignPublicKeys []string) string {
