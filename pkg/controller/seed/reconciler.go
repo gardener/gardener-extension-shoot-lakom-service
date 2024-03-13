@@ -26,7 +26,6 @@ import (
 	"github.com/gardener/gardener/pkg/utils/managedresources"
 	secretutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
-	versionutils "github.com/gardener/gardener/pkg/utils/version"
 	"github.com/go-logr/logr"
 	admissionregistration "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -404,7 +403,6 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		},
 	}
 
-	unhealthyPodEvictionPolicyAlwaysAllow := policyv1.AlwaysAllow
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      constants.SeedExtensionServiceName,
@@ -416,9 +414,8 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 			Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
 		},
 	}
-	if versionutils.ConstraintK8sGreaterEqual126.Check(k8sVersion) {
-		pdb.Spec.UnhealthyPodEvictionPolicy = &unhealthyPodEvictionPolicyAlwaysAllow
-	}
+
+	kutil.SetAlwaysAllowEviction(pdb, k8sVersion)
 
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
