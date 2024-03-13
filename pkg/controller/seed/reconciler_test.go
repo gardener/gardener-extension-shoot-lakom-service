@@ -55,8 +55,6 @@ var _ = Describe("Reconciler", func() {
 		var (
 			cosignPublicKeys []string
 			caBundle         = []byte("caBundle")
-			err              error
-			resources        map[string][]byte
 			k8sVersion       *semver.Version
 		)
 
@@ -73,19 +71,19 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 `,
 			}
 
+			k8sVersion = semver.MustParse("1.27.0")
 		})
 
-		Context("different kubernetes versions", func() {
-
-			JustBeforeEach(func() {
-				resources, err = getResources(
+		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
+			func(k8sVersion string, expectedPDBResult string) {
+				resources, err := getResources(
 					serverTLSSecretName,
 					image,
 					cosignPublicKeys,
 					caBundle,
 					failurePolicy,
 					useOnlyImagePullSecrets,
-					k8sVersion,
+					semver.MustParse(k8sVersion),
 				)
 
 				Expect(err).ToNot(HaveOccurred())
@@ -109,35 +107,15 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 
 					strResource := string(resource)
 					Expect(strResource).To(Equal(expectedResource), key, string(resource))
+
+					pdb, ok := resources[pdbKey]
+					Expect(ok).To(BeTrue())
+					Expect(string(pdb)).To(Equal(expectedPDBResult), pdbKey)
 				}
-			})
-
-			Context("kubernetes version < 1.26", func() {
-				BeforeEach(func() {
-					k8sVersion = semver.MustParse("1.25.0")
-				})
-
-				It("Should ensure the correct resources are created", func() {
-					pdb, ok := resources[pdbKey]
-					Expect(ok).To(BeTrue())
-
-					Expect(string(pdb)).To(Equal(expectedPDB(namespace, false)), pdbKey)
-				})
-			})
-
-			Context("kubernetes version >= 1.26", func() {
-				BeforeEach(func() {
-					k8sVersion = semver.MustParse("1.26.0")
-				})
-
-				It("Should ensure the correct resources are created", func() {
-					pdb, ok := resources[pdbKey]
-					Expect(ok).To(BeTrue())
-
-					Expect(string(pdb)).To(Equal(expectedPDB(namespace, true)), pdbKey)
-				})
-			})
-		})
+			},
+			Entry("Kubernetes version < 1.26", "1.25.0", expectedPDB(namespace, false)),
+			Entry("Kubernetes version >= 1.26", "1.26.0", expectedPDB(namespace, true)),
+		)
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, fp admissionregistrationv1.FailurePolicyType) {
@@ -148,7 +126,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					fp,
 					useOnlyImagePullSecrets,
-					semver.MustParse("1.27.0"),
+					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -169,7 +147,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					fp,
 					useOnlyImagePullSecrets,
-					semver.MustParse("1.27.0"),
+					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -189,7 +167,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				caBundle,
 				failurePolicy,
 				useOnlyImagePullSecrets,
-				semver.MustParse("1.27.0"),
+				k8sVersion,
 			)
 
 			Expect(err).ToNot(HaveOccurred())
