@@ -135,15 +135,11 @@ var _ = Describe("Actuator", func() {
 
 		var (
 			replicas         int32
-			err              error
 			cosignPublicKeys []string
-			resources        map[string][]byte
-			k8sVersion       *semver.Version
 		)
 
 		BeforeEach(func() {
 			replicas = int32(3)
-			resources = map[string][]byte{}
 
 			cosignPublicKeys = []string{
 				`-----BEGIN PUBLIC KEY-----
@@ -158,64 +154,43 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 			}
 		})
 
-		JustBeforeEach(func() {
-			resources, err = getSeedResources(
-				&replicas,
-				namespace,
-				genericKubeconfigName,
-				shootAccessServiceAccountName,
-				serverTLSSecretName,
-				cosignPublicKeys,
-				image,
-				useOnlyImagePullSecrets,
-				k8sVersion,
-			)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resources).To(HaveLen(7))
+		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
+			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy bool) {
+				resources, err := getSeedResources(
+					&replicas,
+					namespace,
+					genericKubeconfigName,
+					shootAccessServiceAccountName,
+					serverTLSSecretName,
+					cosignPublicKeys,
+					image,
+					useOnlyImagePullSecrets,
+					k8sVersion,
+				)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resources).To(HaveLen(7))
 
-			expectedResources := map[string]string{
-				configMapKey:        expectedSeedConfigMap(namespace),
-				deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName),
-				cosignSecretNameKey: expectedSeedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
-				serviceKey:          expectedSeedService(namespace),
-				serviceAccountKey:   expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
-				vpaKey:              expectedSeedVPA(namespace),
-			}
+				expectedResources := map[string]string{
+					configMapKey:        expectedSeedConfigMap(namespace),
+					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName),
+					pdbKey:              expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					cosignSecretNameKey: expectedSeedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
+					serviceKey:          expectedSeedService(namespace),
+					serviceAccountKey:   expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
+					vpaKey:              expectedSeedVPA(namespace),
+				}
 
-			for key, expectedResource := range expectedResources {
-				resource, ok := resources[key]
-				Expect(ok).To(BeTrue())
+				for key, expectedResource := range expectedResources {
+					resource, ok := resources[key]
+					Expect(ok).To(BeTrue())
 
-				strResource := string(resource)
-				Expect(strResource).To(Equal(expectedResource), key)
-			}
-		})
-
-		Context("kubernetes version < 1.26", func() {
-			BeforeEach(func() {
-				k8sVersion = semver.MustParse("1.25.0")
-			})
-
-			It("Should ensure the correct seed resources are created", func() {
-				pdb, ok := resources[pdbKey]
-				Expect(ok).To(BeTrue())
-
-				Expect(string(pdb)).To(Equal(expectedSeedPDB(namespace, false)), pdbKey)
-			})
-		})
-
-		Context("kubernetes version >= 1.26", func() {
-			BeforeEach(func() {
-				k8sVersion = semver.MustParse("1.26.0")
-			})
-
-			It("Should ensure the correct seed resources are created", func() {
-				pdb, ok := resources[pdbKey]
-				Expect(ok).To(BeTrue())
-
-				Expect(string(pdb)).To(Equal(expectedSeedPDB(namespace, true)), pdbKey)
-			})
-		})
+					strResource := string(resource)
+					Expect(strResource).To(Equal(expectedResource), key)
+				}
+			},
+			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false),
+			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true),
+		)
 	})
 })
 
@@ -542,7 +517,7 @@ status: {}
 `
 }
 
-func expectedSeedPDB(namespace string, k8sGreaterEqual126 bool) string {
+func expectedSeedPDB(namespace string, withUnhealthyPodEvictionPolicy bool) string {
 	out := `apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -559,7 +534,7 @@ spec:
       app.kubernetes.io/name: lakom
       app.kubernetes.io/part-of: shoot-lakom-service
 `
-	if k8sGreaterEqual126 {
+	if withUnhealthyPodEvictionPolicy {
 		out += `  unhealthyPodEvictionPolicy: AlwaysAllow
 `
 	}

@@ -75,7 +75,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion string, expectedPDBResult string) {
+			func(k8sVersion string, withUnhealthyPodEvictionPolicy bool) {
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
@@ -95,6 +95,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					clusterRoleKey:        expectedClusterRole(),
 					clusterRoleBindingKey: expectedClusterRoleBinding(),
 					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName),
+					pdbKey:                expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
 					cosignSecretNameKey:   expectedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
 					serviceKey:            expectedService(namespace),
 					serviceAccountKey:     expectedServiceAccount(namespace),
@@ -107,14 +108,10 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 
 					strResource := string(resource)
 					Expect(strResource).To(Equal(expectedResource), key, string(resource))
-
-					pdb, ok := resources[pdbKey]
-					Expect(ok).To(BeTrue())
-					Expect(string(pdb)).To(Equal(expectedPDBResult), pdbKey)
 				}
 			},
-			Entry("Kubernetes version < 1.26", "1.25.0", expectedPDB(namespace, false)),
-			Entry("Kubernetes version >= 1.26", "1.26.0", expectedPDB(namespace, true)),
+			Entry("Kubernetes version < 1.26", "1.25.0", false),
+			Entry("Kubernetes version >= 1.26", "1.26.0", true),
 		)
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
@@ -430,7 +427,7 @@ status: {}
 `
 }
 
-func expectedPDB(namespace string, k8sGreaterEqual126 bool) string {
+func expectedPDB(namespace string, withUnhealthyPodEvictionPolicy bool) string {
 	out := `apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -447,7 +444,7 @@ spec:
       app.kubernetes.io/name: lakom-seed
       app.kubernetes.io/part-of: shoot-lakom-service
 `
-	if k8sGreaterEqual126 {
+	if withUnhealthyPodEvictionPolicy {
 		out += `  unhealthyPodEvictionPolicy: AlwaysAllow
 `
 	}
