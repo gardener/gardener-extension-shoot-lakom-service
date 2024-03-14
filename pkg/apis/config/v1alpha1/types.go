@@ -21,9 +21,6 @@ type Configuration struct {
 	HealthCheckConfig *healthcheckconfigv1alpha1.HealthCheckConfig `json:"healthCheckConfig,omitempty"`
 	// CosignPublicKeys is the cosign public keys used to verify image signatures.
 	CosignPublicKeys []string `json:"cosignPublicKeys,omitempty"`
-	// FailurePolicy is the failure policy used to configure the failurePolicy of the lakom admission webhooks.
-	// +optional
-	FailurePolicy *string `json:"failurePolicy,omitempty"`
 	// DebugConfig contains debug configurations for the controller.
 	// +optional
 	DebugConfig *DebugConfig `json:"debugConfig,omitempty"`
@@ -32,6 +29,9 @@ type Configuration struct {
 	// UseOnlyImagePullSecrets sets lakom to use only the image pull secrets of the pod to access the OCI registry.
 	// Otherwise, also the node identity and docker config file are used.
 	UseOnlyImagePullSecrets bool `json:"useOnlyImagePullSecrets"`
+	// AllowUntrustedImages sets lakom webhook to allow images without trusted signature.
+	// Instead to deny the request, the webhook will allow it with a warning.
+	AllowUntrustedImages bool `json:"allowUntrustedImages"`
 }
 
 // DebugConfig contains debug configurations for the controller.

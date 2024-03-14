@@ -13,7 +13,6 @@ import (
 	goruntime "runtime"
 	"time"
 
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
@@ -99,6 +98,9 @@ type Options struct {
 	// UseOnlyImagePullSecrets sets only the image pull secrets of the pod to be used to access the OCI registry.
 	// Otherwise, also the node identity and docker config file are used.
 	UseOnlyImagePullSecrets bool
+	// AllowUntrustedImages configures the webhook to allow images without trusted signature.
+	// Instead to deny the request, the webhook will allow it with a warning.
+	AllowUntrustedImages bool
 }
 
 // AddFlags adds lakom admission controller's flags to the specified FlagSet.
@@ -114,6 +116,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.CacheTTL, "cache-ttl", time.Minute*10, "TTL for the cached objects. Set to 0, if cache has to be disabled")
 	fs.DurationVar(&o.CacheRefreshInterval, "cache-refresh-interval", time.Second*30, "Refresh interval for the cached objects")
 	fs.BoolVar(&o.UseOnlyImagePullSecrets, "use-only-image-pull-secrets", false, "If set, only the credentials from the image pull secrets of the pod are used to access the OCI registry. Otherwise, the node identity and docker config are also used.")
+	fs.BoolVar(&o.AllowUntrustedImages, "insecure-allow-untrusted-images", false, "If set, the webhook will just return warning for the images without trusted signatures.")
 }
 
 // validate validates all the required options.
@@ -230,6 +233,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithCacheTTL(o.CacheTTL).
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
 		WithUseOnlyImagePullSecrets(o.UseOnlyImagePullSecrets).
+		WithAllowUntrustedImages(o.AllowUntrustedImages).
 		Build()
 	if err != nil {
 		return err
@@ -237,16 +241,14 @@ func (o *Options) Run(ctx context.Context) error {
 
 	server.Register(
 		constants.LakomResolveTagPath,
-		&admission.Server{
-			Webhook: webhook.Admission{Handler: imageTagResolverHandler},
-			Log:     imageTagResolverHandler.GetLogger(),
+		&webhook.Admission{
+			Handler: imageTagResolverHandler,
 		},
 	)
 	server.Register(
 		constants.LakomVerifyCosignSignaturePath,
-		&admission.Server{
-			Webhook: webhook.Admission{Handler: cosignSignatureVerifyHandler},
-			Log:     cosignSignatureVerifyHandler.GetLogger(),
+		&webhook.Admission{
+			Handler: cosignSignatureVerifyHandler,
 		},
 	)
 

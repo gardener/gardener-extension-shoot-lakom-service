@@ -24,7 +24,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /lakom/resolve-tag-to-digest
 {{- end }}
-  failurePolicy: {{ .Values.admissionConfig.failurePolicy }}
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: resolve-tag.lakom.service.gardener.cloud
 {{- if .Values.admissionConfig.namespaceSelector }}

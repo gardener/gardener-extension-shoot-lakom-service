@@ -7,13 +7,13 @@ package lifecycle
 import (
 	b64 "encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 var _ = Describe("Actuator", func() {
@@ -49,7 +49,6 @@ var _ = Describe("Actuator", func() {
 		const (
 			namespace                     = "shoot--for--bar"
 			shootAccessServiceAccountName = "extension-shoot-lakom-service-access"
-			failurePolicy                 = admissionregistrationv1.Ignore
 			validatingWebhookKey          = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-shoot.yaml"
 			mutatingWebhookKey            = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-shoot.yaml"
 			roleKey                       = "role__kube-system__gardener-extension-shoot-lakom-service-resource-reader.yaml"
@@ -61,47 +60,47 @@ var _ = Describe("Actuator", func() {
 
 		It("Should ensure the correct shoot resources are created", func() {
 
-			resources, err := getShootResources(caBundle, namespace, shootAccessServiceAccountName, failurePolicy)
+			resources, err := getShootResources(caBundle, namespace, shootAccessServiceAccountName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).To(HaveLen(4))
 
 			Expect(resources).To(Equal(map[string][]byte{
-				validatingWebhookKey: []byte(expectedSeedValidatingWebhook(caBundle, namespace, failurePolicy)),
-				mutatingWebhookKey:   []byte(expectedShootMutatingWebhook(caBundle, namespace, failurePolicy)),
+				validatingWebhookKey: []byte(expectedSeedValidatingWebhook(caBundle, namespace)),
+				mutatingWebhookKey:   []byte(expectedShootMutatingWebhook(caBundle, namespace)),
 				roleKey:              []byte(expectedShootRole()),
 				roleBindingKey:       []byte(expectedShootRoleBinding(shootAccessServiceAccountName)),
 			}))
 		})
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
-			func(ca []byte, ns string, fp admissionregistrationv1.FailurePolicyType) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, fp)
+			func(ca []byte, ns string) {
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName)
 				Expect(err).ToNot(HaveOccurred())
 
 				mutatingWebhook, ok := resources[mutatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(mutatingWebhook)).To(Equal(expectedShootMutatingWebhook(ca, ns, fp)))
+				Expect(string(mutatingWebhook)).To(Equal(expectedShootMutatingWebhook(ca, ns)))
 			},
-			Entry("Failure policy Fail", caBundle, namespace, admissionregistrationv1.Fail),
-			Entry("Failure policy Ignore", []byte("anotherCABundle"), "different-namespace", admissionregistrationv1.Ignore),
+			Entry("Global CA bundle and namespace name", caBundle, namespace),
+			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
 		)
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
-			func(ca []byte, ns string, fp admissionregistrationv1.FailurePolicyType) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, fp)
+			func(ca []byte, ns string) {
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName)
 				Expect(err).ToNot(HaveOccurred())
 
 				validatingWebhook, ok := resources[validatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(validatingWebhook)).To(Equal(expectedSeedValidatingWebhook(ca, ns, fp)))
+				Expect(string(validatingWebhook)).To(Equal(expectedSeedValidatingWebhook(ca, ns)))
 			},
-			Entry("Failure policy Fail", caBundle, namespace, admissionregistrationv1.Fail),
-			Entry("Failure policy Ignore", []byte("anotherCABundle"), "different-namespace", admissionregistrationv1.Ignore),
+			Entry("Global CA bundle and namespace name", caBundle, namespace),
+			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
 		)
 
 		DescribeTable("Should ensure the rolebinding is correctly set",
 			func(saName string) {
-				resources, err := getShootResources(caBundle, namespace, saName, failurePolicy)
+				resources, err := getShootResources(caBundle, namespace, saName)
 				Expect(err).ToNot(HaveOccurred())
 
 				roleBinding, ok := resources[roleBindingKey]
@@ -121,7 +120,6 @@ var _ = Describe("Actuator", func() {
 			shootAccessServiceAccountName = "extension-shoot-lakom-service"
 			serverTLSSecretName           = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
 			image                         = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
-			useOnlyImagePullSecrets       = true
 			cosignSecretName              = "extension-shoot-lakom-service-cosign-public-keys-e3b0c442"
 
 			cosignSecretNameKey = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
@@ -155,7 +153,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy bool) {
+			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages bool) {
 				resources, err := getSeedResources(
 					&replicas,
 					namespace,
@@ -165,6 +163,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					cosignPublicKeys,
 					image,
 					useOnlyImagePullSecrets,
+					allowUntrustedImages,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
@@ -172,7 +171,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 
 				expectedResources := map[string]string{
 					configMapKey:        expectedSeedConfigMap(namespace),
-					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName),
+					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages)),
 					pdbKey:              expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
 					cosignSecretNameKey: expectedSeedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
 					serviceKey:          expectedSeedService(namespace),
@@ -188,17 +187,16 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					Expect(strResource).To(Equal(expectedResource), key)
 				}
 			},
-			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false),
-			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true),
+			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false),
+			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false),
+			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false),
+			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true),
 		)
 	})
 })
 
-func expectedShootMutatingWebhook(caBundle []byte, namespace string, failurePolicy admissionregistrationv1.FailurePolicyType) string {
-	var (
-		caBundleEncoded  = b64.StdEncoding.EncodeToString(caBundle)
-		strFailurePolicy = string(failurePolicy)
-	)
+func expectedShootMutatingWebhook(caBundle []byte, namespace string) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
 
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
@@ -215,7 +213,7 @@ webhooks:
   clientConfig:
     caBundle: ` + caBundleEncoded + `
     url: https://extension-shoot-lakom-service.` + namespace + `/lakom/resolve-tag-to-digest
-  failurePolicy: ` + strFailurePolicy + `
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: resolve-tag.lakom.service.extensions.gardener.cloud
   namespaceSelector:
@@ -246,11 +244,9 @@ webhooks:
 `
 }
 
-func expectedSeedValidatingWebhook(caBundle []byte, namespace string, failurePolicy admissionregistrationv1.FailurePolicyType) string {
-	var (
-		caBundleEncoded  = b64.StdEncoding.EncodeToString(caBundle)
-		strFailurePolicy = string(failurePolicy)
-	)
+func expectedSeedValidatingWebhook(caBundle []byte, namespace string) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
@@ -266,7 +262,7 @@ webhooks:
   clientConfig:
     caBundle: ` + caBundleEncoded + `
     url: https://extension-shoot-lakom-service.` + namespace + `/lakom/verify-cosign-signature
-  failurePolicy: ` + strFailurePolicy + `
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: verify-signature.lakom.service.extensions.gardener.cloud
   namespaceSelector:
@@ -377,7 +373,7 @@ metadata:
 `
 }
 
-func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, cosignPublicKeysSecretName, serverTLSSecretName string) string {
+func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages string) string {
 	var (
 		genericKubeconfigSecretNameAnnotationKey = references.AnnotationKey("secret", genericKubeconfigSecretName)
 		shootAccessSecretNameAnnotationKey       = references.AnnotationKey("secret", shootAccessSecretName)
@@ -451,7 +447,8 @@ spec:
         - --metrics-bind-address=:8080
         - --port=10250
         - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
-        - --use-only-image-pull-secrets=true
+        - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
+        - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -518,7 +515,12 @@ status: {}
 }
 
 func expectedSeedPDB(namespace string, withUnhealthyPodEvictionPolicy bool) string {
-	out := `apiVersion: policy/v1
+	unhealthyPodEvictionPolicyStr := ""
+	if withUnhealthyPodEvictionPolicy {
+		unhealthyPodEvictionPolicyStr = `  unhealthyPodEvictionPolicy: AlwaysAllow
+`
+	}
+	return `apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   creationTimestamp: null
@@ -533,18 +535,12 @@ spec:
     matchLabels:
       app.kubernetes.io/name: lakom
       app.kubernetes.io/part-of: shoot-lakom-service
-`
-	if withUnhealthyPodEvictionPolicy {
-		out += `  unhealthyPodEvictionPolicy: AlwaysAllow
-`
-	}
-	out += `status:
+` + unhealthyPodEvictionPolicyStr + `status:
   currentHealthy: 0
   desiredHealthy: 0
   disruptionsAllowed: 0
   expectedPods: 0
 `
-	return out
 }
 
 func expectedSeedSecretCosign(namespace, cosignSecretName string, cosignPublicKeys []string) string {

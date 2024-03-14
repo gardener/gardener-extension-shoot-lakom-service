@@ -67,18 +67,6 @@ github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1.HealthCheckConf
 </tr>
 <tr>
 <td>
-<code>failurePolicy</code></br>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>FailurePolicy is the failure policy used to configure the failurePolicy of the lakom admission webhooks.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>debugConfig</code></br>
 <em>
 <a href="#lakom.extensions.config.gardener.cloud/v1alpha1.DebugConfig">
@@ -114,6 +102,18 @@ bool
 <td>
 <p>UseOnlyImagePullSecrets sets lakom to use only the image pull secrets of the pod to access the OCI registry.
 Otherwise, also the node identity and docker config file are used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>allowUntrustedImages</code></br>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>AllowUntrustedImages sets lakom webhook to allow images without trusted signature.
+Instead to deny the request, the webhook will allow it with a warning.</p>
 </td>
 </tr>
 </tbody>

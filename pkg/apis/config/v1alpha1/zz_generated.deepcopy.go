@@ -28,11 +28,6 @@ func (in *Configuration) DeepCopyInto(out *Configuration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.FailurePolicy != nil {
-		in, out := &in.FailurePolicy, &out.FailurePolicy
-		*out = new(string)
-		**out = **in
-	}
 	if in.DebugConfig != nil {
 		in, out := &in.DebugConfig, &out.DebugConfig
 		*out = new(DebugConfig)

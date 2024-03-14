@@ -62,12 +62,12 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_v1alpha1_Configuration_To_config_Configuration(in *Configuration, out *config.Configuration, s conversion.Scope) error {
 	out.HealthCheckConfig = (*apisconfig.HealthCheckConfig)(unsafe.Pointer(in.HealthCheckConfig))
 	out.CosignPublicKeys = *(*[]string)(unsafe.Pointer(&in.CosignPublicKeys))
-	out.FailurePolicy = (*string)(unsafe.Pointer(in.FailurePolicy))
 	out.DebugConfig = (*config.DebugConfig)(unsafe.Pointer(in.DebugConfig))
 	if err := Convert_v1alpha1_SeedBootstrap_To_config_SeedBootstrap(&in.SeedBootstrap, &out.SeedBootstrap, s); err != nil {
 		return err
 	}
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
+	out.AllowUntrustedImages = in.AllowUntrustedImages
 	return nil
 }
 
@@ -79,12 +79,12 @@ func Convert_v1alpha1_Configuration_To_config_Configuration(in *Configuration, o
 func autoConvert_config_Configuration_To_v1alpha1_Configuration(in *config.Configuration, out *Configuration, s conversion.Scope) error {
 	out.HealthCheckConfig = (*configv1alpha1.HealthCheckConfig)(unsafe.Pointer(in.HealthCheckConfig))
 	out.CosignPublicKeys = *(*[]string)(unsafe.Pointer(&in.CosignPublicKeys))
-	out.FailurePolicy = (*string)(unsafe.Pointer(in.FailurePolicy))
 	out.DebugConfig = (*DebugConfig)(unsafe.Pointer(in.DebugConfig))
 	if err := Convert_config_SeedBootstrap_To_v1alpha1_SeedBootstrap(&in.SeedBootstrap, &out.SeedBootstrap, s); err != nil {
 		return err
 	}
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
+	out.AllowUntrustedImages = in.AllowUntrustedImages
 	return nil
 }
 

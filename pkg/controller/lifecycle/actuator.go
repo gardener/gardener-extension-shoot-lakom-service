@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/secrets"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
@@ -44,7 +44,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	vpaautoscalingv1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/version"
@@ -148,26 +147,17 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.CosignPublicKeys,
 		image.String(),
 		a.serviceConfig.UseOnlyImagePullSecrets,
+		a.serviceConfig.AllowUntrustedImages,
 		seedK8sSemverVersion,
 	)
 	if err != nil {
 		return err
 	}
 
-	var (
-		failurePolicy          = admissionregistration.Fail
-		allowedFailurePolicies = sets.NewString(string(admissionregistration.Fail), string(admissionregistration.Ignore))
-	)
-
-	if a.serviceConfig.FailurePolicy != nil && allowedFailurePolicies.Has(*a.serviceConfig.FailurePolicy) {
-		failurePolicy = admissionregistration.FailurePolicyType(*a.serviceConfig.FailurePolicy)
-	}
-
 	shootResources, err := getShootResources(
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
-		failurePolicy,
 	)
 
 	if err != nil {
@@ -275,7 +265,7 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string, useOnlyImagePullSecrets bool, k8sVersion *semver.Version) (map[string][]byte, error) {
+func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string, useOnlyImagePullSecrets, allowUntrustedImages bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                   = corev1.ProtocolTCP
 		serverPort                 = intstr.FromInt(10250)
@@ -365,6 +355,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 							"--port=" + serverPort.String(),
 							"--kubeconfig=" + gutil.PathGenericKubeconfig,
 							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
+							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
 						},
 						Ports: []corev1.ContainerPort{
 							{
@@ -576,10 +567,11 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	return resources, nil
 }
 
-func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAccountName string, failurePolicy admissionregistration.FailurePolicyType) (map[string][]byte, error) {
+func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAccountName string) (map[string][]byte, error) {
 	var (
 		matchPolicy          = admissionregistration.Equivalent
 		sideEffectClass      = admissionregistration.SideEffectClassNone
+		failurePolicy        = admissionregistration.Fail
 		timeOutSeconds       = ptr.To[int32](25)
 		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, namespace)
 		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath

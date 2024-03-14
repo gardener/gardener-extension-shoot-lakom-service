@@ -6,13 +6,13 @@ package seed
 
 import (
 	b64 "encoding/base64"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 var _ = Describe("Reconciler", func() {
@@ -34,11 +34,11 @@ var _ = Describe("Reconciler", func() {
 		const (
 			namespace               = "kube-system"
 			ownerNamespace          = "garden"
-			failurePolicy           = admissionregistrationv1.Ignore
 			cosignSecretName        = "extension-shoot-lakom-service-seed-cosign-public-keys-e3b0c442"
 			serverTLSSecretName     = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
 			image                   = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			useOnlyImagePullSecrets = true
+			allowUntrustedImages    = false
 
 			validatingWebhookKey  = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
 			mutatingWebhookKey    = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
@@ -75,14 +75,14 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion string, withUnhealthyPodEvictionPolicy bool) {
+			func(k8sVersion string, withUnhealthyPodEvictionPolicy, onlyImagePullSecrets, untrustedImages bool) {
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
 					cosignPublicKeys,
 					caBundle,
-					failurePolicy,
-					useOnlyImagePullSecrets,
+					onlyImagePullSecrets,
+					untrustedImages,
 					semver.MustParse(k8sVersion),
 				)
 
@@ -90,11 +90,11 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				Expect(resources).To(HaveLen(10))
 
 				expectedResources := map[string]string{
-					validatingWebhookKey:  expectedValidatingWebhook(caBundle, failurePolicy),
-					mutatingWebhookKey:    expectedMutatingWebhook(caBundle, failurePolicy),
+					validatingWebhookKey:  expectedValidatingWebhook(caBundle),
+					mutatingWebhookKey:    expectedMutatingWebhook(caBundle),
 					clusterRoleKey:        expectedClusterRole(),
 					clusterRoleBindingKey: expectedClusterRoleBinding(),
-					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName),
+					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages)),
 					pdbKey:                expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
 					cosignSecretNameKey:   expectedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
 					serviceKey:            expectedService(namespace),
@@ -110,50 +110,52 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					Expect(strResource).To(Equal(expectedResource), key, string(resource))
 				}
 			},
-			Entry("Kubernetes version < 1.26", "1.25.0", false),
-			Entry("Kubernetes version >= 1.26", "1.26.0", true),
+			Entry("Kubernetes version < 1.26", "1.25.0", false, false, false),
+			Entry("Kubernetes version >= 1.26", "1.26.0", true, false, false),
+			Entry("Use only image pull secrets", "1.27.0", true, true, false),
+			Entry("Allow untrusted images", "1.28.0", true, false, true),
 		)
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
-			func(ca []byte, fp admissionregistrationv1.FailurePolicyType) {
+			func(ca []byte) {
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
 					cosignPublicKeys,
 					ca,
-					fp,
 					useOnlyImagePullSecrets,
+					allowUntrustedImages,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
 				mutatingWebhook, ok := resources[mutatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(mutatingWebhook)).To(Equal(expectedMutatingWebhook(ca, fp)))
+				Expect(string(mutatingWebhook)).To(Equal(expectedMutatingWebhook(ca)))
 			},
-			Entry("Failure policy Fail", caBundle, admissionregistrationv1.Fail),
-			Entry("Failure policy Ignore", []byte("anotherCABundle"), admissionregistrationv1.Ignore),
+			Entry("Global CA bundle", caBundle),
+			Entry("Custom CA bundle", []byte("anotherCABundle")),
 		)
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
-			func(ca []byte, fp admissionregistrationv1.FailurePolicyType) {
+			func(ca []byte) {
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
 					cosignPublicKeys,
 					ca,
-					fp,
 					useOnlyImagePullSecrets,
+					allowUntrustedImages,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
 				validatingWebhook, ok := resources[validatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(validatingWebhook)).To(Equal(expectedValidatingWebhook(ca, fp)))
+				Expect(string(validatingWebhook)).To(Equal(expectedValidatingWebhook(ca)))
 			},
-			Entry("Failure policy Fail", caBundle, admissionregistrationv1.Fail),
-			Entry("Failure policy Ignore", []byte("anotherCABundle"), admissionregistrationv1.Ignore),
+			Entry("Global CA bundle", caBundle),
+			Entry("Custom ca bundle", []byte("anotherCABundle")),
 		)
 
 		It("Should ensure the clusterrolebinding is correctly set", func() {
@@ -162,8 +164,8 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				image,
 				cosignPublicKeys,
 				caBundle,
-				failurePolicy,
 				useOnlyImagePullSecrets,
+				allowUntrustedImages,
 				k8sVersion,
 			)
 
@@ -176,10 +178,9 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 	})
 })
 
-func expectedMutatingWebhook(caBundle []byte, failurePolicy admissionregistrationv1.FailurePolicyType) string {
+func expectedMutatingWebhook(caBundle []byte) string {
 	var (
-		caBundleEncoded  = b64.StdEncoding.EncodeToString(caBundle)
-		strFailurePolicy = string(failurePolicy)
+		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
 	)
 
 	return `apiVersion: admissionregistration.k8s.io/v1
@@ -200,7 +201,7 @@ webhooks:
       name: extension-shoot-lakom-service-seed
       namespace: kube-system
       path: /lakom/resolve-tag-to-digest
-  failurePolicy: ` + strFailurePolicy + `
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: resolve-tag.seed.lakom.service.extensions.gardener.cloud
   namespaceSelector:
@@ -225,10 +226,9 @@ webhooks:
 `
 }
 
-func expectedValidatingWebhook(caBundle []byte, failurePolicy admissionregistrationv1.FailurePolicyType) string {
+func expectedValidatingWebhook(caBundle []byte) string {
 	var (
-		caBundleEncoded  = b64.StdEncoding.EncodeToString(caBundle)
-		strFailurePolicy = string(failurePolicy)
+		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
 	)
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -248,7 +248,7 @@ webhooks:
       name: extension-shoot-lakom-service-seed
       namespace: kube-system
       path: /lakom/verify-cosign-signature
-  failurePolicy: ` + strFailurePolicy + `
+  failurePolicy: Fail
   matchPolicy: Equivalent
   name: verify-signature.seed.lakom.service.extensions.gardener.cloud
   namespaceSelector:
@@ -312,7 +312,7 @@ subjects:
 `
 }
 
-func expectedDeployment(namespace, image, cosignPublicKeysSecretName, serverTLSSecretName string) string {
+func expectedDeployment(namespace, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages string) string {
 	var (
 		serverTLSSecretNameAnnotationKey        = references.AnnotationKey("secret", serverTLSSecretName)
 		cosignPublicKeysSecretNameAnnotationKey = references.AnnotationKey("secret", cosignPublicKeysSecretName)
@@ -380,7 +380,8 @@ spec:
         - --health-bind-address=:8081
         - --metrics-bind-address=:8080
         - --port=10250
-        - --use-only-image-pull-secrets=true
+        - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
+        - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:

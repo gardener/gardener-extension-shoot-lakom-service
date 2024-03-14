@@ -10,10 +10,10 @@ cosignPublicKeys:
   MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
   hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
   -----END PUBLIC KEY-----
-failurePolicy: Fail
 seedBootstrap:
   ownerNamespace: lakom-extension
 useOnlyImagePullSecrets: true
+allowUntrustedImages: false
 debugConfig:
   enableProfiling: false
   enableContentionProfiling: false
