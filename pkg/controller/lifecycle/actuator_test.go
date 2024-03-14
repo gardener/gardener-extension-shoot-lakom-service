@@ -7,6 +7,7 @@ package lifecycle
 import (
 	b64 "encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -119,8 +120,6 @@ var _ = Describe("Actuator", func() {
 			shootAccessServiceAccountName = "extension-shoot-lakom-service"
 			serverTLSSecretName           = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
 			image                         = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
-			useOnlyImagePullSecrets       = true
-			allowUntrustedImages          = false
 			cosignSecretName              = "extension-shoot-lakom-service-cosign-public-keys-e3b0c442"
 
 			cosignSecretNameKey = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
@@ -154,7 +153,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy bool) {
+			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages bool) {
 				resources, err := getSeedResources(
 					&replicas,
 					namespace,
@@ -172,7 +171,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 
 				expectedResources := map[string]string{
 					configMapKey:        expectedSeedConfigMap(namespace),
-					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName),
+					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages)),
 					pdbKey:              expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
 					cosignSecretNameKey: expectedSeedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
 					serviceKey:          expectedSeedService(namespace),
@@ -188,8 +187,10 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					Expect(strResource).To(Equal(expectedResource), key)
 				}
 			},
-			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false),
-			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true),
+			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false),
+			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false),
+			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false),
+			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true),
 		)
 	})
 })
@@ -375,7 +376,7 @@ metadata:
 `
 }
 
-func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, cosignPublicKeysSecretName, serverTLSSecretName string) string {
+func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages string) string {
 	var (
 		genericKubeconfigSecretNameAnnotationKey = references.AnnotationKey("secret", genericKubeconfigSecretName)
 		shootAccessSecretNameAnnotationKey       = references.AnnotationKey("secret", shootAccessSecretName)
@@ -449,8 +450,8 @@ spec:
         - --metrics-bind-address=:8080
         - --port=10250
         - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
-        - --use-only-image-pull-secrets=true
-        - --insecure-allow-untrusted-images=false
+        - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
+        - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -517,7 +518,12 @@ status: {}
 }
 
 func expectedSeedPDB(namespace string, withUnhealthyPodEvictionPolicy bool) string {
-	out := `apiVersion: policy/v1
+	unhealthyPodEvictionPolicyStr := ""
+	if withUnhealthyPodEvictionPolicy {
+		unhealthyPodEvictionPolicyStr = `
+  unhealthyPodEvictionPolicy: AlwaysAllow`
+	}
+	return `apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   creationTimestamp: null
@@ -531,19 +537,13 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: lakom
-      app.kubernetes.io/part-of: shoot-lakom-service
-`
-	if withUnhealthyPodEvictionPolicy {
-		out += `  unhealthyPodEvictionPolicy: AlwaysAllow
-`
-	}
-	out += `status:
+      app.kubernetes.io/part-of: shoot-lakom-service` + unhealthyPodEvictionPolicyStr + `
+status:
   currentHealthy: 0
   desiredHealthy: 0
   disruptionsAllowed: 0
   expectedPods: 0
 `
-	return out
 }
 
 func expectedSeedSecretCosign(namespace, cosignSecretName string, cosignPublicKeys []string) string {

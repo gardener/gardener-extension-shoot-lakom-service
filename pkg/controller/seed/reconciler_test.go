@@ -6,6 +6,7 @@ package seed
 
 import (
 	b64 "encoding/base64"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -74,14 +75,14 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion string, withUnhealthyPodEvictionPolicy bool) {
+			func(k8sVersion string, withUnhealthyPodEvictionPolicy, onlyImagePullSecrets, untrustedImages bool) {
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
 					cosignPublicKeys,
 					caBundle,
-					useOnlyImagePullSecrets,
-					allowUntrustedImages,
+					onlyImagePullSecrets,
+					untrustedImages,
 					semver.MustParse(k8sVersion),
 				)
 
@@ -93,7 +94,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					mutatingWebhookKey:    expectedMutatingWebhook(caBundle),
 					clusterRoleKey:        expectedClusterRole(),
 					clusterRoleBindingKey: expectedClusterRoleBinding(),
-					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName),
+					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages)),
 					pdbKey:                expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
 					cosignSecretNameKey:   expectedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
 					serviceKey:            expectedService(namespace),
@@ -109,8 +110,10 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					Expect(strResource).To(Equal(expectedResource), key, string(resource))
 				}
 			},
-			Entry("Kubernetes version < 1.26", "1.25.0", false),
-			Entry("Kubernetes version >= 1.26", "1.26.0", true),
+			Entry("Kubernetes version < 1.26", "1.25.0", false, false, false),
+			Entry("Kubernetes version >= 1.26", "1.26.0", true, false, false),
+			Entry("Use only image pull secrets", "1.27.0", true, true, false),
+			Entry("Allow untrusted images", "1.28.0", true, false, true),
 		)
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
@@ -309,7 +312,7 @@ subjects:
 `
 }
 
-func expectedDeployment(namespace, image, cosignPublicKeysSecretName, serverTLSSecretName string) string {
+func expectedDeployment(namespace, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages string) string {
 	var (
 		serverTLSSecretNameAnnotationKey        = references.AnnotationKey("secret", serverTLSSecretName)
 		cosignPublicKeysSecretNameAnnotationKey = references.AnnotationKey("secret", cosignPublicKeysSecretName)
@@ -377,8 +380,8 @@ spec:
         - --health-bind-address=:8081
         - --metrics-bind-address=:8080
         - --port=10250
-        - --use-only-image-pull-secrets=true
-        - --insecure-allow-untrusted-images=false
+        - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
+        - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:
