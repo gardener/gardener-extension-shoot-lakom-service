@@ -196,9 +196,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 })
 
 func expectedShootMutatingWebhook(caBundle []byte, namespace string) string {
-	var (
-		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
-	)
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
 
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
@@ -247,9 +245,8 @@ webhooks:
 }
 
 func expectedSeedValidatingWebhook(caBundle []byte, namespace string) string {
-	var (
-		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
-	)
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
@@ -520,8 +517,8 @@ status: {}
 func expectedSeedPDB(namespace string, withUnhealthyPodEvictionPolicy bool) string {
 	unhealthyPodEvictionPolicyStr := ""
 	if withUnhealthyPodEvictionPolicy {
-		unhealthyPodEvictionPolicyStr = `
-  unhealthyPodEvictionPolicy: AlwaysAllow`
+		unhealthyPodEvictionPolicyStr = `  unhealthyPodEvictionPolicy: AlwaysAllow
+`
 	}
 	return `apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -537,8 +534,8 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: lakom
-      app.kubernetes.io/part-of: shoot-lakom-service` + unhealthyPodEvictionPolicyStr + `
-status:
+      app.kubernetes.io/part-of: shoot-lakom-service
+` + unhealthyPodEvictionPolicyStr + `status:
   currentHealthy: 0
   desiredHealthy: 0
   disruptionsAllowed: 0
