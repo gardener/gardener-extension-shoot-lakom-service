@@ -75,9 +75,13 @@ type actuator struct {
 	serviceConfig config.Configuration
 }
 
-func getLakomReplicas(hibernated bool) *int32 {
+func getLakomReplicas(cluster *extensions.Cluster) *int32 {
+	if cluster != nil && cluster.Shoot != nil && cluster.Shoot.DeletionTimestamp != nil {
+		return ptr.To[int32](3)
+	}
+
 	// Scale to 0 if cluster is hibernated
-	if hibernated {
+	if controller.IsHibernationEnabled(cluster) {
 		return ptr.To[int32](0)
 	}
 
@@ -139,7 +143,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	}
 
 	seedResources, err := getSeedResources(
-		getLakomReplicas(controller.IsHibernationEnabled(cluster)),
+		getLakomReplicas(cluster),
 		namespace,
 		extensions.GenericTokenKubeconfigSecretNameFromCluster(cluster),
 		lakomShootAccessSecret.Secret.Name,

@@ -11,25 +11,27 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/gardener/gardener/pkg/apis/core/v1beta1"
+	"github.com/gardener/gardener/pkg/extensions"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("Actuator", func() {
 
 	DescribeTable("Should get correct number of replicas",
-		func(hibernated bool) {
-			expectedReplicas := 3
-			if hibernated {
-				expectedReplicas = 0
-			}
+		func(cluster *extensions.Cluster, expectedReplicas int32) {
 
-			actual := getLakomReplicas(hibernated)
+			actual := getLakomReplicas(cluster)
 			Expect(*actual).To(BeEquivalentTo(expectedReplicas))
 		},
-		Entry("Awaken", false),
-		Entry("Hibernated", true),
+		Entry("Awaken", &extensions.Cluster{Shoot: &v1beta1.Shoot{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: nil}}}, int32(3)),
+		Entry("Hibernated", &extensions.Cluster{Shoot: &v1beta1.Shoot{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: nil}, Spec: v1beta1.ShootSpec{Hibernation: &v1beta1.Hibernation{Enabled: ptr.To(true)}}}}, int32(0)),
+		Entry("Deleting Awaken", &extensions.Cluster{Shoot: &v1beta1.Shoot{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: ptr.To(metav1.Now())}, Spec: v1beta1.ShootSpec{Hibernation: &v1beta1.Hibernation{Enabled: ptr.To(false)}}}}, int32(3)),
+		Entry("Deleting Hibernated", &extensions.Cluster{Shoot: &v1beta1.Shoot{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: ptr.To(metav1.Now())}, Spec: v1beta1.ShootSpec{Hibernation: &v1beta1.Hibernation{Enabled: ptr.To(true)}}}}, int32(3)),
 	)
 
 	It("Should get labels", func() {
