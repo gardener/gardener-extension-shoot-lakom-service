@@ -124,6 +124,7 @@ var _ = Describe("Actuator", func() {
 
 			cosignSecretNameKey = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
 			configMapKey        = "configmap__" + namespace + "__extension-shoot-lakom-service-monitoring.yaml"
+			serviceMonitorKey   = "servicemonitor__" + namespace + "__shoot-extension-shoot-lakom-service.yaml"
 			deploymentKey       = "deployment__" + namespace + "__extension-shoot-lakom-service.yaml"
 			pdbKey              = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service.yaml"
 			serviceKey          = "service__" + namespace + "__extension-shoot-lakom-service.yaml"
@@ -153,7 +154,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages bool) {
+			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages, gep19Monitoring bool) {
 				resources, err := getSeedResources(
 					&replicas,
 					namespace,
@@ -165,12 +166,12 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					k8sVersion,
+					gep19Monitoring,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveLen(7))
 
 				expectedResources := map[string]string{
-					configMapKey:        expectedSeedConfigMap(namespace),
 					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages)),
 					pdbKey:              expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
 					cosignSecretNameKey: expectedSeedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
@@ -179,18 +180,25 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					vpaKey:              expectedSeedVPA(namespace),
 				}
 
+				if gep19Monitoring {
+					expectedResources[serviceMonitorKey] = expectedSeedServiceMonitor(namespace)
+				} else {
+					expectedResources[configMapKey] = expectedSeedConfigMap(namespace)
+				}
+
 				for key, expectedResource := range expectedResources {
 					resource, ok := resources[key]
-					Expect(ok).To(BeTrue())
+					Expect(ok).To(BeTrue(), key)
 
 					strResource := string(resource)
 					Expect(strResource).To(Equal(expectedResource), key)
 				}
 			},
-			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false),
-			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false),
-			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false),
-			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true),
+			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false, false),
+			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false, false),
+			Entry("With GEP-19 Monitoring", semver.MustParse("1.26.0"), true, false, false, true),
+			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false),
+			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false),
 		)
 	})
 })
@@ -370,6 +378,31 @@ metadata:
     extensions.gardener.cloud/configuration: monitoring
   name: extension-shoot-lakom-service-monitoring
   namespace: ` + namespace + `
+`
+}
+
+func expectedSeedServiceMonitor(namespace string) string {
+	return `apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  creationTimestamp: null
+  labels:
+    prometheus: shoot
+  name: shoot-extension-shoot-lakom-service
+  namespace: ` + namespace + `
+spec:
+  endpoints:
+  - metricRelabelings:
+    - action: keep
+      regex: ^(lakom.*)$
+      sourceLabels:
+      - __name__
+    port: metrics
+  namespaceSelector: {}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
 `
 }
 
