@@ -120,7 +120,7 @@ var _ = Describe("Actuator", func() {
 			shootAccessServiceAccountName = "extension-shoot-lakom-service"
 			serverTLSSecretName           = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
 			image                         = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
-			cosignSecretName              = "extension-shoot-lakom-service-cosign-public-keys-e3b0c442"
+			cosignSecretName              = "extension-shoot-lakom-service-cosign-public-keys-5a1fe295"
 
 			cosignSecretNameKey = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
 			configMapKey        = "configmap__" + namespace + "__extension-shoot-lakom-service-monitoring.yaml"
@@ -382,9 +382,9 @@ func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretNa
 
 		annotations = []string{
 			genericKubeconfigSecretNameAnnotationKey + ": " + genericKubeconfigSecretName,
+			cosignPublicKeysSecretNameAnnotationKey + ": " + cosignPublicKeysSecretName,
 			shootAccessSecretNameAnnotationKey + ": " + shootAccessSecretName,
 			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
-			cosignPublicKeysSecretNameAnnotationKey + ": " + cosignPublicKeysSecretName,
 		}
 	)
 

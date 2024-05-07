@@ -46,7 +46,7 @@ func NewServiceControllerCommand() *cobra.Command {
 		Short:         "Lakom Service Controller manages components which provide lakom admission controller.",
 		SilenceErrors: true,
 
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			verflag.PrintAndExitIfRequested()
 
 			if err := options.optionAggregator.Complete(); err != nil {

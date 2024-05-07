@@ -34,7 +34,7 @@ var _ = Describe("Reconciler", func() {
 		const (
 			namespace               = "kube-system"
 			ownerNamespace          = "garden"
-			cosignSecretName        = "extension-shoot-lakom-service-seed-cosign-public-keys-e3b0c442"
+			cosignSecretName        = "extension-shoot-lakom-service-seed-cosign-public-keys-5a1fe295"
 			serverTLSSecretName     = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
 			image                   = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			useOnlyImagePullSecrets = true
@@ -318,8 +318,8 @@ func expectedDeployment(namespace, image, cosignPublicKeysSecretName, serverTLSS
 		cosignPublicKeysSecretNameAnnotationKey = references.AnnotationKey("secret", cosignPublicKeysSecretName)
 
 		annotations = []string{
-			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
 			cosignPublicKeysSecretNameAnnotationKey + ": " + cosignPublicKeysSecretName,
+			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
 		}
 	)
 
