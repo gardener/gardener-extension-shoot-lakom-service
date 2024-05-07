@@ -46,7 +46,7 @@ func NewAdmissionCommand() *cobra.Command {
 		Short: "Launch the " + constants.ApplicationName,
 		Long:  constants.ApplicationName + " serves validating and mutating webhook endpoints for cosign image signature validation.",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			verflag.PrintAndExitIfRequested()
 
 			if err := opts.validate(); err != nil {
