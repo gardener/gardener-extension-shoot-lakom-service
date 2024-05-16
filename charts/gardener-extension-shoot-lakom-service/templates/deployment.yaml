@@ -53,7 +53,7 @@ spec:
                 - key: app.kubernetes.io/name
                   operator: In
                   values:
-                  - {{ .Values.name }}
+                  - gardener-extension-{{ .Values.serviceName }}
                 - key: app.kubernetes.io/instance
                   operator: In
                   values:
