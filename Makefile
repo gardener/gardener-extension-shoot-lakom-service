@@ -53,6 +53,7 @@ start-lakom:
 		--cosign-public-key-path=example/lakom/cosign/cosign.pub \
 		--cache-ttl=$(CACHE_TTL) \
 		--cache-refresh-interval=$(CACHE_REFRESH_INTERVAL)
+		--insecure-allow-untrusted-images=true
 
 .PHONE: dev-setup
 dev-setup: $(COSIGN)

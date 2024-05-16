@@ -1,0 +1,81 @@
+---
+apiVersion: skaffold/v4beta3
+kind: Config
+metadata:
+  name: extension
+build:
+  artifacts:
+    - image: local-skaffold/gardener-extension-shoot-lakom-service
+      ko:
+        # The dependencies section configures what files Skaffold should watch for changes when in dev mode.
+        dependencies:
+          paths:
+            - charts
+            - charts/images.yaml
+            - cmd/gardener-extension-shoot-lakom-service
+            - cmd/gardener-extension-shoot-lakom-service/app
+            - pkg/apis/config
+            - pkg/apis/config/v1alpha1
+            - pkg/cmd
+            - pkg/constants
+            - pkg/controller/config
+            - pkg/controller/healthcheck
+            - pkg/controller/lifecycle
+            - pkg/controller/seed
+            - pkg/imagevector
+            - pkg/secrets
+            - VERSION
+        ldflags:
+          - '{{.LD_FLAGS}}'
+        main: ./cmd/gardener-extension-shoot-lakom-service
+resourceSelector:
+  allow:
+    # instruct skaffold to inject the built image reference into the image field in our ControllerDeployment
+    - groupKind: ControllerDeployment.core.gardener.cloud
+      image: [".*"]
+manifests:
+  kustomize:
+    paths:
+      - local-setup
+deploy:
+  kubectl: {}
+---
+apiVersion: skaffold/v4beta3
+kind: Config
+metadata:
+  name: admission
+build:
+  artifacts:
+    - image: local-skaffold/gardener-extension-shoot-lakom-service
+      ko:
+        dependencies:
+          paths:
+            - cmd/lakom
+            - cmd/lakom/app
+            - pkg/constants
+            - pkg/lakom/metrics
+            - pkg/lakom/resolvetag
+            - pkg/lakom/utils
+            - pkg/lakom/verifysignature
+            - VERSION
+        ldflags:
+          - '{{.LD_FLAGS}}'
+        main: ./cmd/lakom
+deploy:
+  helm:
+    releases:
+      - name: gardener-extension-shoot-lakom-service
+        namespace: garden
+        wait: true
+        # TODO: Figure out wheter this is the right path
+        chartPath: charts/lakom
+        setValueTemplates:
+          global.image.repository: '{{.IMAGE_REPO_local_skaffold_gardener_extension_shoot_lakom_service_admission}}'
+          global.image.tag: '{{.IMAGE_TAG_local_skaffold_gardener_extension_shoot_lakom_service_admission}}@{{.IMAGE_DIGEST_local_skaffold_gardener_extension_lakom_service_admission}}'
+profiles:
+  - name: remote-extensions
+    patches:
+      - op: add
+        path: /deploy/helm/releases/0/setValues
+        value:
+          global.vpa.enabled: false
