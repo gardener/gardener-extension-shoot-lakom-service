@@ -12,33 +12,6 @@ caBundle=$(cat ${certDir}/ca.pem | base64 -w0)
 
 cat <<EOF | kubectl apply -f -
 ---
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: lakom-system
----
-kind: Service
-apiVersion: v1
-metadata:
-  name: lakom
-  namespace: lakom-system
-spec:
-  ports:
-  - protocol: TCP
-    port: 9443
-    targetPort: 9443
----
-kind: Endpoints
-apiVersion: v1
-metadata:
-  name: lakom
-  namespace: lakom-system
-subsets:
-- addresses:
-  - ip: ${ipAddress}
-  ports:
-  - port: 9443
----
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
