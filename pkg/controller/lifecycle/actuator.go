@@ -104,6 +104,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
+
 	// initialize SecretsManager based on Cluster object
 	configs := secrets.ConfigsFor(namespace)
 
@@ -140,6 +141,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
+
 	seedResources, err := getSeedResources(
 		getLakomReplicas(controller.IsHibernationEnabled(cluster)),
 		namespace,
@@ -162,6 +164,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
+		cluster.Shoot.GetNamespace(),
 	)
 
 	if err != nil {
@@ -592,7 +595,8 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	return resources, nil
 }
 
-func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAccountName string) (map[string][]byte, error) {
+func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAccountName string, shootNamespace string) (map[string][]byte, error) {
+
 	var (
 		matchPolicy          = admissionregistration.Equivalent
 		sideEffectClass      = admissionregistration.SideEffectClassNone
@@ -610,7 +614,7 @@ func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAcco
 				},
 			},
 		}
-		objectSelector = metav1.LabelSelector{
+		objectSelector = &metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
 					Key:      resourcesv1alpha1.ManagedBy,
@@ -628,6 +632,11 @@ func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAcco
 			},
 		}}
 	)
+
+	isManagedSeed := shootNamespace == v1beta1constants.GardenNamespace
+	if isManagedSeed {
+		objectSelector = nil
+	}
 
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
 	shootResources, err := shootRegistry.AddAllAndSerialize(
@@ -649,7 +658,7 @@ func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAcco
 					CABundle: webhookCaBundle,
 				},
 				NamespaceSelector: &namespaceSelector,
-				ObjectSelector:    &objectSelector,
+				ObjectSelector:    objectSelector,
 			}},
 		},
 		&admissionregistration.ValidatingWebhookConfiguration{
@@ -670,7 +679,7 @@ func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAcco
 					CABundle: webhookCaBundle,
 				},
 				NamespaceSelector: &namespaceSelector,
-				ObjectSelector:    &objectSelector,
+				ObjectSelector:    objectSelector,
 			}},
 		},
 		&rbacv1.Role{
