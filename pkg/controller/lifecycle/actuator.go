@@ -158,6 +158,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
+	logger.Info("Shoot namespace: ", "namespace", cluster.Shoot.GetNamespace())
 	shootResources, err := getShootResources(
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
@@ -593,7 +594,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	return resources, nil
 }
 
-func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName string, shootNamespace string) (map[string][]byte, error) {
+func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName, shootNamespace string) (map[string][]byte, error) {
 	var (
 		matchPolicy          = admissionregistration.Equivalent
 		sideEffectClass      = admissionregistration.SideEffectClassNone
@@ -611,15 +612,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 				},
 			},
 		}
-		objectSelector = metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key:      resourcesv1alpha1.ManagedBy,
-					Operator: metav1.LabelSelectorOpIn,
-					Values:   []string{"gardener"},
-				},
-			},
-		}
+		objectSelector = metav1.LabelSelector{}
 		rules = []admissionregistration.RuleWithOperations{{
 			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
 			Rule: admissionregistration.Rule{
@@ -631,8 +624,16 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 	)
 
 	isManagedSeed := shootNamespace == v1beta1constants.GardenNamespace
-	if isManagedSeed {
-		objectSelector = metav1.LabelSelector{}
+	if !isManagedSeed {
+		objectSelector = metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      resourcesv1alpha1.ManagedBy,
+					Operator: metav1.LabelSelectorOpIn,
+					Values:   []string{"gardener"},
+				},
+			},
+		}
 	}
 
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
