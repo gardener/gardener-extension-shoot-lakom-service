@@ -613,7 +613,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 			},
 		}
 		objectSelector = metav1.LabelSelector{}
-		rules = []admissionregistration.RuleWithOperations{{
+		rules          = []admissionregistration.RuleWithOperations{{
 			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
 			Rule: admissionregistration.Rule{
 				APIGroups:   []string{""},
