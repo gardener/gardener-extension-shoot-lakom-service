@@ -158,7 +158,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
-	logger.Info("Shoot namespace: ", "namespace", cluster.Shoot.GetNamespace())
 	shootResources, err := getShootResources(
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
