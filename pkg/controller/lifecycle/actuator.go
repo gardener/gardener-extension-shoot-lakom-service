@@ -162,6 +162,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
+		cluster.Shoot.GetNamespace(),
 	)
 
 	if err != nil {
@@ -592,13 +593,13 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	return resources, nil
 }
 
-func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAccountName string) (map[string][]byte, error) {
+func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName, projectNamespace string) (map[string][]byte, error) {
 	var (
 		matchPolicy          = admissionregistration.Equivalent
 		sideEffectClass      = admissionregistration.SideEffectClassNone
 		failurePolicy        = admissionregistration.Fail
 		timeOutSeconds       = ptr.To[int32](25)
-		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, namespace)
+		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, extensionNamespace)
 		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
 		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
 		namespaceSelector    = metav1.LabelSelector{
@@ -610,6 +611,19 @@ func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAcco
 				},
 			},
 		}
+		objectSelector = metav1.LabelSelector{}
+		rules          = []admissionregistration.RuleWithOperations{{
+			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
+			Rule: admissionregistration.Rule{
+				APIGroups:   []string{""},
+				APIVersions: []string{"v1"},
+				Resources:   []string{"pods", "pods/ephemeralcontainers"},
+			},
+		}}
+	)
+
+	isManagedSeed := projectNamespace == v1beta1constants.GardenNamespace
+	if !isManagedSeed {
 		objectSelector = metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
@@ -619,15 +633,7 @@ func getShootResources(webhookCaBundle []byte, namespace, shootAccessServiceAcco
 				},
 			},
 		}
-		rules = []admissionregistration.RuleWithOperations{{
-			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
-			Rule: admissionregistration.Rule{
-				APIGroups:   []string{""},
-				APIVersions: []string{"v1"},
-				Resources:   []string{"pods", "pods/ephemeralcontainers"},
-			},
-		}}
-	)
+	}
 
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
 	shootResources, err := shootRegistry.AddAllAndSerialize(
