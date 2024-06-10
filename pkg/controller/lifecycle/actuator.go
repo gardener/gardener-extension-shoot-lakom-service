@@ -593,7 +593,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	return resources, nil
 }
 
-func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName, shootNamespace string) (map[string][]byte, error) {
+func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName, projectNamespace string) (map[string][]byte, error) {
 	var (
 		matchPolicy          = admissionregistration.Equivalent
 		sideEffectClass      = admissionregistration.SideEffectClassNone
@@ -622,7 +622,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 		}}
 	)
 
-	isManagedSeed := shootNamespace == v1beta1constants.GardenNamespace
+	isManagedSeed := projectNamespace == v1beta1constants.GardenNamespace
 	if !isManagedSeed {
 		objectSelector = metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
