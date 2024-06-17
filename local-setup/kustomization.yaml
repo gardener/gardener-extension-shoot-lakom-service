@@ -7,9 +7,10 @@ resources:
 patches:
 - patch: |
     - op: replace
-      path: /helm/values/image
-      value: local-skaffold/gardener-extension-registry-cache
+      path: /providerConfig/values/image
+      value: local-skaffold/gardener-extension-shoot-lakom-service
   target:
     group: core.gardener.cloud
     kind: ControllerDeployment
-    name: extension-registry-cache
+    name: shoot-lakom-service
+- path: patch-imagevector-overwrite.yaml

@@ -90,8 +90,6 @@ func getLakomReplicas(hibernated bool) *int32 {
 func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
 	namespace := ex.GetNamespace()
 
-	fmt.Println("------------- Extension reconcilation started -----------------")
-
 	cluster, err := controller.GetCluster(ctx, a.client, namespace)
 	if err != nil {
 		return err
@@ -174,7 +172,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
-	fmt.Println("Creating managed resource for shoot")
 	if err := managedresources.CreateForShoot(ctx, a.client, namespace, constants.ManagedResourceNamesShoot, constants.GardenerExtensionName, false, shootResources); err != nil {
 		return err
 	}
@@ -186,7 +183,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
-	fmt.Println("------------- Extension reconcilation ended -----------------")
 	return secretsManager.Cleanup(ctx)
 }
 

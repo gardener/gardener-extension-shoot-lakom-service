@@ -33,6 +33,11 @@ endif
 EXTENSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(EXTENSION_NAME))"
 ADMISSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(ADMISSION_NAME))"
 
+extension-build extension-up: export SKAFFOLD_DEFAULT_REPO = localhost:5001
+extension-build extension-up: export SKAFFOLD_PUSH = true
+# use static label for skaffold to prevent rolling all gardener components on every `skaffold` invocation
+extension-build extension-up extension-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
+
 .PHONY: start
 start:
 	@LEADER_ELECTION_NAMESPACE=$(LEADER_ELECTION_NAMESPACE) go run \
@@ -42,6 +47,8 @@ start:
 		--leader-election=$(LEADER_ELECTION) \
 		--leader-election-id=extension-shoot-lakom-service-leader-election \
 		--config=./example/00-config.yaml
+
+
 
 .PHONY: start-lakom
 start-lakom:
@@ -132,3 +139,20 @@ verify: check format test
 
 .PHONY: verify-extended
 verify-extended: check-generate check format test test-cov test-clean
+
+# speed-up skaffold deployments by building all images concurrently
+export SKAFFOLD_BUILD_CONCURRENCY = 0
+extension-up extension-dev: export SKAFFOLD_DEFAULT_REPO = localhost:5001
+extension-up extension-dev: export SKAFFOLD_PUSH = true
+# use static label for skaffold to prevent rolling all gardener components on every `skaffold` invocation
+extension-up extension-dev extension-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
+
+extension-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL)
+	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) --cache-artifacts=false run
+
+extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL)
+	$(SKAFFOLD) dev --cleanup=false --trigger=manual
+
+extension-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
+	$(SKAFFOLD) delete
+
