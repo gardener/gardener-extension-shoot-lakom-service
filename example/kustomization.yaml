@@ -3,3 +3,6 @@ kind: Kustomization
 
 resources:
 - controller-registration.yaml
+
+patches:
+- path: lakom/skaffold/patch-imagevector-overwrite.yaml
