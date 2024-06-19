@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -47,7 +48,8 @@ var _ = Describe("Actuator", func() {
 
 	Context("getShootResources", func() {
 		const (
-			namespace                     = "shoot--for--bar"
+			shootNamespace                = "garden-foo"
+			extensionNamespace            = "shoot--foo--bar"
 			shootAccessServiceAccountName = "extension-shoot-lakom-service-access"
 			validatingWebhookKey          = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-shoot.yaml"
 			mutatingWebhookKey            = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-shoot.yaml"
@@ -60,13 +62,13 @@ var _ = Describe("Actuator", func() {
 
 		It("Should ensure the correct shoot resources are created", func() {
 
-			resources, err := getShootResources(caBundle, namespace, shootAccessServiceAccountName)
+			resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, shootNamespace)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).To(HaveLen(4))
 
 			Expect(resources).To(Equal(map[string][]byte{
-				validatingWebhookKey: []byte(expectedSeedValidatingWebhook(caBundle, namespace)),
-				mutatingWebhookKey:   []byte(expectedShootMutatingWebhook(caBundle, namespace)),
+				validatingWebhookKey: []byte(expectedSeedValidatingWebhook(caBundle, extensionNamespace, false)),
+				mutatingWebhookKey:   []byte(expectedShootMutatingWebhook(caBundle, extensionNamespace, false)),
 				roleKey:              []byte(expectedShootRole()),
 				roleBindingKey:       []byte(expectedShootRoleBinding(shootAccessServiceAccountName)),
 			}))
@@ -74,33 +76,50 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName)
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, shootNamespace)
 				Expect(err).ToNot(HaveOccurred())
 
 				mutatingWebhook, ok := resources[mutatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(mutatingWebhook)).To(Equal(expectedShootMutatingWebhook(ca, ns)))
+				Expect(string(mutatingWebhook)).To(Equal(expectedShootMutatingWebhook(ca, ns, false)))
 			},
-			Entry("Global CA bundle and namespace name", caBundle, namespace),
+			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
 			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
 		)
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName)
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, shootNamespace)
 				Expect(err).ToNot(HaveOccurred())
 
 				validatingWebhook, ok := resources[validatingWebhookKey]
 				Expect(ok).To(BeTrue())
-				Expect(string(validatingWebhook)).To(Equal(expectedSeedValidatingWebhook(ca, ns)))
+				Expect(string(validatingWebhook)).To(Equal(expectedSeedValidatingWebhook(ca, ns, false)))
 			},
-			Entry("Global CA bundle and namespace name", caBundle, namespace),
+			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
+			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
+		)
+
+		DescribeTable("Should return an empty object selector for the webhooks when shoot is in the garden namespace",
+			func(ca []byte, ns string) {
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, v1beta1constants.GardenNamespace)
+				Expect(err).ToNot(HaveOccurred())
+
+				mutatingWebhook, ok := resources[mutatingWebhookKey]
+				Expect(ok).To(BeTrue())
+				Expect(string(mutatingWebhook)).To(Equal(expectedShootMutatingWebhook(ca, ns, true)))
+
+				validatingWebhook, ok := resources[validatingWebhookKey]
+				Expect(ok).To(BeTrue())
+				Expect(string(validatingWebhook)).To(Equal(expectedSeedValidatingWebhook(ca, ns, true)))
+			},
+			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
 			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
 		)
 
 		DescribeTable("Should ensure the rolebinding is correctly set",
 			func(saName string) {
-				resources, err := getShootResources(caBundle, namespace, saName)
+				resources, err := getShootResources(caBundle, extensionNamespace, saName, shootNamespace)
 				Expect(err).ToNot(HaveOccurred())
 
 				roleBinding, ok := resources[roleBindingKey]
@@ -203,8 +222,18 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 	})
 })
 
-func expectedShootMutatingWebhook(caBundle []byte, namespace string) string {
+func expectedShootMutatingWebhook(caBundle []byte, namespace string, withEmptyObjectSelector bool) string {
 	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	objectSelector := ` {}`
+	if !withEmptyObjectSelector {
+		objectSelector = `
+    matchExpressions:
+    - key: resources.gardener.cloud/managed-by
+      operator: In
+      values:
+      - gardener`
+	}
 
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
@@ -230,12 +259,7 @@ webhooks:
       operator: In
       values:
       - kube-system
-  objectSelector:
-    matchExpressions:
-    - key: resources.gardener.cloud/managed-by
-      operator: In
-      values:
-      - gardener
+  objectSelector:` + objectSelector + `
   rules:
   - apiGroups:
     - ""
@@ -252,8 +276,18 @@ webhooks:
 `
 }
 
-func expectedSeedValidatingWebhook(caBundle []byte, namespace string) string {
+func expectedSeedValidatingWebhook(caBundle []byte, namespace string, withEmptyObjectSelector bool) string {
 	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	objectSelector := ` {}`
+	if !withEmptyObjectSelector {
+		objectSelector = `
+    matchExpressions:
+    - key: resources.gardener.cloud/managed-by
+      operator: In
+      values:
+      - gardener`
+	}
 
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -279,12 +313,7 @@ webhooks:
       operator: In
       values:
       - kube-system
-  objectSelector:
-    matchExpressions:
-    - key: resources.gardener.cloud/managed-by
-      operator: In
-      values:
-      - gardener
+  objectSelector:` + objectSelector + `
   rules:
   - apiGroups:
     - ""
