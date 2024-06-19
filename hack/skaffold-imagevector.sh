@@ -1,4 +1,7 @@
-cat <<EOF > local-setup/patch-imagevector-overwrite.yaml
+IMAGE_REPO=$(echo $SKAFFOLD_IMAGE | cut -d':' -f1,2)
+IMAGE_TAG=$(echo $SKAFFOLD_IMAGE | cut -d':' -f3)
+
+cat <<EOF > example/lakom/skaffold/patch-imagevector-overwrite.yaml
 apiVersion: core.gardener.cloud/v1beta1
 kind: ControllerDeployment
 metadata:
@@ -8,6 +11,6 @@ providerConfig:
     imageVectorOverwrite:
       images:
       - name: lakom
-        repository: ${SKAFFOLD_IMAGE_REPO}
-        tag: ${SKAFFOLD_IMAGE_TAG}
+        repository: ${IMAGE_REPO}
+        tag: ${IMAGE_TAG}
 EOF
