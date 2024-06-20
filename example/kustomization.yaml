@@ -17,8 +17,8 @@ patches:
           cosignPublicKeys:
             - |
               -----BEGIN PUBLIC KEY-----
-              mfkwewyhkozizj0caqyikozizj0daqcdqgaeakzef+d07q1ayxxf8xw3l23tgdsq
-              scitl0xdpdlgpoduzxg6lbwy3qxs6yhct0mzh6+jf5l/8dao7hdrrvbqmg==
+              MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAKZef+D07q1AyXxf8xw3L23TgDSq
+              Scitl0xDpdLGpODUZXG6LbWY3QXS6yhCt0MZH6+Jf5l/8daO7HDRRvbQMg==
               -----END PUBLIC KEY-----
   target:
     group: core.gardener.cloud
