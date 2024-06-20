@@ -3,26 +3,3 @@ kind: Kustomization
 
 resources:
 - ../example
-
-patches:
-- patch: |
-    - op: replace
-      path: /providerConfig/values/image
-      value: local-skaffold/gardener-extension-shoot-lakom-service
-    - op: add
-      path: /providerConfig/values
-      value:
-        controllers:
-          allowUntrustedImages: true
-          cosignPublicKeys:
-            - |
-              -----BEGIN PUBLIC KEY-----
-              MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAKZef+D07q1AyXxf8xw3L23TgDSq
-              Scitl0xDpdLGpODUZXG6LbWY3QXS6yhCt0MZH6+Jf5l/8daO7HDRRvbQMg==
-              -----END PUBLIC KEY-----
-  target:
-    group: core.gardener.cloud
-    kind: ControllerDeployment
-    name: shoot-lakom-service
-# This patch file is generated post-build via skaffold hooks.
-# - path: ../example/lakom/skaffold/patch-imagevector-overwrite.yaml
