@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+
 # Ideally we'd use $SKAFFOLD_IMAGE_REPO & $SKAFFOLD_IMAGE_TAG instead of
 # extracting these values from $SKAFFOLD_IMAGE, but for some reason,
 # the value for $SKAFFOLD_IMAGE_REPO is everything before the '/' symbol, instead

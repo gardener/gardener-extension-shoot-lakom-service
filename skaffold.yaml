@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: skaffold/v4beta3
 kind: Config
@@ -13,6 +16,7 @@ build:
       - image: local-skaffold/lakom
       ko:
         # The dependencies section configures what files Skaffold should watch for changes when in dev mode.
+        # These dependencies can be updated using a skaffold script found in the hack dir of gardener
         dependencies:
           paths:
             - charts
