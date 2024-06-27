@@ -4,7 +4,7 @@
 
 COSIGN         := $(TOOLS_BIN_DIR)/cosign
 COSIGN_VERSION ?= v2.2.3
-CRANE		   := $(TOOLS_BIN_DIR)/crane
+CRANE          := $(TOOLS_BIN_DIR)/crane
 CRANE_VERSION  ?= v0.19.2
 
 export TOOLS_BIN_DIR := $(TOOLS_BIN_DIR)

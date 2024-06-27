@@ -133,6 +133,10 @@ verify: check format test
 .PHONY: verify-extended
 verify-extended: check-generate check format test test-cov test-clean
 
+.PHONY: update-skaffold-deps
+update-skaffold-deps: $(YQ)
+	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) hack/check-skaffold-deps.sh update
+
 # speed-up skaffold deployments by building all images concurrently
 export SKAFFOLD_BUILD_CONCURRENCY = 0
 extension-up extension-dev: export SKAFFOLD_DEFAULT_REPO = localhost:5001
