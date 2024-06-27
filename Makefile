@@ -56,7 +56,7 @@ start-lakom:
 		--insecure-allow-untrusted-images=true
 
 .PHONE: dev-setup
-dev-setup: $(COSIGN)
+dev-setup: $(COSIGN) $(CRANE)
 	@$(HACK_DIR)/generate-certificates.sh
 	@$(HACK_DIR)/configure-webhook.sh
 	@$(HACK_DIR)/generate-cosign-key-pair.sh
@@ -148,3 +148,4 @@ extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL)
 
 extension-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
 	$(SKAFFOLD) delete
+

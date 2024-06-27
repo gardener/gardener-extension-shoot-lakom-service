@@ -14,8 +14,11 @@
 # This might need to be brought up as an issue on skaffold's side. For anyone
 # interested, the logic for the parsing of the image name in the skaffold project 
 # is contained in https://github.com/GoogleContainerTools/skaffold/blob/main/pkg/skaffold/docker/reference.go
+#
+# Additionally, we want to inject the image digest from the manifest in the registry.
+# Skaffold does not export this value. That's why crane is used to append it manually.
 IMAGE_REPO=$(echo $SKAFFOLD_IMAGE | cut -d':' -f1,2)
-IMAGE_TAG=$(echo $SKAFFOLD_IMAGE | cut -d':' -f3)
+IMAGE_TAG=$(echo "$(echo $SKAFFOLD_IMAGE | cut -d':' -f3)@$(crane digest $SKAFFOLD_IMAGE)")
 
 cat <<EOF > example/lakom/skaffold/patch-imagevector-overwrite.yaml
 apiVersion: core.gardener.cloud/v1beta1
