@@ -17,8 +17,14 @@
 #
 # Additionally, we want to inject the image digest from the manifest in the registry.
 # Skaffold does not export this value. That's why crane is used to append it manually.
+
+set -o pipefail
+set -o errexit
+
 IMAGE_REPO=$(echo $SKAFFOLD_IMAGE | cut -d':' -f1,2)
 IMAGE_TAG=$(echo "$(echo $SKAFFOLD_IMAGE | cut -d':' -f3)@$(crane digest $SKAFFOLD_IMAGE)")
+
+mkdir -p example/lakom/skaffold
 
 cat <<EOF > example/lakom/skaffold/patch-imagevector-overwrite.yaml
 apiVersion: core.gardener.cloud/v1beta1

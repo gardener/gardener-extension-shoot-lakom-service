@@ -16,7 +16,7 @@ build:
         - image: local-skaffold/lakom
       ko:
         # The dependencies section configures what files Skaffold should watch for changes when in dev mode.
-        # These dependencies can be updated using a skaffold script found in the hack dir of gardener
+        # These dependencies can be updated using a skaffold script found in the hack dir
         dependencies:
           paths:
             - charts
@@ -38,7 +38,7 @@ build:
         main: ./cmd/gardener-extension-shoot-lakom-service
     - image: local-skaffold/lakom
       # We need the image for the lakom admisison controller to be injected 
-      # into the vectorImageOverwrite for the controller registration.
+      # into the imageVectorOverwrite for the controller registration.
       # Skaffold currently does not give us an easy way to access the 
       # image name of the newly built lakom during deployment (eg. passing it
       # to kustomize).

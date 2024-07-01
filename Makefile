@@ -135,7 +135,7 @@ verify-extended: check-generate check format test test-cov test-clean
 
 .PHONY: update-skaffold-deps
 update-skaffold-deps: $(YQ)
-	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) hack/check-skaffold-deps.sh update
+	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) $(HACK_DIR)/check-skaffold-deps.sh update
 
 # speed-up skaffold deployments by building all images concurrently
 export SKAFFOLD_BUILD_CONCURRENCY = 0
@@ -147,7 +147,7 @@ extension-up extension-dev extension-down: export SKAFFOLD_LABEL = skaffold.dev/
 extension-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL) $(CRANE)
 	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) --cache-artifacts=false run
 
-extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL)
+extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL) $(CRANE)
 	$(SKAFFOLD) dev --cleanup=false --trigger=manual
 
 extension-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
