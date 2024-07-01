@@ -13,7 +13,7 @@ cosignPublicKeys:
 seedBootstrap:
   ownerNamespace: lakom-extension
 useOnlyImagePullSecrets: true
-allowUntrustedImages: false
+allowUntrustedImages: true
 debugConfig:
   enableProfiling: false
   enableContentionProfiling: false
