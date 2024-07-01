@@ -56,7 +56,7 @@ start-lakom:
 		--insecure-allow-untrusted-images=true
 
 .PHONE: dev-setup
-dev-setup: $(COSIGN) $(CRANE)
+dev-setup: $(COSIGN)
 	@$(HACK_DIR)/generate-certificates.sh
 	@$(HACK_DIR)/configure-webhook.sh
 	@$(HACK_DIR)/generate-cosign-key-pair.sh
@@ -144,7 +144,7 @@ extension-up extension-dev: export SKAFFOLD_PUSH = true
 # use static label for skaffold to prevent rolling all gardener components on every `skaffold` invocation
 extension-up extension-dev extension-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
 
-extension-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL)
+extension-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL) $(CRANE)
 	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) --cache-artifacts=false run
 
 extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL)
