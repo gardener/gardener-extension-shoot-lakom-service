@@ -4,8 +4,6 @@
 
 COSIGN         := $(TOOLS_BIN_DIR)/cosign
 COSIGN_VERSION ?= v2.2.3
-CRANE          := $(TOOLS_BIN_DIR)/crane
-CRANE_VERSION  ?= v0.19.2
 
 export TOOLS_BIN_DIR := $(TOOLS_BIN_DIR)
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
@@ -24,7 +22,4 @@ tool_version_file = $(TOOLS_BIN_DIR)/.version_$(subst $(TOOLS_BIN_DIR)/,,$(1))_$
 
 $(COSIGN): $(call tool_version_file,$(COSIGN),$(COSIGN_VERSION))
 	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install github.com/sigstore/cosign/v2/cmd/cosign@$(COSIGN_VERSION)
-
-$(CRANE): $(call tool_version_file,$(CRANE),$(CRANE_VERSION))
-	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install github.com/google/go-containerregistry/cmd/crane@$(CRANE_VERSION)
 

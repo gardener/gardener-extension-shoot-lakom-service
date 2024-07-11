@@ -21,8 +21,8 @@
 set -o pipefail
 set -o errexit
 
-IMAGE_REPO=$(echo $SKAFFOLD_IMAGE | cut -d':' -f1,2)
-IMAGE_TAG=$(echo "$(echo $SKAFFOLD_IMAGE | cut -d':' -f3)@$(crane digest $SKAFFOLD_IMAGE)")
+image_repo=$(echo $SKAFFOLD_IMAGE | cut -d':' -f1,2)
+image_tag=$(echo $SKAFFOLD_IMAGE | cut -d':' -f3)
 
 mkdir -p example/lakom/skaffold
 
@@ -36,6 +36,6 @@ providerConfig:
     imageVectorOverwrite:
       images:
       - name: lakom
-        repository: ${IMAGE_REPO}
-        tag: ${IMAGE_TAG}
+        repository: ${image_repo}
+        tag: ${image_tag}
 EOF
