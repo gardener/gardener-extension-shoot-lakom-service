@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Gardener contributors
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -14,9 +14,6 @@
 # This might need to be brought up as an issue on skaffold's side. For anyone
 # interested, the logic for the parsing of the image name in the skaffold project 
 # is contained in https://github.com/GoogleContainerTools/skaffold/blob/main/pkg/skaffold/docker/reference.go
-#
-# Additionally, we want to inject the image digest from the manifest in the registry.
-# Skaffold does not export this value. That's why crane is used to append it manually.
 
 set -o pipefail
 set -o errexit

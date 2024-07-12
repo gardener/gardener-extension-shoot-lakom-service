@@ -103,6 +103,7 @@ check-generate:
 check: $(GOIMPORTS) $(GOLANGCI_LINT) $(HELM)
 	@bash $(GARDENER_HACK_DIR)/check.sh --golangci-lint-config=./.golangci.yaml ./cmd/... ./pkg/... ./test/...
 	@bash $(GARDENER_HACK_DIR)/check-charts.sh ./charts
+	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) $(HACK_DIR)/check-skaffold-deps.sh 
 
 .PHONY: generate
 generate: $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ) $(VGOPATH)
