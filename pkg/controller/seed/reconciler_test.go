@@ -39,6 +39,7 @@ var _ = Describe("Reconciler", func() {
 			image                   = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			useOnlyImagePullSecrets = true
 			allowUntrustedImages    = false
+                        insecureRegistries      = false
 
 			validatingWebhookKey  = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
 			mutatingWebhookKey    = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
@@ -75,7 +76,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion string, withUnhealthyPodEvictionPolicy, onlyImagePullSecrets, untrustedImages bool) {
+			func(k8sVersion string, withUnhealthyPodEvictionPolicy, onlyImagePullSecrets, untrustedImages, insecureRegistries bool) {
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
@@ -83,6 +84,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					caBundle,
 					onlyImagePullSecrets,
 					untrustedImages,
+                                        insecureRegistries,
 					semver.MustParse(k8sVersion),
 				)
 
@@ -94,7 +96,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					mutatingWebhookKey:    expectedMutatingWebhook(caBundle),
 					clusterRoleKey:        expectedClusterRole(),
 					clusterRoleBindingKey: expectedClusterRoleBinding(),
-					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages)),
+					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages), strconv.FormatBool(insecureRegistries)),
 					pdbKey:                expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
 					cosignSecretNameKey:   expectedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
 					serviceKey:            expectedService(namespace),
@@ -110,10 +112,11 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					Expect(strResource).To(Equal(expectedResource), key, string(resource))
 				}
 			},
-			Entry("Kubernetes version < 1.26", "1.25.0", false, false, false),
-			Entry("Kubernetes version >= 1.26", "1.26.0", true, false, false),
-			Entry("Use only image pull secrets", "1.27.0", true, true, false),
-			Entry("Allow untrusted images", "1.28.0", true, false, true),
+			Entry("Kubernetes version < 1.26", "1.25.0", false, false, false, false),
+			Entry("Kubernetes version >= 1.26", "1.26.0", true, false, false, false),
+			Entry("Use only image pull secrets", "1.27.0", true, true, false, false),
+			Entry("Allow untrusted images", "1.28.0", true, false, true, false),
+                        Entry("Allow insecure registries", "1.29.0", true, false, false, true),
 		)
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
@@ -125,6 +128,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
+                                        insecureRegistries,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
@@ -146,6 +150,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
+                                        insecureRegistries,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
@@ -166,6 +171,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				caBundle,
 				useOnlyImagePullSecrets,
 				allowUntrustedImages,
+                                insecureRegistries,
 				k8sVersion,
 			)
 
@@ -312,7 +318,7 @@ subjects:
 `
 }
 
-func expectedDeployment(namespace, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages string) string {
+func expectedDeployment(namespace, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
 	var (
 		serverTLSSecretNameAnnotationKey        = references.AnnotationKey("secret", serverTLSSecretName)
 		cosignPublicKeysSecretNameAnnotationKey = references.AnnotationKey("secret", cosignPublicKeysSecretName)
@@ -382,6 +388,7 @@ spec:
         - --port=10250
         - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
         - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
+        - --insecure-allow-insecure-registries=` + allowInsecureRegistries + `
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:

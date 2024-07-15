@@ -47,6 +47,7 @@ controllers:
   metricsPort: 8081
   useOnlyImagePullSecrets: false
   allowUntrustedImages: false
+  allowInsecureRegistries: false
   debugConfig:
     enableProfiling: false
     enableContentionProfiling: false

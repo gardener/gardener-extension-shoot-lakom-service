@@ -17,6 +17,7 @@ patches:
       path: /providerConfig/values/controllers
       value:
           allowUntrustedImages: true
+          allowInsecureRegistries: true
           cosignPublicKeys:
             - |
               -----BEGIN PUBLIC KEY-----

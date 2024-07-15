@@ -32,6 +32,7 @@ type HandleBuilder struct {
 	cacheTTL                time.Duration
 	cacheRefreshInterval    time.Duration
 	useOnlyImagePullSecrets bool
+        allowInsecureRegistries bool
 }
 
 // NewHandleBuilder returns new handle builder.
@@ -50,6 +51,12 @@ func (hb HandleBuilder) WithManager(mgr manager.Manager) HandleBuilder {
 func (hb HandleBuilder) WithUseOnlyImagePullSecrets(useOnlyImagePullSecrets bool) HandleBuilder {
 	hb.useOnlyImagePullSecrets = useOnlyImagePullSecrets
 	return hb
+}
+
+// WithAllowInsecureRegistries allows Lakom to use HTTP for communication with the registries
+func (hb HandleBuilder) WithAllowInsecureRegistries(allowInsecureRegistries bool) HandleBuilder {
+        hb.allowInsecureRegistries = allowInsecureRegistries
+        return hb
 }
 
 // WithCacheTTL sets the TTL for the cache.
@@ -78,6 +85,7 @@ func (hb HandleBuilder) Build() (*handler, error) {
 			reader:                  hb.mgr.GetAPIReader(),
 			decoder:                 admission.NewDecoder(hb.mgr.GetScheme()),
 			useOnlyImagePullSecrets: hb.useOnlyImagePullSecrets,
+                        allowInsecureRegistries: hb.allowInsecureRegistries,
 		}
 		resolver Resolver
 	)
@@ -102,6 +110,7 @@ type handler struct {
 
 	resolver                Resolver
 	useOnlyImagePullSecrets bool
+        allowInsecureRegistries bool
 }
 
 var (
@@ -193,7 +202,15 @@ func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logg
 func (h *handler) handleContainer(ctx context.Context, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
 	logger = logger.WithValues("originalImage", image)
 
-	imageRef, err := name.ParseReference(image)
+        var (
+            imageRef name.Reference
+            err error
+        )
+        if h.allowInsecureRegistries {
+            imageRef, err = name.ParseReference(image, name.Insecure)
+        } else {
+            imageRef, err = name.ParseReference(image)
+        }
 	if err != nil {
 		return "", err
 	}
@@ -219,3 +236,4 @@ func (h *handler) handleContainer(ctx context.Context, image string, kcr utils.K
 
 	return resolved, nil
 }
+
