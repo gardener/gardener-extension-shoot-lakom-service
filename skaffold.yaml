@@ -7,6 +7,8 @@ kind: Config
 metadata:
   name: extension
 build:
+  tagPolicy:
+    inputDigest: {}
   insecureRegistries:
     - garden.local.gardener.cloud
   artifacts:
