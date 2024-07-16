@@ -202,15 +202,12 @@ func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logg
 func (h *handler) handleContainer(ctx context.Context, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
 	logger = logger.WithValues("originalImage", image)
 
-        var (
-            imageRef name.Reference
-            err error
-        )
-        if h.allowInsecureRegistries {
-            imageRef, err = name.ParseReference(image, name.Insecure)
-        } else {
-            imageRef, err = name.ParseReference(image)
-        }
+        opts := []name.Option{}
+	if h.allowInsecureRegistries {
+		opts = append(opts, name.Insecure)
+	}
+
+	imageRef, err := name.ParseReference(image, opts...)
 	if err != nil {
 		return "", err
 	}

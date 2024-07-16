@@ -36,6 +36,7 @@ type HandleBuilder struct {
 	cacheRefreshInterval    time.Duration
 	useOnlyImagePullSecrets bool
 	allowUntrustedImages    bool
+        allowInsecureRegistries bool
 }
 
 // NewHandleBuilder returns new handle builder.
@@ -59,6 +60,12 @@ func (hb HandleBuilder) WithUseOnlyImagePullSecrets(useOnlyImagePullSecrets bool
 // WithAllowUntrustedImages configures the webhook to allow images without trusted signature.
 func (hb HandleBuilder) WithAllowUntrustedImages(allowUntrustedImages bool) HandleBuilder {
 	hb.allowUntrustedImages = allowUntrustedImages
+	return hb
+}
+
+// WithAllowInsecureRegistries configures lakom to communicate via HTTP with registries if HTTPS is not possible
+func (hb HandleBuilder) WithAllowInsecureRegistries(allowInsecureRegistries bool) HandleBuilder {
+	hb.allowInsecureRegistries = allowInsecureRegistries
 	return hb
 }
 
@@ -95,6 +102,7 @@ func (hb HandleBuilder) Build() (*handler, error) {
 			decoder:                 admission.NewDecoder(hb.mgr.GetScheme()),
 			useOnlyImagePullSecrets: hb.useOnlyImagePullSecrets,
 			allowUntrustedImages:    hb.allowUntrustedImages,
+                        allowInsecureRegistries: hb.allowInsecureRegistries,
 		}
 		verifier Verifier
 	)
@@ -130,6 +138,7 @@ type handler struct {
 	verifier                Verifier
 	useOnlyImagePullSecrets bool
 	allowUntrustedImages    bool
+        allowInsecureRegistries bool
 }
 
 var (
@@ -232,7 +241,7 @@ func (h *handler) validateContainerImage(ctx context.Context, logger logr.Logger
 	logger = logger.WithValues("image", image).WithValues("containerName", containerName)
 	ctx = logf.IntoContext(ctx, logger)
 
-	verified, err := h.verifier.Verify(ctx, image, kcr)
+	verified, err := h.verifier.Verify(ctx, image, kcr, h.allowInsecureRegistries)
 	if err != nil {
 		metrics.ImageSignatureErrors.WithLabelValues().Inc()
 	} else {

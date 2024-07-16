@@ -239,6 +239,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
 		WithUseOnlyImagePullSecrets(o.UseOnlyImagePullSecrets).
 		WithAllowUntrustedImages(o.AllowUntrustedImages).
+                WithAllowInsecureRegistries(o.AllowInsecureRegistries).
 		Build()
 	if err != nil {
 		return err

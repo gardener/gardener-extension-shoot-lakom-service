@@ -12,7 +12,7 @@ import (
 
 // Verifier is interface which implementations should verify cosign signatures of an image.
 type Verifier interface {
-	Verify(context.Context, string, utils.KeyChainReader) (bool, error)
+	Verify(context.Context, string, utils.KeyChainReader, bool) (bool, error)
 }
 
 // SignatureVerificationResultCache is interface which implementations should store the signature verification status of an image.
