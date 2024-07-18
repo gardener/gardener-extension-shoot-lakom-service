@@ -29,9 +29,9 @@ type Configuration struct {
 	// AllowUntrustedImages sets lakom webhook to allow images without trusted signature.
 	// Instead to deny the request, the webhook will allow it with a warning.
 	AllowUntrustedImages bool
-        // AllowInsecureRegistries sets the lakom webhook to allow HTTP communication with OCI registries.
-        // It first tries HTTPS and then falls back to HTTP.
-        AllowInsecureRegistries bool
+	// AllowInsecureRegistries sets the lakom webhook to allow HTTP communication with OCI registries.
+	// It first tries HTTPS and then falls back to HTTP.
+	AllowInsecureRegistries bool
 }
 
 // DebugConfig contains debug configurations for the controller.

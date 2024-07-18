@@ -101,9 +101,9 @@ type Options struct {
 	// AllowUntrustedImages configures the webhook to allow images without trusted signature.
 	// Instead to deny the request, the webhook will allow it with a warning.
 	AllowUntrustedImages bool
-        // AllowInsecureRegistries configures the webhook to fallback to HTTP if HTTPS communication with
-        // the respective registry is not possible.
-        AllowInsecureRegistries bool
+	// AllowInsecureRegistries configures the webhook to fallback to HTTP if HTTPS communication with
+	// the respective registry is not possible.
+	AllowInsecureRegistries bool
 }
 
 // AddFlags adds lakom admission controller's flags to the specified FlagSet.
@@ -215,7 +215,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithCacheTTL(o.CacheTTL).
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
 		WithUseOnlyImagePullSecrets(o.UseOnlyImagePullSecrets).
-                WithAllowInsecureRegistries(o.AllowInsecureRegistries).
+		WithAllowInsecureRegistries(o.AllowInsecureRegistries).
 		Build()
 	if err != nil {
 		return err
@@ -239,7 +239,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
 		WithUseOnlyImagePullSecrets(o.UseOnlyImagePullSecrets).
 		WithAllowUntrustedImages(o.AllowUntrustedImages).
-                WithAllowInsecureRegistries(o.AllowInsecureRegistries).
+		WithAllowInsecureRegistries(o.AllowInsecureRegistries).
 		Build()
 	if err != nil {
 		return err

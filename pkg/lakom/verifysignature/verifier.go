@@ -25,20 +25,22 @@ import (
 
 type directVerifier struct {
 	publicKeys []crypto.PublicKey
+	insecure   bool
 }
 
 // NewDirectVerifier creates new verifier and returns it.
-func NewDirectVerifier(keys []crypto.PublicKey) *directVerifier {
+func NewDirectVerifier(keys []crypto.PublicKey, allowInsecureRegistries bool) *directVerifier {
 	dv := &directVerifier{
 		publicKeys: keys,
+		insecure:   allowInsecureRegistries,
 	}
 	return dv
 }
 
 // Verify check if image is signed by at least one of the configured cosign public keys.
-func (r *directVerifier) Verify(ctx context.Context, image string, kcr utils.KeyChainReader, insecure bool) (bool, error) {
-        opts := []name.Option{}
-	if insecure {
+func (r *directVerifier) Verify(ctx context.Context, image string, kcr utils.KeyChainReader) (bool, error) {
+	opts := []name.Option{}
+	if r.insecure {
 		opts = append(opts, name.Insecure)
 	}
 	imageRef, err := name.ParseReference(image, opts...)
@@ -138,7 +140,7 @@ func NewCacheVerifier(cache SignatureVerificationResultCache, verifier Verifier)
 // Verify check cosign signature of an image. Firstly it checks if the cache have an entry
 // for the verification state of the image and returns it. If the cache have no entry,
 // it uses the verifier to do the real verification, persists the result in the cache and return it.
-func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyChainReader, insecure bool) (bool, error) {
+func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyChainReader) (bool, error) {
 	verified, found := r.cache.GetSignatureVerificationResult(image)
 	if found {
 		metrics.ImageSignatureCache.WithLabelValues(metrics.CacheHit).Inc()
@@ -147,7 +149,7 @@ func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyC
 
 	defer r.requestGroup.Forget(image)
 	v, err, _ := r.requestGroup.Do(image, func() (any, error) {
-		verified, err := r.actualVerifier.Verify(ctx, image, kcr, insecure)
+		verified, err := r.actualVerifier.Verify(ctx, image, kcr)
 		if err != nil {
 			return false, err
 		}

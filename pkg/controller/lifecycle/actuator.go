@@ -150,7 +150,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		image.String(),
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
-                a.serviceConfig.AllowInsecureRegistries,
+		a.serviceConfig.AllowInsecureRegistries,
 		seedK8sSemverVersion,
 		// TODO(rfranzke): Delete this after August 2024.
 		a.client.Get(ctx, client.ObjectKey{Name: "prometheus-shoot", Namespace: ex.Namespace}, &appsv1.StatefulSet{}) == nil,
@@ -362,7 +362,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 							"--kubeconfig=" + gutil.PathGenericKubeconfig,
 							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
 							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
-                                                        "--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
+							"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
 						},
 						Ports: []corev1.ContainerPort{
 							{

@@ -36,7 +36,7 @@ type HandleBuilder struct {
 	cacheRefreshInterval    time.Duration
 	useOnlyImagePullSecrets bool
 	allowUntrustedImages    bool
-        allowInsecureRegistries bool
+	allowInsecureRegistries bool
 }
 
 // NewHandleBuilder returns new handle builder.
@@ -102,7 +102,6 @@ func (hb HandleBuilder) Build() (*handler, error) {
 			decoder:                 admission.NewDecoder(hb.mgr.GetScheme()),
 			useOnlyImagePullSecrets: hb.useOnlyImagePullSecrets,
 			allowUntrustedImages:    hb.allowUntrustedImages,
-                        allowInsecureRegistries: hb.allowInsecureRegistries,
 		}
 		verifier Verifier
 	)
@@ -117,7 +116,7 @@ func (hb HandleBuilder) Build() (*handler, error) {
 		return nil, err
 	}
 
-	verifier = NewDirectVerifier(cosignPublicKeys)
+	verifier = NewDirectVerifier(cosignPublicKeys, hb.allowInsecureRegistries)
 	if hb.cacheTTL != 0 {
 		cache, err := NewSignatureVerificationResultCache(hb.cacheRefreshInterval, hb.cacheTTL)
 		if err != nil {
@@ -138,7 +137,6 @@ type handler struct {
 	verifier                Verifier
 	useOnlyImagePullSecrets bool
 	allowUntrustedImages    bool
-        allowInsecureRegistries bool
 }
 
 var (
@@ -241,7 +239,7 @@ func (h *handler) validateContainerImage(ctx context.Context, logger logr.Logger
 	logger = logger.WithValues("image", image).WithValues("containerName", containerName)
 	ctx = logf.IntoContext(ctx, logger)
 
-	verified, err := h.verifier.Verify(ctx, image, kcr, h.allowInsecureRegistries)
+	verified, err := h.verifier.Verify(ctx, image, kcr)
 	if err != nil {
 		metrics.ImageSignatureErrors.WithLabelValues().Inc()
 	} else {

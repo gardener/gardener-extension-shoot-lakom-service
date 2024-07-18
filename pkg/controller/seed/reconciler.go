@@ -110,7 +110,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		kcr.serviceConfig.UseOnlyImagePullSecrets,
 		kcr.serviceConfig.AllowUntrustedImages,
-                kcr.serviceConfig.AllowInsecureRegistries,
+		kcr.serviceConfig.AllowInsecureRegistries,
 		kcr.seedK8sVersion,
 	)
 	if err != nil {
@@ -287,7 +287,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 							"--port=" + serverPort.String(),
 							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
 							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
-                                                        "--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
+							"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
 						},
 						Ports: []corev1.ContainerPort{
 							{

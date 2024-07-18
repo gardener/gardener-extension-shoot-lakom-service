@@ -39,7 +39,7 @@ var _ = Describe("Reconciler", func() {
 			image                   = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			useOnlyImagePullSecrets = true
 			allowUntrustedImages    = false
-                        insecureRegistries      = false
+			insecureRegistries      = false
 
 			validatingWebhookKey  = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
 			mutatingWebhookKey    = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
@@ -84,7 +84,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					caBundle,
 					onlyImagePullSecrets,
 					untrustedImages,
-                                        insecureRegistries,
+					insecureRegistries,
 					semver.MustParse(k8sVersion),
 				)
 
@@ -116,7 +116,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 			Entry("Kubernetes version >= 1.26", "1.26.0", true, false, false, false),
 			Entry("Use only image pull secrets", "1.27.0", true, true, false, false),
 			Entry("Allow untrusted images", "1.28.0", true, false, true, false),
-                        Entry("Allow insecure registries", "1.29.0", true, false, false, true),
+			Entry("Allow insecure registries", "1.29.0", true, false, true, true),
 		)
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
@@ -128,7 +128,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
-                                        insecureRegistries,
+					insecureRegistries,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
@@ -150,7 +150,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					ca,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
-                                        insecureRegistries,
+					insecureRegistries,
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
@@ -171,7 +171,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				caBundle,
 				useOnlyImagePullSecrets,
 				allowUntrustedImages,
-                                insecureRegistries,
+				insecureRegistries,
 				k8sVersion,
 			)
 

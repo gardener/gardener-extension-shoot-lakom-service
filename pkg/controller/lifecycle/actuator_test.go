@@ -184,7 +184,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					image,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
-                                        allowInsecureRegistries,
+					allowInsecureRegistries,
 					k8sVersion,
 					gep19Monitoring,
 				)
@@ -219,7 +219,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 			Entry("With GEP-19 Monitoring", semver.MustParse("1.26.0"), true, false, false, false, true),
 			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false, false),
 			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false, false),
-                        Entry("Allow insecure registries", semver.MustParse("1.29.0"), true, false, false, true, false),
+			Entry("Allow insecure registries", semver.MustParse("1.29.0"), true, false, true, false, true),
 		)
 	})
 })

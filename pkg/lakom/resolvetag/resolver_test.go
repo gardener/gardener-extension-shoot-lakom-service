@@ -69,7 +69,7 @@ var _ = Describe("Resolver", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resolvedImage).To(Equal(expectedImage))
 			},
-			Entry("[GCR] Resolve tag to digest", "k8s.gcr.io/pause:3.7", "k8s.gcr.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c", false, false, ""),
+			Entry("[GCR] Resolve tag to digest", "registry.k8s.io/pause:3.7", "registry.k8s.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c", false, false, ""),
 			Entry("[Docker Hub] Resolve tag to digest", "index.docker.io/library/alpine:3.10.0", "index.docker.io/library/alpine@sha256:ca1c944a4f8486a153024d9965aafbe24f5723c1d5c02f4964c045a16d19dc54", false, false, ""),
 			Entry("Do not run actual resolving of image with digest", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", true, false, ""),
 			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", "", true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
@@ -102,7 +102,7 @@ var _ = Describe("Resolver", func() {
 				Expect(got).To(BeTrue())
 				Expect(cachedImage).To(Equal(expectedImage))
 			},
-			Entry("[GCR] Resolve tag to digest", "k8s.gcr.io/pause:3.7", "k8s.gcr.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c", false, false, ""),
+			Entry("[GCR] Resolve tag to digest", "registry.k8s.io/pause:3.7", "registry.k8s.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c", false, false, ""),
 			Entry("[Docker Hub] Resolve tag to digest", "index.docker.io/library/alpine:3.10.0", "index.docker.io/library/alpine@sha256:ca1c944a4f8486a153024d9965aafbe24f5723c1d5c02f4964c045a16d19dc54", false, false, ""),
 			Entry("Do not run actual resolving of image with digest", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", true, false, ""),
 			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", "", true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
