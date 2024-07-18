@@ -52,7 +52,7 @@ start-lakom:
 		--tls-cert-dir=example/lakom/tls/ \
 		--cosign-public-key-path=example/lakom/cosign/cosign.pub \
 		--cache-ttl=$(CACHE_TTL) \
-		--cache-refresh-interval=$(CACHE_REFRESH_INTERVAL)
+		--cache-refresh-interval=$(CACHE_REFRESH_INTERVAL) \
 		--insecure-allow-untrusted-images=true
 
 .PHONE: dev-setup
