@@ -6,11 +6,12 @@ package verifysignature
 
 import (
 	"context"
-	"crypto"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
+	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
@@ -19,17 +20,18 @@ import (
 	"github.com/sigstore/cosign/v2/pkg/cosign"
 	ociremote "github.com/sigstore/cosign/v2/pkg/oci/remote"
 	"github.com/sigstore/sigstore/pkg/signature"
+	"github.com/sigstore/sigstore/pkg/signature/options"
 	"golang.org/x/sync/singleflight"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type directVerifier struct {
-	publicKeys []crypto.PublicKey
+	publicKeys lakomconfig.CompletedConfig
 	insecure   bool
 }
 
 // NewDirectVerifier creates new verifier and returns it.
-func NewDirectVerifier(keys []crypto.PublicKey, allowInsecureRegistries bool) *directVerifier {
+func NewDirectVerifier(keys lakomconfig.CompletedConfig, allowInsecureRegistries bool) *directVerifier {
 	dv := &directVerifier{
 		publicKeys: keys,
 		insecure:   allowInsecureRegistries,
@@ -62,7 +64,7 @@ func (r *directVerifier) Verify(ctx context.Context, image string, kcr utils.Key
 	return verify(ctx, imageRef, r.publicKeys, remoteOpts)
 }
 
-func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKey, opts ...ociremote.Option) (bool, error) {
+func verify(ctx context.Context, imageRef name.Reference, keys lakomconfig.CompletedConfig, opts ...ociremote.Option) (bool, error) {
 	if _, ok := imageRef.(name.Digest); !ok {
 		return false, fmt.Errorf("image reference is not a digest, reference: %q", imageRef.Name())
 	}
@@ -70,10 +72,24 @@ func verify(ctx context.Context, imageRef name.Reference, keys []crypto.PublicKe
 	logger := logf.FromContext(ctx)
 
 	// We need successful verification for at least one key, therefore any other failures can be ignored.
-	for idx, k := range keys {
-		log := logger.WithValues("cosignKeyID", idx)
+	for _, k := range keys.Keys {
+		log := logger.WithValues("keyName", k.Name, "scheme", k.Scheme)
+		loadOpts := []signature.LoadOption{}
 
-		verifier, err := signature.LoadVerifier(k, crypto.SHA256)
+		if k.Hash != nil {
+			loadOpts = append(loadOpts, options.WithHash(*k.Hash))
+			log = log.WithValues("hash", k.Hash.String())
+		}
+
+		if k.Scheme != nil {
+			log = log.WithValues("scheme", k.Scheme)
+
+			if *k.Scheme == lakomconfig.RSASSAPSS {
+				loadOpts = append(loadOpts, options.WithRSAPSS(&rsa.PSSOptions{Hash: *k.Hash}))
+			}
+		}
+
+		verifier, err := signature.LoadVerifierWithOpts(k.Key, loadOpts...)
 		if err != nil {
 			log.Info("Failed creating verifier", "error", err.Error())
 			continue

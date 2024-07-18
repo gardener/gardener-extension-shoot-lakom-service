@@ -9,11 +9,11 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"os"
 	goruntime "runtime"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
+	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
 
@@ -89,8 +89,8 @@ type Options struct {
 	// EnableContentionProfiling enables lock contention profiling, if
 	// enableProfiling is true.
 	EnableContentionProfiling bool
-	// CosignPublicKeyPath is path to file with cosign public key used to verify the image signatures.
-	CosignPublicKeyPath string
+	// LakomConfigPath is path to file with lakom configuration containing cosign public keys used to verify the image signatures.
+	LakomConfigPath string
 	// CacheTTL is the duration the objects are kept in the cache.
 	CacheTTL time.Duration
 	// CacheRefreshInterval is the duration between cache evaluations if a given object needs to dropped from the cache or not.
@@ -115,7 +115,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.HealthBindAddress, "health-bind-address", ":8081", "Bind address for the health server")
 	fs.BoolVar(&o.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled")
-	fs.StringVar(&o.CosignPublicKeyPath, "cosign-public-key-path", "", "Path to file with cosign public key used to verify the image signatures")
+	fs.StringVar(&o.LakomConfigPath, "lakom-config-path", "", "Path to file with lakom configuration containing cosign public keys used to verify the image signatures")
 	fs.DurationVar(&o.CacheTTL, "cache-ttl", time.Minute*10, "TTL for the cached objects. Set to 0, if cache has to be disabled")
 	fs.DurationVar(&o.CacheRefreshInterval, "cache-refresh-interval", time.Second*30, "Refresh interval for the cached objects")
 	fs.BoolVar(&o.UseOnlyImagePullSecrets, "use-only-image-pull-secrets", false, "If set, only the credentials from the image pull secrets of the pod are used to access the OCI registry. Otherwise, the node identity and docker config are also used.")
@@ -137,8 +137,8 @@ func (o *Options) validate() error {
 		return fmt.Errorf("missing server tls cert path")
 	}
 
-	if len(o.CosignPublicKeyPath) == 0 {
-		return fmt.Errorf("missing cosign public key path")
+	if len(o.LakomConfigPath) == 0 {
+		return fmt.Errorf("missing lakom config path")
 	}
 
 	if o.CacheTTL != 0 {
@@ -221,20 +221,15 @@ func (o *Options) Run(ctx context.Context) error {
 		return err
 	}
 
-	reader, err := os.Open(o.CosignPublicKeyPath)
+	config, err := lakomconfig.LoadConfig(o.LakomConfigPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load lakom config, %w", err)
 	}
-	defer func() {
-		if err := reader.Close(); err != nil {
-			log.Error(err, "failed to close file", "filePath", o.CosignPublicKeyPath)
-		}
-	}()
 
 	cosignSignatureVerifyHandler, err := verifysignature.NewHandleBuilder().
 		WithManager(mgr).
 		WithLogger(log.WithName("cosign-signature-verifier")).
-		WithCosignPublicKeysReader(reader).
+		WithLakomConfig(*config).
 		WithCacheTTL(o.CacheTTL).
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
 		WithUseOnlyImagePullSecrets(o.UseOnlyImagePullSecrets).
