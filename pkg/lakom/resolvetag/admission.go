@@ -32,6 +32,7 @@ type HandleBuilder struct {
 	cacheTTL                time.Duration
 	cacheRefreshInterval    time.Duration
 	useOnlyImagePullSecrets bool
+	allowInsecureRegistries bool
 }
 
 // NewHandleBuilder returns new handle builder.
@@ -49,6 +50,12 @@ func (hb HandleBuilder) WithManager(mgr manager.Manager) HandleBuilder {
 // WithUseOnlyImagePullSecrets sets only the image pull secrets to be used to access the OCI Registry.
 func (hb HandleBuilder) WithUseOnlyImagePullSecrets(useOnlyImagePullSecrets bool) HandleBuilder {
 	hb.useOnlyImagePullSecrets = useOnlyImagePullSecrets
+	return hb
+}
+
+// WithAllowInsecureRegistries allows Lakom to use HTTP for communication with the registries
+func (hb HandleBuilder) WithAllowInsecureRegistries(allowInsecureRegistries bool) HandleBuilder {
+	hb.allowInsecureRegistries = allowInsecureRegistries
 	return hb
 }
 
@@ -78,6 +85,7 @@ func (hb HandleBuilder) Build() (*handler, error) {
 			reader:                  hb.mgr.GetAPIReader(),
 			decoder:                 admission.NewDecoder(hb.mgr.GetScheme()),
 			useOnlyImagePullSecrets: hb.useOnlyImagePullSecrets,
+			allowInsecureRegistries: hb.allowInsecureRegistries,
 		}
 		resolver Resolver
 	)
@@ -102,6 +110,7 @@ type handler struct {
 
 	resolver                Resolver
 	useOnlyImagePullSecrets bool
+	allowInsecureRegistries bool
 }
 
 var (
@@ -193,7 +202,12 @@ func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logg
 func (h *handler) handleContainer(ctx context.Context, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
 	logger = logger.WithValues("originalImage", image)
 
-	imageRef, err := name.ParseReference(image)
+	opts := []name.Option{}
+	if h.allowInsecureRegistries {
+		opts = append(opts, name.Insecure)
+	}
+
+	imageRef, err := name.ParseReference(image, opts...)
 	if err != nil {
 		return "", err
 	}

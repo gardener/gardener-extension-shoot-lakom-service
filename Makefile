@@ -52,7 +52,8 @@ start-lakom:
 		--tls-cert-dir=example/lakom/tls/ \
 		--cosign-public-key-path=example/lakom/cosign/cosign.pub \
 		--cache-ttl=$(CACHE_TTL) \
-		--cache-refresh-interval=$(CACHE_REFRESH_INTERVAL)
+		--cache-refresh-interval=$(CACHE_REFRESH_INTERVAL) \
+		--insecure-allow-untrusted-images=true
 
 .PHONE: dev-setup
 dev-setup: $(COSIGN)
@@ -102,6 +103,7 @@ check-generate:
 check: $(GOIMPORTS) $(GOLANGCI_LINT) $(HELM)
 	@bash $(GARDENER_HACK_DIR)/check.sh --golangci-lint-config=./.golangci.yaml ./cmd/... ./pkg/... ./test/...
 	@bash $(GARDENER_HACK_DIR)/check-charts.sh ./charts
+	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) $(HACK_DIR)/check-skaffold-deps.sh 
 
 .PHONY: generate
 generate: $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ) $(VGOPATH)
@@ -131,3 +133,24 @@ verify: check format test
 
 .PHONY: verify-extended
 verify-extended: check-generate check format test test-cov test-clean
+
+.PHONY: update-skaffold-deps
+update-skaffold-deps: $(YQ)
+	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) $(HACK_DIR)/check-skaffold-deps.sh update
+
+# speed-up skaffold deployments by building all images concurrently
+export SKAFFOLD_BUILD_CONCURRENCY = 0
+extension-up extension-dev: export SKAFFOLD_DEFAULT_REPO = garden.local.gardener.cloud:5001
+extension-up extension-dev: export SKAFFOLD_PUSH = true
+# use static label for skaffold to prevent rolling all gardener components on every `skaffold` invocation
+extension-up extension-dev extension-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
+
+extension-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL) $(CRANE)
+	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) --cache-artifacts=false run
+
+extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL) $(CRANE)
+	$(SKAFFOLD) dev --cleanup=false --trigger=manual
+
+extension-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
+	$(SKAFFOLD) delete
+

@@ -36,6 +36,7 @@ type HandleBuilder struct {
 	cacheRefreshInterval    time.Duration
 	useOnlyImagePullSecrets bool
 	allowUntrustedImages    bool
+	allowInsecureRegistries bool
 }
 
 // NewHandleBuilder returns new handle builder.
@@ -59,6 +60,12 @@ func (hb HandleBuilder) WithUseOnlyImagePullSecrets(useOnlyImagePullSecrets bool
 // WithAllowUntrustedImages configures the webhook to allow images without trusted signature.
 func (hb HandleBuilder) WithAllowUntrustedImages(allowUntrustedImages bool) HandleBuilder {
 	hb.allowUntrustedImages = allowUntrustedImages
+	return hb
+}
+
+// WithAllowInsecureRegistries configures lakom to communicate via HTTP with registries if HTTPS is not possible
+func (hb HandleBuilder) WithAllowInsecureRegistries(allowInsecureRegistries bool) HandleBuilder {
+	hb.allowInsecureRegistries = allowInsecureRegistries
 	return hb
 }
 
@@ -109,7 +116,7 @@ func (hb HandleBuilder) Build() (*handler, error) {
 		return nil, err
 	}
 
-	verifier = NewDirectVerifier(cosignPublicKeys)
+	verifier = NewDirectVerifier(cosignPublicKeys, hb.allowInsecureRegistries)
 	if hb.cacheTTL != 0 {
 		cache, err := NewSignatureVerificationResultCache(hb.cacheRefreshInterval, hb.cacheTTL)
 		if err != nil {

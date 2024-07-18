@@ -173,7 +173,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages, gep19Monitoring bool) {
+			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries, gep19Monitoring bool) {
 				resources, err := getSeedResources(
 					&replicas,
 					namespace,
@@ -184,6 +184,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					image,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
+					allowInsecureRegistries,
 					k8sVersion,
 					gep19Monitoring,
 				)
@@ -191,7 +192,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				Expect(resources).To(HaveLen(7))
 
 				expectedResources := map[string]string{
-					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages)),
+					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
 					pdbKey:              expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
 					cosignSecretNameKey: expectedSeedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
 					serviceKey:          expectedSeedService(namespace),
@@ -213,11 +214,12 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					Expect(strResource).To(Equal(expectedResource), key)
 				}
 			},
-			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false, false),
-			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false, false),
-			Entry("With GEP-19 Monitoring", semver.MustParse("1.26.0"), true, false, false, true),
-			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false),
-			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false),
+			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false, false, false),
+			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false, false, false),
+			Entry("With GEP-19 Monitoring", semver.MustParse("1.26.0"), true, false, false, false, true),
+			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false, false),
+			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false, false),
+			Entry("Allow insecure registries", semver.MustParse("1.29.0"), true, false, true, false, true),
 		)
 	})
 })
@@ -435,7 +437,7 @@ spec:
 `
 }
 
-func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages string) string {
+func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
 	var (
 		genericKubeconfigSecretNameAnnotationKey = references.AnnotationKey("secret", genericKubeconfigSecretName)
 		shootAccessSecretNameAnnotationKey       = references.AnnotationKey("secret", shootAccessSecretName)
@@ -511,6 +513,7 @@ spec:
         - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
         - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
         - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
+        - --insecure-allow-insecure-registries=` + allowInsecureRegistries + `
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:

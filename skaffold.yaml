@@ -1,0 +1,87 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: skaffold/v4beta3
+kind: Config
+metadata:
+  name: extension
+build:
+  tagPolicy:
+    inputDigest: {}
+  insecureRegistries:
+    - garden.local.gardener.cloud
+  artifacts:
+    - image: local-skaffold/gardener-extension-shoot-lakom-service
+      # The extension controller uses the vectorImageOverwrite values to use 
+      # as the image for the resources it deploys.
+      # This requires that the admission controller is built before this image.
+      requires:
+        - image: local-skaffold/lakom
+      ko:
+        # The dependencies section configures what files Skaffold should watch for changes when in dev mode.
+        # These dependencies can be updated using a skaffold script found in the hack dir
+        dependencies:
+          paths:
+            - charts
+            - cmd/gardener-extension-shoot-lakom-service
+            - cmd/gardener-extension-shoot-lakom-service/app
+            - pkg/apis/config
+            - pkg/apis/config/v1alpha1
+            - pkg/cmd
+            - pkg/constants
+            - pkg/controller/config
+            - pkg/controller/healthcheck
+            - pkg/controller/lifecycle
+            - pkg/controller/seed
+            - pkg/imagevector
+            - pkg/secrets
+            - VERSION
+        ldflags:
+          - '{{.LD_FLAGS}}'
+        main: ./cmd/gardener-extension-shoot-lakom-service
+    - image: local-skaffold/lakom
+      # We need the image for the lakom admisison controller to be injected 
+      # into the imageVectorOverwrite for the controller registration.
+      # Skaffold currently does not give us an easy way to access the 
+      # image name of the newly built lakom during deployment (eg. passing it
+      # to kustomize).
+      #
+      # Hooks(https://skaffold.dev/docs/lifecycle-hooks/), however, provide us
+      # environment variables that contain the needed values:
+      # - SKAFFOLD_IMAGE_REPO
+      # - SKAFFOLD_IMAGE_TAG
+      #
+      # For this reason, using a post-build hook we can inject the image name and
+      # image tag into a patch file for kustomize, which will be triggered during
+      # the deployment phase of skaffold.
+      #
+      # The script file simply creates the needed resource patch for kustomize.
+      hooks:
+        after:
+          - command: ["sh", "hack/skaffold-imagevector.sh"]
+      ko:
+        dependencies:
+          paths:
+            - cmd/lakom
+            - cmd/lakom/app
+            - pkg/constants
+            - pkg/lakom/metrics
+            - pkg/lakom/resolvetag
+            - pkg/lakom/utils
+            - pkg/lakom/verifysignature
+            - VERSION
+        ldflags:
+          - '{{.LD_FLAGS}}'
+        main: ./cmd/lakom
+resourceSelector:
+  allow:
+    # instruct skaffold to inject the built image reference into the image field in our ControllerDeployment
+    - groupKind: ControllerDeployment.core.gardener.cloud
+      image: [".*"]
+manifests:
+  kustomize:
+    paths:
+      - local-setup
+deploy:
+  kubectl: {}

@@ -25,19 +25,25 @@ import (
 
 type directVerifier struct {
 	publicKeys []crypto.PublicKey
+	insecure   bool
 }
 
 // NewDirectVerifier creates new verifier and returns it.
-func NewDirectVerifier(keys []crypto.PublicKey) *directVerifier {
+func NewDirectVerifier(keys []crypto.PublicKey, allowInsecureRegistries bool) *directVerifier {
 	dv := &directVerifier{
 		publicKeys: keys,
+		insecure:   allowInsecureRegistries,
 	}
 	return dv
 }
 
 // Verify check if image is signed by at least one of the configured cosign public keys.
 func (r *directVerifier) Verify(ctx context.Context, image string, kcr utils.KeyChainReader) (bool, error) {
-	imageRef, err := name.ParseReference(image)
+	opts := []name.Option{}
+	if r.insecure {
+		opts = append(opts, name.Insecure)
+	}
+	imageRef, err := name.ParseReference(image, opts...)
 	if err != nil {
 		return false, err
 	}

@@ -29,8 +29,8 @@ import (
 var (
 	deploymentGVK = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
 	podGVK        = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
-	imageTag      = "k8s.gcr.io/pause:3.7"
-	imageDigest   = "k8s.gcr.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c" // #nosec G101
+	imageTag      = "registry.k8s.io/pause:3.7"
+	imageDigest   = "registry.k8s.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c" // #nosec G101
 
 	scheme    *runtime.Scheme
 	ctrl      *gomock.Controller

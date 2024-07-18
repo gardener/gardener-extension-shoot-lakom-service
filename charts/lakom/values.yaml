@@ -32,6 +32,7 @@ cosign:
   #   -----END PUBLIC KEY-----
 useOnlyImagePullSecrets: false
 allowUntrustedImages: false
+allowInsecureRegistries: false
 kubeconfig: {}
 admissionConfig:
   objectSelector: {}

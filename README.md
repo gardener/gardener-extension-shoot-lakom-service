@@ -43,6 +43,15 @@ Please note, this extension controller relies on the [Gardener-Resource-Manager]
 The `Lakom` admission controller can be configured with `make dev-setup` and started with `make start-lakom`.
 You can run the lakom extension controller locally on your machine by executing `make start`.
 
+If you'd like to develop Lakom using a local cluster such as KinD, make sure your KUBECONFIG environment variable is targeting the local Garden cluster.
+Add ```127.0.0.1 garden.local.gardener.cloud``` to your ```/etc/hosts```. You can then run:
+
+```bash
+make extension-up
+```
+
+This will trigger a skaffold deployment that builds the images, pushes them to the registry and installs the helm charts from ```/charts```.
+
 We are using Go modules for Golang package dependency management and [Ginkgo](https://github.com/onsi/ginkgo)/[Gomega](https://github.com/onsi/gomega) for testing.
 
 ## Feedback and Support

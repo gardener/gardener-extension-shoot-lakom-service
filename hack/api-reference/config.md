@@ -116,6 +116,17 @@ bool
 Instead to deny the request, the webhook will allow it with a warning.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>allowInsecureRegistries</code></br>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>AllowInsecureRegistries allows Lakom to use HTTP for communication with the registries</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="lakom.extensions.config.gardener.cloud/v1alpha1.DebugConfig">DebugConfig

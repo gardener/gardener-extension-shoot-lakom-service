@@ -18,6 +18,7 @@ data:
       ownerNamespace: {{ .Release.Namespace }}
     useOnlyImagePullSecrets: {{ .Values.controllers.useOnlyImagePullSecrets }}
     allowUntrustedImages: {{ .Values.controllers.allowUntrustedImages }}
+    allowInsecureRegistries: {{ .Values.controllers.allowInsecureRegistries }}
     debugConfig:
       enableProfiling: {{ .Values.controllers.debugConfig.enableProfiling | default false }}
       enableContentionProfiling: {{ .Values.controllers.debugConfig.enableContentionProfiling | default false }}

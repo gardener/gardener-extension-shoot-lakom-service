@@ -83,6 +83,7 @@ spec:
         {{- end }}
         - --use-only-image-pull-secrets={{ .Values.useOnlyImagePullSecrets }}
         - --insecure-allow-untrusted-images={{ .Values.allowUntrustedImages }}
+        - --insecure-allow-insecure-registries={{ .Values.allowInsecureRegistries }}
         {{- if .Values.resources }}
         resources:
 {{ toYaml .Values.resources | trim | indent 10 }}
