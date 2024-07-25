@@ -18,6 +18,9 @@ build:
       # This requires that the admission controller is built before this image.
       requires:
         - image: local-skaffold/lakom
+      hooks:
+        after:
+          - command: ["sh", "hack/skaffold-image.sh"]
       ko:
         # The dependencies section configures what files Skaffold should watch for changes when in dev mode.
         # These dependencies can be updated using a skaffold script found in the hack dir

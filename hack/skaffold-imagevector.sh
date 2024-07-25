@@ -21,9 +21,7 @@ set -o errexit
 image_repo=$(echo $SKAFFOLD_IMAGE | cut -d':' -f1,2)
 image_tag=$(echo $SKAFFOLD_IMAGE | cut -d':' -f3)
 
-mkdir -p example/lakom/skaffold
-
-cat <<EOF > example/lakom/skaffold/patch-imagevector-overwrite.yaml
+cat <<EOF > local-setup/patch-imagevector-overwrite.yaml
 apiVersion: core.gardener.cloud/v1beta1
 kind: ControllerDeployment
 metadata:

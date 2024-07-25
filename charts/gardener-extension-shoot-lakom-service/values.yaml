@@ -5,7 +5,10 @@
 serviceName: shoot-lakom-service
 replicaCount: 3
 
-image: europe-docker.pkg.dev/gardener-project/public/gardener/extensions/shoot-lakom-service
+image:
+  repository: europe-docker.pkg.dev/gardener-project/public/gardener/extensions/shoot-lakom-service
+  tag: latest
+  pullPolicy: IfNotPresent
 
 imageVectorOverwrite: {}
   # images:

@@ -69,7 +69,8 @@ spec:
           type: RuntimeDefault
       containers:
       - name: gardener-extension-{{ .Values.serviceName }}
-        image: {{ .Values.image }}
+        image: {{ include "image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
         - --config=/etc/lakom-service/config.yaml
         - --lifecycle-max-concurrent-reconciles={{ .Values.controllers.lifecycle.concurrentSyncs }}
