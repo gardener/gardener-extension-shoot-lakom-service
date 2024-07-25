@@ -1,4 +1,5 @@
-## Introduction
+# Introduction
+
 This extension implements [cosign](https://github.com/sigstore/cosign) image verification. It is strictly limited only to the kubernetes system components deployed by Gardener and other Gardener Extensions in the `kube-system` namespace of a shoot cluster.
 
 ## Shoot Feature Gate
