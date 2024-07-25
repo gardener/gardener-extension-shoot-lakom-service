@@ -3,6 +3,27 @@
 # SPDX-License-Identifier: Apache-2.0
 
 gardener-extension-shoot-lakom-service:
+  templates: 
+    helmcharts:
+    - &shoot-lakom-service
+      name: shoot-lakom-service
+      dir: charts/gardener-extension-shoot-lakom-service
+      registry: europe-docker.pkg.dev/gardener-project/snapshots/charts/gardener/extensions
+      mappings:
+      - ref: ocm-resource:gardener-extension-shoot-lakom-service.repository
+        attribute: image.repository
+      - ref: ocm-resource:gardener-extension-shoot-lakom-service.tag
+        attribute: image.tag
+    - &lakom
+      name: lakom
+      dir: charts/lakom
+      registry: europe-docker.pkg.dev/gardener-project/snapshots/charts/gardener/extensions
+      mappings:
+      - ref: ocm-resource:lakom.repository
+        attribute: image.repository
+      - ref: ocm-resource:lakom.tag
+        attribute: image.tag
+
   base_definition:
     traits:
       version:
@@ -32,6 +53,10 @@ gardener-extension-shoot-lakom-service:
         draft_release: ~
         options:
           public_build_logs: true
+        publish:
+          helmcharts:
+          - *shoot-lakom-service
+          - *lakom
     pull-request:
       traits:
         pull-request: ~
@@ -40,6 +65,10 @@ gardener-extension-shoot-lakom-service:
             - repository: europe-docker.pkg.dev/gardener-project/releases
         options:
           public_build_logs: true
+        publish:
+          helmcharts:
+          - *shoot-lakom-service
+          - *lakom
     release:
       traits:
         version:
@@ -54,6 +83,11 @@ gardener-extension-shoot-lakom-service:
             lakom:
               image: europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom
               tag_as_latest: true
+          helmcharts:
+          - <<: *shoot-lakom-service
+            registry: europe-docker.pkg.dev/gardener-project/releases/charts/gardener/extensions
+          - <<: *lakom
+            registry: europe-docker.pkg.dev/gardener-project/releases/charts/gardener/extensions
         release:
           nextversion: 'bump_minor'
           next_version_callback: '.ci/prepare_release'
