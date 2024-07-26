@@ -7,6 +7,7 @@ package config
 import (
 	healthcheckconfig "github.com/gardener/gardener/extensions/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -18,7 +19,7 @@ type Configuration struct {
 	// HealthCheckConfig is the config for the health check controller.
 	HealthCheckConfig *healthcheckconfig.HealthCheckConfig
 	// CosignPublicKeys is the cosign public keys used to verify image signatures.
-	CosignPublicKeys []string
+	CosignPublicKeys *runtime.RawExtension
 	// DebugConfig contains debug configurations for the controller.
 	DebugConfig *DebugConfig
 	// SeedBootstrap configures the seed bootstrap controller.

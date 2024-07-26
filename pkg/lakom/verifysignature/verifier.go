@@ -73,7 +73,7 @@ func verify(ctx context.Context, imageRef name.Reference, keys lakomconfig.Compl
 
 	// We need successful verification for at least one key, therefore any other failures can be ignored.
 	for _, k := range keys.Keys {
-		log := logger.WithValues("keyName", k.Name, "scheme", k.Scheme)
+		log := logger.WithValues("keyName", k.Name)
 		loadOpts := []signature.LoadOption{}
 
 		if k.Hash != nil {
