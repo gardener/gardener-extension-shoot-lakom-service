@@ -70,6 +70,6 @@ type VerifierKey struct {
 	Key crypto.PublicKey
 	// Hash is the hash function that the verifier should use during signature verification.
 	Hash *crypto.Hash
-	// Scheme is the RSA scheme (if the key is of RSA type) the verifier to use during signature verification.
-	Scheme *RSASchemeKey
+	// RSAScheme is the RSA scheme (if the key is of RSA type) the verifier to use during signature verification.
+	RSAScheme *RSASchemeKey
 }

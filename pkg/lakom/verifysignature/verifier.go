@@ -81,10 +81,10 @@ func verify(ctx context.Context, imageRef name.Reference, keys lakomconfig.Compl
 			log = log.WithValues("hash", k.Hash.String())
 		}
 
-		if k.Scheme != nil {
-			log = log.WithValues("scheme", k.Scheme)
+		if k.RSAScheme != nil {
+			log = log.WithValues("scheme", k.RSAScheme)
 
-			if *k.Scheme == lakomconfig.RSASSAPSS {
+			if *k.RSAScheme == lakomconfig.RSASSAPSS {
 				loadOpts = append(loadOpts, options.WithRSAPSS(&rsa.PSSOptions{Hash: *k.Hash}))
 			}
 		}

@@ -82,7 +82,7 @@ func (c *Config) Complete() (*CompletedConfig, error) {
 		}
 
 		config.Hash = hash
-		config.Scheme = scheme
+		config.RSAScheme = scheme
 
 		res.Keys = append(res.Keys, config)
 	}
