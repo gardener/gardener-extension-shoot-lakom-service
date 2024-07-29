@@ -26,7 +26,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret-lakom-config: {{ include (print $.Template.BasePath "/secret-lakom-config.yaml") . | sha256sum }}
+        checksum/configmap-lakom-config: {{ include (print $.Template.BasePath "/configmap-lakom-config.yaml") . | sha256sum }}
         checksum/secret-lakom-server-tls: {{ include (print $.Template.BasePath "/secret-lakom-server-tls.yaml") . | sha256sum }}
         {{- if .Values.kubeconfig }}
         checksum/secret-lakom-target-kubeconfig: {{ include (print $.Template.BasePath "/secret-lakom-target-kubeconfig.yaml") . | sha256sum }}
@@ -118,8 +118,8 @@ spec:
         {{- end }}
       volumes:
       - name: lakom-config
-        secret:
-          secretName: lakom-config
+        configMap:
+          name: lakom-config
       - name: lakom-server-tls
         secret:
           secretName: lakom-server-tls

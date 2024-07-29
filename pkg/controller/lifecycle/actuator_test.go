@@ -139,16 +139,16 @@ var _ = Describe("Actuator", func() {
 			shootAccessServiceAccountName = "extension-shoot-lakom-service"
 			serverTLSSecretName           = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
 			image                         = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
-			lakomConfigSecretName         = "extension-shoot-lakom-service-lakom-config-5ccba116"
+			lakomConfigConfigMapName      = "extension-shoot-lakom-service-lakom-config-5ccba116"
 
-			lakomConfigSecretNameKey = "secret__" + namespace + "__" + lakomConfigSecretName + ".yaml"
-			configMapKey             = "configmap__" + namespace + "__extension-shoot-lakom-service-monitoring.yaml"
-			serviceMonitorKey        = "servicemonitor__" + namespace + "__shoot-extension-shoot-lakom-service.yaml"
-			deploymentKey            = "deployment__" + namespace + "__extension-shoot-lakom-service.yaml"
-			pdbKey                   = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service.yaml"
-			serviceKey               = "service__" + namespace + "__extension-shoot-lakom-service.yaml"
-			serviceAccountKey        = "serviceaccount__" + namespace + "__extension-shoot-lakom-service.yaml"
-			vpaKey                   = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service.yaml"
+			lakomConfigConfigMapNameKey = "configmap__" + namespace + "__" + lakomConfigConfigMapName + ".yaml"
+			configMapKey                = "configmap__" + namespace + "__extension-shoot-lakom-service-monitoring.yaml"
+			serviceMonitorKey           = "servicemonitor__" + namespace + "__shoot-extension-shoot-lakom-service.yaml"
+			deploymentKey               = "deployment__" + namespace + "__extension-shoot-lakom-service.yaml"
+			pdbKey                      = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service.yaml"
+			serviceKey                  = "service__" + namespace + "__extension-shoot-lakom-service.yaml"
+			serviceAccountKey           = "serviceaccount__" + namespace + "__extension-shoot-lakom-service.yaml"
+			vpaKey                      = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service.yaml"
 		)
 
 		var (
@@ -197,12 +197,12 @@ var _ = Describe("Actuator", func() {
 				Expect(resources).To(HaveLen(7))
 
 				expectedResources := map[string]string{
-					deploymentKey:            expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, lakomConfigSecretName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
-					pdbKey:                   expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
-					lakomConfigSecretNameKey: expectedSeedSecretLakomConfig(namespace, lakomConfigSecretName, lakomConfig),
-					serviceKey:               expectedSeedService(namespace),
-					serviceAccountKey:        expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
-					vpaKey:                   expectedSeedVPA(namespace),
+					deploymentKey:               expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
+					pdbKey:                      expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					lakomConfigConfigMapNameKey: expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					serviceKey:                  expectedSeedService(namespace),
+					serviceAccountKey:           expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
+					vpaKey:                      expectedSeedVPA(namespace),
 				}
 
 				if gep19Monitoring {
@@ -444,18 +444,18 @@ spec:
 `
 }
 
-func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, lakomConfigSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
+func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, lakomConfigConfigMapName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
 	var (
 		genericKubeconfigSecretNameAnnotationKey = references.AnnotationKey("secret", genericKubeconfigSecretName)
 		shootAccessSecretNameAnnotationKey       = references.AnnotationKey("secret", shootAccessSecretName)
 		serverTLSSecretNameAnnotationKey         = references.AnnotationKey("secret", serverTLSSecretName)
-		lakomConfigSecretNameAnnotationKey       = references.AnnotationKey("secret", lakomConfigSecretName)
+		lakomConfigConfigMapNameAnnotationKey    = references.AnnotationKey("configmap", lakomConfigConfigMapName)
 
 		annotations = []string{
+			lakomConfigConfigMapNameAnnotationKey + ": " + lakomConfigConfigMapName,
 			genericKubeconfigSecretNameAnnotationKey + ": " + genericKubeconfigSecretName,
 			shootAccessSecretNameAnnotationKey + ": " + shootAccessSecretName,
 			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
-			lakomConfigSecretNameAnnotationKey + ": " + lakomConfigSecretName,
 		}
 	)
 
@@ -560,9 +560,9 @@ spec:
       priorityClassName: gardener-system-300
       serviceAccountName: extension-shoot-lakom-service
       volumes:
-      - name: lakom-config
-        secret:
-          secretName: ` + lakomConfigSecretName + `
+      - configMap:
+          name: ` + lakomConfigConfigMapName + `
+        name: lakom-config
       - name: lakom-server-tls
         secret:
           secretName: ` + serverTLSSecretName + `
@@ -615,11 +615,14 @@ spec:
 `
 }
 
-func expectedSeedSecretLakomConfig(namespace, lakomConfigSecretName string, lakomConfig string) string {
+func expectedSeedConfigMapLakomConfig(namespace, lakomConfigSecretName string, lakomConfig string) string {
 
 	return `apiVersion: v1
+data:
+  config.yaml: |
+    ` + strings.TrimSuffix(strings.ReplaceAll(lakomConfig, "\n", "\n    "), "\n    ") + `
 immutable: true
-kind: Secret
+kind: ConfigMap
 metadata:
   creationTimestamp: null
   labels:
@@ -628,10 +631,6 @@ metadata:
     resources.gardener.cloud/garbage-collectable-reference: "true"
   name: ` + lakomConfigSecretName + `
   namespace: ` + namespace + `
-stringData:
-  config.yaml: |
-    ` + strings.TrimSuffix(strings.ReplaceAll(lakomConfig, "\n", "\n    "), "\n    ") + `
-type: Opaque
 `
 }
 

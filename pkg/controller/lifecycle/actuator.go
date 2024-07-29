@@ -278,34 +278,33 @@ func getLabels() map[string]string {
 
 func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version, gep19Monitoring bool) (map[string][]byte, error) {
 	var (
-		tcpProto              = corev1.ProtocolTCP
-		serverPort            = intstr.FromInt(10250)
-		metricsPort           = intstr.FromInt(8080)
-		healthPort            = intstr.FromInt(8081)
-		cacheTTL              = time.Minute * 10
-		cacheRefreshInterval  = time.Second * 30
-		lakomConfigDir        = "/etc/lakom/config"
-		lakomConfigSecretName = constants.ExtensionServiceName + "-lakom-config"
-		webhookTLSCertDir     = "/etc/lakom/tls"
-		registry              = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestCPU            = resource.MustParse("50m")
-		requestMemory         = resource.MustParse("64Mi")
-		vpaUpdateMode         = vpaautoscalingv1.UpdateModeAuto
+		tcpProto                 = corev1.ProtocolTCP
+		serverPort               = intstr.FromInt(10250)
+		metricsPort              = intstr.FromInt(8080)
+		healthPort               = intstr.FromInt(8081)
+		cacheTTL                 = time.Minute * 10
+		cacheRefreshInterval     = time.Second * 30
+		lakomConfigDir           = "/etc/lakom/config"
+		lakomConfigConfigMapName = constants.ExtensionServiceName + "-lakom-config"
+		webhookTLSCertDir        = "/etc/lakom/tls"
+		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
+		requestCPU               = resource.MustParse("50m")
+		requestMemory            = resource.MustParse("64Mi")
+		vpaUpdateMode            = vpaautoscalingv1.UpdateModeAuto
 	)
 
-	lakomConfigSecret := corev1.Secret{
+	lakomConfigConfigMap := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      lakomConfigSecretName,
+			Name:      lakomConfigConfigMapName,
 			Namespace: namespace,
 			Labels:    getLabels(),
 		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
+		Data: map[string]string{
 			"config.yaml": lakomConfig,
 		},
 	}
 
-	if err := kutil.MakeUnique(&lakomConfigSecret); err != nil {
+	if err := kutil.MakeUnique(&lakomConfigConfigMap); err != nil {
 		return nil, err
 	}
 
@@ -425,8 +424,10 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 						{
 							Name: "lakom-config",
 							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: lakomConfigSecret.Name,
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: lakomConfigConfigMap.Name,
+									},
 								},
 							},
 						},
@@ -552,7 +553,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
 		pdb,
-		&lakomConfigSecret,
+		&lakomConfigConfigMap,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      constants.ExtensionServiceName,

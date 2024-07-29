@@ -32,25 +32,25 @@ var _ = Describe("Reconciler", func() {
 
 	Context("getResources", func() {
 		const (
-			namespace               = "kube-system"
-			ownerNamespace          = "garden"
-			lakomConfigSecretName   = "extension-shoot-lakom-service-seed-lakom-config-5ccba116"
-			serverTLSSecretName     = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
-			image                   = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
-			useOnlyImagePullSecrets = true
-			allowUntrustedImages    = false
-			insecureRegistries      = false
+			namespace                = "kube-system"
+			ownerNamespace           = "garden"
+			lakomConfigConfigMapName = "extension-shoot-lakom-service-seed-lakom-config-5ccba116"
+			serverTLSSecretName      = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
+			image                    = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
+			useOnlyImagePullSecrets  = true
+			allowUntrustedImages     = false
+			insecureRegistries       = false
 
-			validatingWebhookKey     = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
-			mutatingWebhookKey       = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
-			clusterRoleKey           = "clusterrole____extension-shoot-lakom-service-seed.yaml"
-			clusterRoleBindingKey    = "clusterrolebinding____extension-shoot-lakom-service-seed.yaml"
-			lakomConfigSecretNameKey = "secret__" + namespace + "__" + lakomConfigSecretName + ".yaml"
-			deploymentKey            = "deployment__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			pdbKey                   = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			serviceKey               = "service__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			serviceAccountKey        = "serviceaccount__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			vpaKey                   = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			validatingWebhookKey        = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
+			mutatingWebhookKey          = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
+			clusterRoleKey              = "clusterrole____extension-shoot-lakom-service-seed.yaml"
+			clusterRoleBindingKey       = "clusterrolebinding____extension-shoot-lakom-service-seed.yaml"
+			lakomConfigConfigMapNameKey = "configmap__" + namespace + "__" + lakomConfigConfigMapName + ".yaml"
+			deploymentKey               = "deployment__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			pdbKey                      = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			serviceKey                  = "service__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			serviceAccountKey           = "serviceaccount__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			vpaKey                      = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
 		)
 
 		var (
@@ -97,16 +97,16 @@ var _ = Describe("Reconciler", func() {
 				Expect(resources).To(HaveLen(10))
 
 				expectedResources := map[string]string{
-					validatingWebhookKey:     expectedValidatingWebhook(caBundle),
-					mutatingWebhookKey:       expectedMutatingWebhook(caBundle),
-					clusterRoleKey:           expectedClusterRole(),
-					clusterRoleBindingKey:    expectedClusterRoleBinding(),
-					deploymentKey:            expectedDeployment(namespace, image, lakomConfigSecretName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages), strconv.FormatBool(insecureRegistries)),
-					pdbKey:                   expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
-					lakomConfigSecretNameKey: expectedSecretLakomConfig(namespace, lakomConfigSecretName, lakomConfig),
-					serviceKey:               expectedService(namespace),
-					serviceAccountKey:        expectedServiceAccount(namespace),
-					vpaKey:                   expectedVPA(namespace),
+					validatingWebhookKey:        expectedValidatingWebhook(caBundle),
+					mutatingWebhookKey:          expectedMutatingWebhook(caBundle),
+					clusterRoleKey:              expectedClusterRole(),
+					clusterRoleBindingKey:       expectedClusterRoleBinding(),
+					deploymentKey:               expectedDeployment(namespace, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages), strconv.FormatBool(insecureRegistries)),
+					pdbKey:                      expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					lakomConfigConfigMapNameKey: expectedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					serviceKey:                  expectedService(namespace),
+					serviceAccountKey:           expectedServiceAccount(namespace),
+					vpaKey:                      expectedVPA(namespace),
 				}
 
 				for key, expectedResource := range expectedResources {
@@ -323,14 +323,14 @@ subjects:
 `
 }
 
-func expectedDeployment(namespace, image, lakomConfigSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
+func expectedDeployment(namespace, image, lakomConfigConfigMapName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
 	var (
-		serverTLSSecretNameAnnotationKey   = references.AnnotationKey("secret", serverTLSSecretName)
-		lakomConfigSecretNameAnnotationKey = references.AnnotationKey("secret", lakomConfigSecretName)
+		serverTLSSecretNameAnnotationKey      = references.AnnotationKey("secret", serverTLSSecretName)
+		lakomConfigConfigMapNameAnnotationKey = references.AnnotationKey("configmap", lakomConfigConfigMapName)
 
 		annotations = []string{
+			lakomConfigConfigMapNameAnnotationKey + ": " + lakomConfigConfigMapName,
 			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
-			lakomConfigSecretNameAnnotationKey + ": " + lakomConfigSecretName,
 		}
 	)
 
@@ -430,9 +430,9 @@ spec:
       priorityClassName: gardener-system-900
       serviceAccountName: extension-shoot-lakom-service-seed
       volumes:
-      - name: lakom-config
-        secret:
-          secretName: ` + lakomConfigSecretName + `
+      - configMap:
+          name: ` + lakomConfigConfigMapName + `
+        name: lakom-config
       - name: lakom-server-tls
         secret:
           secretName: ` + serverTLSSecretName + `
@@ -470,11 +470,14 @@ spec:
 	return out
 }
 
-func expectedSecretLakomConfig(namespace, lakomConfigSecretName string, lakomConfig string) string {
+func expectedConfigMapLakomConfig(namespace, lakomConfigSecretName, lakomConfig string) string {
 
 	return `apiVersion: v1
+data:
+  config.yaml: |
+    ` + strings.TrimSuffix(strings.ReplaceAll(lakomConfig, "\n", "\n    "), "\n    ") + `
 immutable: true
-kind: Secret
+kind: ConfigMap
 metadata:
   creationTimestamp: null
   labels:
@@ -483,10 +486,6 @@ metadata:
     resources.gardener.cloud/garbage-collectable-reference: "true"
   name: ` + lakomConfigSecretName + `
   namespace: ` + namespace + `
-stringData:
-  config.yaml: |
-    ` + strings.TrimSuffix(strings.ReplaceAll(lakomConfig, "\n", "\n    "), "\n    ") + `
-type: Opaque
 `
 }
 
