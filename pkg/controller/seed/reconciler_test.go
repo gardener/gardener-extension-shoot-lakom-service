@@ -32,45 +32,50 @@ var _ = Describe("Reconciler", func() {
 
 	Context("getResources", func() {
 		const (
-			namespace               = "kube-system"
-			ownerNamespace          = "garden"
-			cosignSecretName        = "extension-shoot-lakom-service-seed-cosign-public-keys-5a1fe295"
-			serverTLSSecretName     = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
-			image                   = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
-			useOnlyImagePullSecrets = true
-			allowUntrustedImages    = false
-			insecureRegistries      = false
+			namespace                = "kube-system"
+			ownerNamespace           = "garden"
+			lakomConfigConfigMapName = "extension-shoot-lakom-service-seed-lakom-config-5ccba116"
+			serverTLSSecretName      = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
+			image                    = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
+			useOnlyImagePullSecrets  = true
+			allowUntrustedImages     = false
+			insecureRegistries       = false
 
-			validatingWebhookKey  = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
-			mutatingWebhookKey    = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
-			clusterRoleKey        = "clusterrole____extension-shoot-lakom-service-seed.yaml"
-			clusterRoleBindingKey = "clusterrolebinding____extension-shoot-lakom-service-seed.yaml"
-			cosignSecretNameKey   = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
-			deploymentKey         = "deployment__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			pdbKey                = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			serviceKey            = "service__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			serviceAccountKey     = "serviceaccount__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			vpaKey                = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			validatingWebhookKey        = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
+			mutatingWebhookKey          = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
+			clusterRoleKey              = "clusterrole____extension-shoot-lakom-service-seed.yaml"
+			clusterRoleBindingKey       = "clusterrolebinding____extension-shoot-lakom-service-seed.yaml"
+			lakomConfigConfigMapNameKey = "configmap__" + namespace + "__" + lakomConfigConfigMapName + ".yaml"
+			deploymentKey               = "deployment__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			pdbKey                      = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			serviceKey                  = "service__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			serviceAccountKey           = "serviceaccount__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
+			vpaKey                      = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
 		)
 
 		var (
-			cosignPublicKeys []string
-			caBundle         = []byte("caBundle")
-			k8sVersion       *semver.Version
+			lakomConfig string
+			caBundle    = []byte("caBundle")
+			k8sVersion  *semver.Version
 		)
 
 		BeforeEach(func() {
-			cosignPublicKeys = []string{
-				`-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
-On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
------END PUBLIC KEY-----
-`, `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
-hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
------END PUBLIC KEY-----
-`,
-			}
+			lakomConfig = `publicKeys:
+- name: test-01
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
+    On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
+    -----END PUBLIC KEY-----
+- name: test-02
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
+    hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
+    -----END PUBLIC KEY-----
+`
 
 			k8sVersion = semver.MustParse("1.27.0")
 		})
@@ -80,7 +85,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
-					cosignPublicKeys,
+					lakomConfig,
 					caBundle,
 					onlyImagePullSecrets,
 					untrustedImages,
@@ -92,16 +97,16 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				Expect(resources).To(HaveLen(10))
 
 				expectedResources := map[string]string{
-					validatingWebhookKey:  expectedValidatingWebhook(caBundle),
-					mutatingWebhookKey:    expectedMutatingWebhook(caBundle),
-					clusterRoleKey:        expectedClusterRole(),
-					clusterRoleBindingKey: expectedClusterRoleBinding(),
-					deploymentKey:         expectedDeployment(namespace, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages), strconv.FormatBool(insecureRegistries)),
-					pdbKey:                expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
-					cosignSecretNameKey:   expectedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
-					serviceKey:            expectedService(namespace),
-					serviceAccountKey:     expectedServiceAccount(namespace),
-					vpaKey:                expectedVPA(namespace),
+					validatingWebhookKey:        expectedValidatingWebhook(caBundle),
+					mutatingWebhookKey:          expectedMutatingWebhook(caBundle),
+					clusterRoleKey:              expectedClusterRole(),
+					clusterRoleBindingKey:       expectedClusterRoleBinding(),
+					deploymentKey:               expectedDeployment(namespace, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages), strconv.FormatBool(insecureRegistries)),
+					pdbKey:                      expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					lakomConfigConfigMapNameKey: expectedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					serviceKey:                  expectedService(namespace),
+					serviceAccountKey:           expectedServiceAccount(namespace),
+					vpaKey:                      expectedVPA(namespace),
 				}
 
 				for key, expectedResource := range expectedResources {
@@ -124,7 +129,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
-					cosignPublicKeys,
+					lakomConfig,
 					ca,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
@@ -146,7 +151,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
-					cosignPublicKeys,
+					lakomConfig,
 					ca,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
@@ -167,7 +172,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 			resources, err := getResources(
 				serverTLSSecretName,
 				image,
-				cosignPublicKeys,
+				lakomConfig,
 				caBundle,
 				useOnlyImagePullSecrets,
 				allowUntrustedImages,
@@ -318,13 +323,13 @@ subjects:
 `
 }
 
-func expectedDeployment(namespace, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
+func expectedDeployment(namespace, image, lakomConfigConfigMapName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
 	var (
-		serverTLSSecretNameAnnotationKey        = references.AnnotationKey("secret", serverTLSSecretName)
-		cosignPublicKeysSecretNameAnnotationKey = references.AnnotationKey("secret", cosignPublicKeysSecretName)
+		serverTLSSecretNameAnnotationKey      = references.AnnotationKey("secret", serverTLSSecretName)
+		lakomConfigConfigMapNameAnnotationKey = references.AnnotationKey("configmap", lakomConfigConfigMapName)
 
 		annotations = []string{
-			cosignPublicKeysSecretNameAnnotationKey + ": " + cosignPublicKeysSecretName,
+			lakomConfigConfigMapNameAnnotationKey + ": " + lakomConfigConfigMapName,
 			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
 		}
 	)
@@ -381,7 +386,7 @@ spec:
       - args:
         - --cache-ttl=10m0s
         - --cache-refresh-interval=30s
-        - --cosign-public-key-path=/etc/lakom/cosign/cosign.pub
+        - --lakom-config-path=/etc/lakom/config/config.yaml
         - --tls-cert-dir=/etc/lakom/tls
         - --health-bind-address=:8081
         - --metrics-bind-address=:8080
@@ -416,8 +421,8 @@ spec:
             cpu: 50m
             memory: 64Mi
         volumeMounts:
-        - mountPath: /etc/lakom/cosign
-          name: lakom-public-keys
+        - mountPath: /etc/lakom/config
+          name: lakom-config
           readOnly: true
         - mountPath: /etc/lakom/tls
           name: lakom-server-tls
@@ -425,9 +430,9 @@ spec:
       priorityClassName: gardener-system-900
       serviceAccountName: extension-shoot-lakom-service-seed
       volumes:
-      - name: lakom-public-keys
-        secret:
-          secretName: ` + cosignPublicKeysSecretName + `
+      - configMap:
+          name: ` + lakomConfigConfigMapName + `
+        name: lakom-config
       - name: lakom-server-tls
         secret:
           secretName: ` + serverTLSSecretName + `
@@ -465,27 +470,22 @@ spec:
 	return out
 }
 
-func expectedSecretCosign(namespace, cosignSecretName string, cosignPublicKeys []string) string {
-	indentedKeys := []string{}
-	for _, key := range cosignPublicKeys {
-		indentedKeys = append(indentedKeys, "    "+strings.TrimSuffix(strings.ReplaceAll(key, "\n", "\n    "), "    "))
-	}
+func expectedConfigMapLakomConfig(namespace, lakomConfigSecretName, lakomConfig string) string {
 
 	return `apiVersion: v1
+data:
+  config.yaml: |
+    ` + strings.TrimSuffix(strings.ReplaceAll(lakomConfig, "\n", "\n    "), "\n    ") + `
 immutable: true
-kind: Secret
+kind: ConfigMap
 metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
     resources.gardener.cloud/garbage-collectable-reference: "true"
-  name: ` + cosignSecretName + `
+  name: ` + lakomConfigSecretName + `
   namespace: ` + namespace + `
-stringData:
-  cosign.pub: |
-` + strings.TrimSuffix(strings.Join(indentedKeys, "\n"), "\n") + `
-type: Opaque
 `
 }
 

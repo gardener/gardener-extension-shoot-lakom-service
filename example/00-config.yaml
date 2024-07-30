@@ -5,11 +5,14 @@
 apiVersion: lakom.extensions.config.gardener.cloud/v1alpha1
 kind: Configuration
 cosignPublicKeys:
-- |
-  -----BEGIN PUBLIC KEY-----
-  MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
-  hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
-  -----END PUBLIC KEY-----
+  publicKeys:
+  - name: example-01
+    algorithm: RSASSA-PKCS1-v1_5-SHA256
+    key: |-
+      -----BEGIN PUBLIC KEY-----
+      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
+      hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
+      -----END PUBLIC KEY-----
 seedBootstrap:
   ownerNamespace: lakom-extension
 useOnlyImagePullSecrets: true

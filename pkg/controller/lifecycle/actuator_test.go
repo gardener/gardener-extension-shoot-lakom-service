@@ -139,37 +139,42 @@ var _ = Describe("Actuator", func() {
 			shootAccessServiceAccountName = "extension-shoot-lakom-service"
 			serverTLSSecretName           = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
 			image                         = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
-			cosignSecretName              = "extension-shoot-lakom-service-cosign-public-keys-5a1fe295"
+			lakomConfigConfigMapName      = "extension-shoot-lakom-service-lakom-config-5ccba116"
 
-			cosignSecretNameKey = "secret__" + namespace + "__" + cosignSecretName + ".yaml"
-			configMapKey        = "configmap__" + namespace + "__extension-shoot-lakom-service-monitoring.yaml"
-			serviceMonitorKey   = "servicemonitor__" + namespace + "__shoot-extension-shoot-lakom-service.yaml"
-			deploymentKey       = "deployment__" + namespace + "__extension-shoot-lakom-service.yaml"
-			pdbKey              = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service.yaml"
-			serviceKey          = "service__" + namespace + "__extension-shoot-lakom-service.yaml"
-			serviceAccountKey   = "serviceaccount__" + namespace + "__extension-shoot-lakom-service.yaml"
-			vpaKey              = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service.yaml"
+			lakomConfigConfigMapNameKey = "configmap__" + namespace + "__" + lakomConfigConfigMapName + ".yaml"
+			configMapKey                = "configmap__" + namespace + "__extension-shoot-lakom-service-monitoring.yaml"
+			serviceMonitorKey           = "servicemonitor__" + namespace + "__shoot-extension-shoot-lakom-service.yaml"
+			deploymentKey               = "deployment__" + namespace + "__extension-shoot-lakom-service.yaml"
+			pdbKey                      = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service.yaml"
+			serviceKey                  = "service__" + namespace + "__extension-shoot-lakom-service.yaml"
+			serviceAccountKey           = "serviceaccount__" + namespace + "__extension-shoot-lakom-service.yaml"
+			vpaKey                      = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service.yaml"
 		)
 
 		var (
-			replicas         int32
-			cosignPublicKeys []string
+			replicas    int32
+			lakomConfig string
 		)
 
 		BeforeEach(func() {
 			replicas = int32(3)
 
-			cosignPublicKeys = []string{
-				`-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
-On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
------END PUBLIC KEY-----
-`, `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
-hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
------END PUBLIC KEY-----
-`,
-			}
+			lakomConfig = `publicKeys:
+- name: test-01
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
+    On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
+    -----END PUBLIC KEY-----
+- name: test-02
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
+    hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
+    -----END PUBLIC KEY-----
+`
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
@@ -180,7 +185,7 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					genericKubeconfigName,
 					shootAccessServiceAccountName,
 					serverTLSSecretName,
-					cosignPublicKeys,
+					lakomConfig,
 					image,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
@@ -192,12 +197,12 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 				Expect(resources).To(HaveLen(7))
 
 				expectedResources := map[string]string{
-					deploymentKey:       expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, cosignSecretName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
-					pdbKey:              expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
-					cosignSecretNameKey: expectedSeedSecretCosign(namespace, cosignSecretName, cosignPublicKeys),
-					serviceKey:          expectedSeedService(namespace),
-					serviceAccountKey:   expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
-					vpaKey:              expectedSeedVPA(namespace),
+					deploymentKey:               expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
+					pdbKey:                      expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					lakomConfigConfigMapNameKey: expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					serviceKey:                  expectedSeedService(namespace),
+					serviceAccountKey:           expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
+					vpaKey:                      expectedSeedVPA(namespace),
 				}
 
 				if gep19Monitoring {
@@ -211,7 +216,9 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 					Expect(ok).To(BeTrue(), key)
 
 					strResource := string(resource)
-					Expect(strResource).To(Equal(expectedResource), key)
+					Expect(strResource).To(Equal(expectedResource), func() string {
+						return fmt.Sprintf("\nkey=%q\ngenerated resource\n%s\nexpectedResource\n%s\n", key, strResource, expectedResource)
+					})
 				}
 			},
 			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false, false, false),
@@ -437,16 +444,16 @@ spec:
 `
 }
 
-func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, cosignPublicKeysSecretName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
+func expectedSeedDeployment(replicas int32, namespace, genericKubeconfigSecretName, shootAccessSecretName, image, lakomConfigConfigMapName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
 	var (
 		genericKubeconfigSecretNameAnnotationKey = references.AnnotationKey("secret", genericKubeconfigSecretName)
 		shootAccessSecretNameAnnotationKey       = references.AnnotationKey("secret", shootAccessSecretName)
 		serverTLSSecretNameAnnotationKey         = references.AnnotationKey("secret", serverTLSSecretName)
-		cosignPublicKeysSecretNameAnnotationKey  = references.AnnotationKey("secret", cosignPublicKeysSecretName)
+		lakomConfigConfigMapNameAnnotationKey    = references.AnnotationKey("configmap", lakomConfigConfigMapName)
 
 		annotations = []string{
+			lakomConfigConfigMapNameAnnotationKey + ": " + lakomConfigConfigMapName,
 			genericKubeconfigSecretNameAnnotationKey + ": " + genericKubeconfigSecretName,
-			cosignPublicKeysSecretNameAnnotationKey + ": " + cosignPublicKeysSecretName,
 			shootAccessSecretNameAnnotationKey + ": " + shootAccessSecretName,
 			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
 		}
@@ -505,7 +512,7 @@ spec:
       - args:
         - --cache-ttl=10m0s
         - --cache-refresh-interval=30s
-        - --cosign-public-key-path=/etc/lakom/cosign/cosign.pub
+        - --lakom-config-path=/etc/lakom/config/config.yaml
         - --tls-cert-dir=/etc/lakom/tls
         - --health-bind-address=:8081
         - --metrics-bind-address=:8080
@@ -541,8 +548,8 @@ spec:
             cpu: 50m
             memory: 64Mi
         volumeMounts:
-        - mountPath: /etc/lakom/cosign
-          name: lakom-public-keys
+        - mountPath: /etc/lakom/config
+          name: lakom-config
           readOnly: true
         - mountPath: /etc/lakom/tls
           name: lakom-server-tls
@@ -553,9 +560,9 @@ spec:
       priorityClassName: gardener-system-300
       serviceAccountName: extension-shoot-lakom-service
       volumes:
-      - name: lakom-public-keys
-        secret:
-          secretName: ` + cosignPublicKeysSecretName + `
+      - configMap:
+          name: ` + lakomConfigConfigMapName + `
+        name: lakom-config
       - name: lakom-server-tls
         secret:
           secretName: ` + serverTLSSecretName + `
@@ -608,27 +615,22 @@ spec:
 `
 }
 
-func expectedSeedSecretCosign(namespace, cosignSecretName string, cosignPublicKeys []string) string {
-	indentedKeys := []string{}
-	for _, key := range cosignPublicKeys {
-		indentedKeys = append(indentedKeys, "    "+strings.TrimSuffix(strings.ReplaceAll(key, "\n", "\n    "), "    "))
-	}
+func expectedSeedConfigMapLakomConfig(namespace, lakomConfigSecretName string, lakomConfig string) string {
 
 	return `apiVersion: v1
+data:
+  config.yaml: |
+    ` + strings.TrimSuffix(strings.ReplaceAll(lakomConfig, "\n", "\n    "), "\n    ") + `
 immutable: true
-kind: Secret
+kind: ConfigMap
 metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
     resources.gardener.cloud/garbage-collectable-reference: "true"
-  name: ` + cosignSecretName + `
+  name: ` + lakomConfigSecretName + `
   namespace: ` + namespace + `
-stringData:
-  cosign.pub: |
-` + strings.TrimSuffix(strings.Join(indentedKeys, "\n"), "\n") + `
-type: Opaque
 `
 }
 

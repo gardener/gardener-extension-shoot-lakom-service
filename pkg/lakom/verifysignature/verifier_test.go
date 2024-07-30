@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/authn"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,12 +36,9 @@ func (k *anonymousKeyChainReader) GetKeyChain() (authn.Keychain, error) {
 }
 
 var _ = Describe("Verifier", func() {
-	var (
+	const (
 		refresh = time.Millisecond * 100
 		ttl     = time.Second
-		kcr     = &anonymousKeyChainReader{}
-		ctx     context.Context
-		logger  = logzap.New(logzap.WriteTo(GinkgoWriter), logzap.UseDevMode(true))
 
 		// source: https://github.com/sigstore/cosign/releases/download/v1.11.1/release-cosign.pub
 		cosignPublicKey = `-----BEGIN PUBLIC KEY-----
@@ -49,8 +48,32 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 `
 	)
 
+	var (
+		logger      logr.Logger
+		kcr         utils.KeyChainReader
+		ctx         context.Context
+		lakomConfig *config.CompletedConfig
+	)
+
 	BeforeEach(func() {
+		logger = logzap.New(logzap.WriteTo(GinkgoWriter), logzap.UseDevMode(true))
 		ctx = logf.IntoContext(context.Background(), logger)
+		kcr = &anonymousKeyChainReader{}
+
+		c := config.Config{
+			PublicKeys: []config.Key{
+				{
+					Name:      "test",
+					Key:       cosignPublicKey,
+					Algorithm: config.RSAPKCS1v15SHA256,
+				},
+			},
+		}
+
+		l, err := c.Complete()
+		Expect(err).ToNot(HaveOccurred())
+
+		lakomConfig = l
 	})
 
 	Describe("Direct Verifier", func() {
@@ -62,7 +85,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			Expect(err).ToNot(HaveOccurred())
 			Expect(keys).ToNot(BeZero())
 
-			directVerifier = verifysignature.NewDirectVerifier(keys, false)
+			directVerifier = verifysignature.NewDirectVerifier(*lakomConfig, false)
 		})
 
 		DescribeTable("Verify images",
@@ -107,7 +130,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			cache, err = verifysignature.NewSignatureVerificationResultCache(refresh, ttl)
 			Expect(err).ToNot(HaveOccurred())
 
-			directVerifier := verifysignature.NewDirectVerifier(keys, false)
+			directVerifier := verifysignature.NewDirectVerifier(*lakomConfig, false)
 			cachedVerifier = verifysignature.NewCacheVerifier(cache, directVerifier)
 		})
 

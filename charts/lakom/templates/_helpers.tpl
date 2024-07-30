@@ -5,9 +5,3 @@
   {{- printf "%s:%s" .Values.image.repository .Values.image.tag }}
   {{- end }}
 {{- end }}
-
-{{- define "lakom.cosignPublicKeys" -}}
-{{- range .Values.cosign.publicKeys -}}
-{{- printf "%s\n" . -}}
-{{- end -}}
-{{- end -}}

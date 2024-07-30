@@ -66,6 +66,7 @@ build:
             - cmd/lakom
             - cmd/lakom/app
             - pkg/constants
+            - pkg/lakom/config
             - pkg/lakom/metrics
             - pkg/lakom/resolvetag
             - pkg/lakom/utils

@@ -25,8 +25,8 @@ func (in *Configuration) DeepCopyInto(out *Configuration) {
 	}
 	if in.CosignPublicKeys != nil {
 		in, out := &in.CosignPublicKeys, &out.CosignPublicKeys
-		*out = make([]string, len(*in))
-		copy(*out, *in)
+		*out = new(runtime.RawExtension)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.DebugConfig != nil {
 		in, out := &in.DebugConfig, &out.DebugConfig

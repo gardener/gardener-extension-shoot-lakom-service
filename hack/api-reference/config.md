@@ -58,10 +58,11 @@ github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1.HealthCheckConf
 <td>
 <code>cosignPublicKeys</code></br>
 <em>
-[]string
+k8s.io/apimachinery/pkg/runtime.RawExtension
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>CosignPublicKeys is the cosign public keys used to verify image signatures.</p>
 </td>
 </tr>
