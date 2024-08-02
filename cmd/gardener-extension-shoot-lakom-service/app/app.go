@@ -16,6 +16,8 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
 
+	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+	v1alpha1apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/heartbeat"
 	"github.com/gardener/gardener/extensions/pkg/util"
@@ -114,6 +116,12 @@ func (o *Options) run(ctx context.Context) error {
 		return fmt.Errorf("could not update manager scheme: %s", err)
 	}
 	if err := monitoringv1.AddToScheme(mgr.GetScheme()); err != nil {
+		return fmt.Errorf("could not update manager scheme: %w", err)
+	}
+	if err := v1alpha1apilakom.AddToScheme(mgr.GetScheme()); err != nil {
+		return fmt.Errorf("could not update manager scheme: %w", err)
+	}
+	if err := apilakom.AddToScheme(mgr.GetScheme()); err != nil {
 		return fmt.Errorf("could not update manager scheme: %w", err)
 	}
 

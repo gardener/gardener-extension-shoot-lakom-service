@@ -12,5 +12,9 @@ spec:
   extensions:
   - type: shoot-lakom-service
     disabled: true
+    providerConfig:
+      apiVersion: lakom.extensions.gardener.cloud/v1alpha1
+      kind: lakomConfig
+      scope: "kubeSystem"
 ...
 ```
