@@ -14,7 +14,7 @@ spec:
     disabled: true
     providerConfig:
       apiVersion: lakom.extensions.gardener.cloud/v1alpha1
-      kind: lakomConfig
+      kind: LakomConfig
       scope: "kubeSystem"
 ...
 ```
