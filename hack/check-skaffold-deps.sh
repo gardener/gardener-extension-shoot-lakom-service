@@ -20,8 +20,9 @@ function run() {
 }
 
 # skaffold.yaml
-run "skaffold.yaml" "gardener-extension-shoot-lakom-service"      "extension"
-run "skaffold.yaml" "lakom"                                       "extension"
+run "skaffold.yaml" "gardener-extension-shoot-lakom-service"                "extension"
+run "skaffold.yaml" "lakom"                                                 "extension"
+run "skaffold.yaml" "gardener-extension-shoot-lakom-service-admission"      "admission"
 
 if ! $success ; then
   exit 1

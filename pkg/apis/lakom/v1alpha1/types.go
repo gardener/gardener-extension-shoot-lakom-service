@@ -5,27 +5,20 @@
 package v1alpha1
 
 import (
+	lakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type ScopeType string
-
-const (
-	KubeSystem                  ScopeType = "kubeSystem"
-	KubeSystemManagedByGardener ScopeType = "kubeSystemManagedByGardener"
-	Cluster                     ScopeType = "Cluster"
-)
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Configuration contains information about the Lakom service configuration.
+// LakomConfig contains information about the Lakom service configuration.
 type LakomConfig struct {
 	metav1.TypeMeta
 
 	// The scope in which lakom will verify pods
 	// +optional
-	Scope ScopeType `json:"scope"`
+	Scope lakom.ScopeType `json:"scope"`
 }

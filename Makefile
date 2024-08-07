@@ -148,8 +148,8 @@ extension-up extension-dev extension-down: export SKAFFOLD_LABEL = skaffold.dev/
 extension-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL) $(CRANE)
 	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) --cache-artifacts=false run
 
-extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL) $(CRANE)
-	$(SKAFFOLD) dev --cleanup=false --trigger=manual
+extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL) $(CRANE) $(KIND)
+	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) dev --cleanup=false --trigger=manual
 
 extension-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
 	$(SKAFFOLD) delete

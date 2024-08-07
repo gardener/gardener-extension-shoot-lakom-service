@@ -627,24 +627,24 @@ func scopeToObjectSelector(scope lakom.ScopeType) metav1.LabelSelector {
 }
 
 func scopeToNamespaceSelector(scope lakom.ScopeType) metav1.LabelSelector {
-    namespaceSelector := metav1.LabelSelector {
-                MatchExpressions: []metav1.LabelSelectorRequirement{
-                        {
-                                Key:      corev1.LabelMetadataName,
-                                Operator: metav1.LabelSelectorOpIn,
-                                Values:   []string{metav1.NamespaceSystem},
-                        },
-                },
-            }
+	namespaceSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      corev1.LabelMetadataName,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{metav1.NamespaceSystem},
+			},
+		},
+	}
 
-    switch scope {
-        case lakom.KubeSystemManagedByGardener:
-        case lakom.KubeSystem:
-        case lakom.Cluster:
-            namespaceSelector = metav1.LabelSelector{}
-    }
+	switch scope {
+	case lakom.KubeSystemManagedByGardener:
+	case lakom.KubeSystem:
+	case lakom.Cluster:
+		namespaceSelector = metav1.LabelSelector{}
+	}
 
-    return namespaceSelector
+	return namespaceSelector
 }
 
 func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName, projectNamespace string, scope lakom.ScopeType) (map[string][]byte, error) {
@@ -670,10 +670,11 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 
 	// This effectively overrides the scope set by the client in the shoot if the seed is a managed one.
 	// Needs to be discussed
+        // TODO(rrhubenov): Remove. Default will be KubeSystemManagerByGardener
 	isManagedSeed := projectNamespace == v1beta1constants.GardenNamespace
 	if isManagedSeed {
 		objectSelector = scopeToObjectSelector(lakom.KubeSystem)
-                namespaceSelector = scopeToNamespaceSelector(lakom.KubeSystem)
+		namespaceSelector = scopeToNamespaceSelector(lakom.KubeSystem)
 	}
 
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)

@@ -10,8 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+
+	"github.com/Masterminds/semver/v3"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
@@ -57,21 +58,20 @@ var _ = Describe("Actuator", func() {
 			mutatingWebhookKey              = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-shoot.yaml"
 			roleKey                         = "role__kube-system__gardener-extension-shoot-lakom-service-resource-reader.yaml"
 			roleBindingKey                  = "rolebinding__kube-system__gardener-extension-shoot-lakom-service-resource-reader.yaml"
-                        managedByGardenerObjectSelector = `
+			managedByGardenerObjectSelector = `
     matchExpressions:
     - key: resources.gardener.cloud/managed-by
       operator: In
       values:
       - gardener`
-                        emptyObjectSelector = ` {}`
-                        kubeSystemNamespaceSelector = `
+			emptyObjectSelector         = ` {}`
+			kubeSystemNamespaceSelector = `
     matchExpressions:
     - key: kubernetes.io/metadata.name
       operator: In
       values:
       - kube-system`
-                        emptyNamespaceSelector = ` {}`
-
+			emptyNamespaceSelector = ` {}`
 		)
 		var (
 			caBundle = []byte("caBundle")
@@ -117,7 +117,6 @@ var _ = Describe("Actuator", func() {
 			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
 		)
 
-		// TODO(rrhubenov): Need to decide whether we'll keep the custom "garden" namespace logic or leave it to the client that adds the extensions to the shoot.
 		DescribeTable("Should return an empty object selector for the webhooks when shoot is in the garden namespace",
 			func(ca []byte, ns string) {
 				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, v1beta1constants.GardenNamespace, scope)
@@ -263,16 +262,6 @@ hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
 func expectedShootMutatingWebhook(caBundle []byte, namespace string, objectSelector string, namespaceSelector string) string {
 	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
 
-	// objectSelector := ` {}`
-	// if !withEmptyObjectSelector {
-	// 	objectSelector = `
-	//    matchExpressions:
-	//    - key: resources.gardener.cloud/managed-by
-	//      operator: In
-	//      values:
-	//      - gardener`
-	// }
-
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
@@ -311,16 +300,6 @@ webhooks:
 
 func expectedSeedValidatingWebhook(caBundle []byte, namespace string, objectSelector string, namespaceSelector string) string {
 	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
-
-	// objectSelector := ` {}`
-	// if !withEmptyObjectSelector {
-	// 	objectSelector = `
-	//    matchExpressions:
-	//    - key: resources.gardener.cloud/managed-by
-	//      operator: In
-	//      values:
-	//      - gardener`
-	// }
 
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration

@@ -10,20 +10,12 @@
 </p>
 Resource Types:
 <ul><li>
-<a href="#lakom.extensions.gardener.cloud/v1alpha1.ScopeType">ScopeType</a>
+<a href="#lakom.extensions.gardener.cloud/v1alpha1.LakomConfig">LakomConfig</a>
 </li></ul>
-<h3 id="lakom.extensions.gardener.cloud/v1alpha1.ScopeType">ScopeType
-(<code>string</code> alias)</p></h3>
-<p>
-(<em>Appears on:</em>
-<a href="#lakom.extensions.gardener.cloud/v1alpha1.LakomConfig">LakomConfig</a>)
-</p>
-<p>
-</p>
 <h3 id="lakom.extensions.gardener.cloud/v1alpha1.LakomConfig">LakomConfig
 </h3>
 <p>
-<p>Configuration contains information about the Lakom service configuration.</p>
+<p>LakomConfig contains information about the Lakom service configuration.</p>
 </p>
 <table>
 <thead>
@@ -35,11 +27,26 @@ Resource Types:
 <tbody>
 <tr>
 <td>
-<code>scopeType</code></br>
+<code>apiVersion</code></br>
+string</td>
+<td>
+<code>
+lakom.extensions.gardener.cloud/v1alpha1
+</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code></br>
+string
+</td>
+<td><code>LakomConfig</code></td>
+</tr>
+<tr>
+<td>
+<code>scope</code></br>
 <em>
-<a href="#lakom.extensions.gardener.cloud/v1alpha1.ScopeType">
-ScopeType
-</a>
+github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom.ScopeType
 </em>
 </td>
 <td>

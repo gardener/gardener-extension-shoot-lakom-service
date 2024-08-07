@@ -46,7 +46,7 @@ func Convert_v1alpha1_LakomConfig_To_lakom_LakomConfig(in *LakomConfig, out *lak
 }
 
 func autoConvert_lakom_LakomConfig_To_v1alpha1_LakomConfig(in *lakom.LakomConfig, out *LakomConfig, s conversion.Scope) error {
-	out.Scope = ScopeType(in.Scope)
+	out.Scope = lakom.ScopeType(in.Scope)
 	return nil
 }
 
