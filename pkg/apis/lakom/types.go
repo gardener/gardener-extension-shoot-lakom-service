@@ -6,7 +6,7 @@ package lakom
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-        "k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -16,13 +16,14 @@ type ScopeType string
 
 const (
 	// KubeSystem denotes the `kube-system` namespace
-	KubeSystem ScopeType                  = "kubeSystem"
+	KubeSystem ScopeType = "kubeSystem"
 	// KubeSystemManagedByGardener denoes pods in the `kube-system` namespace that have a `managed-by/gardener` label
 	KubeSystemManagedByGardener ScopeType = "kubeSystemManagedByGardener"
 	// Cluster denotes the whole cluster
-	Cluster ScopeType                     = "cluster"
+	Cluster ScopeType = "cluster"
 )
 
+// AllowedScopes lists the scopes that can be chosen for lakom
 var AllowedScopes sets.Set[ScopeType] = sets.New(KubeSystem, KubeSystemManagedByGardener, Cluster)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

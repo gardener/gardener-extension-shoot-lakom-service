@@ -1,26 +1,27 @@
 package lakom_test
 
 import (
-	"testing"
+	"context"
 	"encoding/json"
-        "context"
+	"testing"
+
+	lakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission/validator/lakom"
+	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+	v1alpha1 "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
 
 	extensionswebhook "github.com/gardener/gardener/extensions/pkg/webhook"
-        mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
-	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-        v1alpha1 "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
-	"go.uber.org/mock/gomock"
-        lakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission/validator/lakom"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"github.com/gardener/gardener/pkg/apis/core"
+	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
+	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func TestLakom(t *testing.T) {
@@ -30,21 +31,20 @@ func TestLakom(t *testing.T) {
 
 var _ = Describe("Shoot validator", func() {
 	var (
-		ctx  = context.Background()
+		ctx = context.Background()
 
 		shootValidator extensionswebhook.Validator
-                ctrl           *gomock.Controller
-                apiReader      *mockclient.MockReader
+		ctrl           *gomock.Controller
+		apiReader      *mockclient.MockReader
 
 		shoot *core.Shoot
 	)
 
-        
 	Describe("#Validate", func() {
-            BeforeEach(func() {
+		BeforeEach(func() {
 			scheme := runtime.NewScheme()
-                        utilruntime.Must(apilakom.AddToScheme(scheme))
-                        utilruntime.Must(v1alpha1.AddToScheme(scheme))
+			utilruntime.Must(apilakom.AddToScheme(scheme))
+			utilruntime.Must(v1alpha1.AddToScheme(scheme))
 
 			decoder := serializer.NewCodecFactory(scheme, serializer.EnableStrict).UniversalDecoder()
 			apiReader = mockclient.NewMockReader(ctrl)
@@ -67,76 +67,74 @@ var _ = Describe("Shoot validator", func() {
 										APIVersion: v1alpha1.SchemeGroupVersion.String(),
 										Kind:       "LakomConfig",
 									},
-                                                                        Scope: apilakom.Cluster,
+									Scope: apilakom.Cluster,
 								}),
 							},
 						},
 					},
 				},
 			}
-            })
+		})
 
-            It("should return err when new is not a Shoot", func() {
-                    err := shootValidator.Validate(ctx, &corev1.Pod{}, nil)
+		It("should return err when new is not a Shoot", func() {
+			err := shootValidator.Validate(ctx, &corev1.Pod{}, nil)
 
-                    Expect(err).To(HaveOccurred())
-            })
+			Expect(err).To(HaveOccurred())
+		})
 
-            It("should do nothing when the Shoot does no specify a shoot-lakom-service extension", func() {
-                    shoot.Spec.Extensions[0].Type = "foo"
+		It("should do nothing when the Shoot does no specify a shoot-lakom-service extension", func() {
+			shoot.Spec.Extensions[0].Type = "foo"
 
-                    Expect(shootValidator.Validate(ctx, shoot, nil)).To(Succeed())
-            })
+			Expect(shootValidator.Validate(ctx, shoot, nil)).To(Succeed())
+		})
 
+		It("should return err when shoot-lakom-service providerConfig is nil", func() {
+			shoot.Spec.Extensions[0].ProviderConfig = nil
 
-            It("should return err when shoot-lakom-service providerConfig is nil", func() {
-                    shoot.Spec.Extensions[0].ProviderConfig = nil
+			err := shootValidator.Validate(ctx, shoot, nil)
+			Expect(err).To(PointTo(MatchFields(IgnoreExtras, Fields{
+				"Type":  Equal(field.ErrorTypeRequired),
+				"Field": Equal("spec.extensions[0].providerConfig"),
+			})))
+		})
 
-                    err := shootValidator.Validate(ctx, shoot, nil)
-                    Expect(err).To(PointTo(MatchFields(IgnoreExtras, Fields{
-                            "Type":   Equal(field.ErrorTypeRequired),
-                            "Field":  Equal("spec.extensions[0].providerConfig"),
-                    })))
-            })
+		It("should return err when shoot-lakom-service providerConfig cannot be decoded", func() {
+			shoot.Spec.Extensions[0].ProviderConfig = &runtime.RawExtension{
+				Raw: []byte(`{"bar": "baz"}`),
+			}
 
-            It("should return err when shoot-lakom-service providerConfig cannot be decoded", func() {
-                    shoot.Spec.Extensions[0].ProviderConfig = &runtime.RawExtension{
-                            Raw: []byte(`{"bar": "baz"}`),
-                    }
+			err := shootValidator.Validate(ctx, shoot, nil)
+			Expect(err).To(HaveOccurred())
+		})
 
-                    err := shootValidator.Validate(ctx, shoot, nil)
-                    Expect(err).To(HaveOccurred())
-            })
+		It("should succeed for valid Shoot", func() {
+			Expect(shootValidator.Validate(ctx, shoot, nil)).To(Succeed())
+		})
 
-            It("should succeed for valid Shoot", func() {
-                    Expect(shootValidator.Validate(ctx, shoot, nil)).To(Succeed())
-            })
+		It("should fail if the given scope is not recognized", func() {
+			extension := &runtime.RawExtension{
+				Raw: encode(&v1alpha1.LakomConfig{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: v1alpha1.SchemeGroupVersion.String(),
+						Kind:       "LakomConfig",
+					},
+					Scope: "invalid",
+				}),
+			}
 
-            It("should fail if the given scope is not recognized", func() {
-                extension := &runtime.RawExtension{
-                    Raw: encode(&v1alpha1.LakomConfig{
-                        TypeMeta: metav1.TypeMeta{
-                            APIVersion: v1alpha1.SchemeGroupVersion.String(),
-                            Kind:       "LakomConfig",
-                        },
-                        Scope: "invalid",
-                    }),
-                }
+			shoot.Spec.Extensions[0].ProviderConfig = extension
 
-                shoot.Spec.Extensions[0].ProviderConfig = extension
+			err := shootValidator.Validate(ctx, shoot, nil)
+			Expect(err).To(ConsistOf(PointTo(MatchFields(IgnoreExtras, Fields{
+				"Type":  Equal(field.ErrorTypeInvalid),
+				"Field": Equal("spec.extensions[0].providerConfig.scope"),
+			}))))
+		})
 
-                err := shootValidator.Validate(ctx, shoot, nil)
-                Expect(err).To(ConsistOf(PointTo(MatchFields(IgnoreExtras, Fields{
-                        "Type":   Equal(field.ErrorTypeInvalid),
-                        "Field":  Equal("spec.extensions[0].providerConfig.scope"),
-                }))))
-            })
-
-        })
+	})
 })
 
 func encode(obj runtime.Object) []byte {
 	data, _ := json.Marshal(obj)
 	return data
 }
-

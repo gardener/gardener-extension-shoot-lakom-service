@@ -9,12 +9,13 @@ import (
 	"fmt"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
+
 	extensionswebhook "github.com/gardener/gardener/extensions/pkg/webhook"
 	"github.com/gardener/gardener/pkg/apis/core"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 )
 
 // shoot validates shoots
@@ -42,13 +43,13 @@ func findExtension(extensions []core.Extension, extensionType string) (int, core
 }
 
 func (s *shoot) validateScopeType(fldPath *field.Path, scopeType lakom.ScopeType) field.ErrorList {
-    errList := field.ErrorList{}
+	errList := field.ErrorList{}
 
-    if ! lakom.AllowedScopes.Has(scopeType) {
-            errList = append(errList, field.Invalid(fldPath, scopeType, fmt.Sprintf("Invalid scope %s. Please refer to the documentation for available scopes", scopeType)))
-    }
+	if !lakom.AllowedScopes.Has(scopeType) {
+		errList = append(errList, field.Invalid(fldPath, scopeType, fmt.Sprintf("Invalid scope %s. Please refer to the documentation for available scopes", scopeType)))
+	}
 
-    return errList
+	return errList
 }
 
 // Validate validates the given shoot object
@@ -75,8 +76,7 @@ func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
 		return fmt.Errorf("failed to decode providerConfig: %w", err)
 	}
 
-        allErrs = append(allErrs, s.validateScopeType(providerConfigPath.Child("scope"), lakomConfig.Scope)...)
+	allErrs = append(allErrs, s.validateScopeType(providerConfigPath.Child("scope"), lakomConfig.Scope)...)
 
 	return allErrs.ToAggregate()
 }
-
