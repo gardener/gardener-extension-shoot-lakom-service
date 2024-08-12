@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package cache
+package lakom
 
 import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package cache
+package lakom
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 )
 
 // shoot validates shoots
@@ -40,12 +41,14 @@ func findExtension(extensions []core.Extension, extensionType string) (int, core
 	return -1, core.Extension{}
 }
 
-func (s *shoot) validateScopeType(providerConfigPath *field.Path, scopeType lakom.ScopeType) *field.Error {
+func (s *shoot) validateScopeType(fldPath *field.Path, scopeType lakom.ScopeType) field.ErrorList {
+    errList := field.ErrorList{}
+
     if ! lakom.AllowedScopes.Has(scopeType) {
-            return field.Invalid(providerConfigPath.Child("scope"), scopeType, fmt.Sprintf("Invalid scope %s. Please refer to the documentation for available scopes", scopeType))
+            errList = append(errList, field.Invalid(fldPath, scopeType, fmt.Sprintf("Invalid scope %s. Please refer to the documentation for available scopes", scopeType)))
     }
 
-    return nil
+    return errList
 }
 
 // Validate validates the given shoot object
@@ -57,8 +60,7 @@ func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
 		return fmt.Errorf("wrong object type %T", new)
 	}
 
-	// TODO: Move `shoot-lakom-service` to constants
-	i, lakomExt := findExtension(shoot.Spec.Extensions, "shoot-lakom-service")
+	i, lakomExt := findExtension(shoot.Spec.Extensions, constants.ExtensionType)
 	if i == -1 {
 		return nil
 	}
@@ -73,7 +75,7 @@ func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
 		return fmt.Errorf("failed to decode providerConfig: %w", err)
 	}
 
-        allErrs = append(allErrs, s.validateScopeType(providerConfigPath.Child("scope"), lakomConfig.Scope))
+        allErrs = append(allErrs, s.validateScopeType(providerConfigPath.Child("scope"), lakomConfig.Scope)...)
 
 	return allErrs.ToAggregate()
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 
 	"github.com/Masterminds/semver/v3"
-	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -79,7 +78,7 @@ var _ = Describe("Actuator", func() {
 
 		It("Should ensure the correct shoot resources are created", func() {
 
-			resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, shootNamespace, scope)
+			resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).To(HaveLen(4))
 
@@ -93,7 +92,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, shootNamespace, scope)
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope)
 				Expect(err).ToNot(HaveOccurred())
 
 				mutatingWebhook, ok := resources[mutatingWebhookKey]
@@ -106,7 +105,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, shootNamespace, scope)
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope)
 				Expect(err).ToNot(HaveOccurred())
 
 				validatingWebhook, ok := resources[validatingWebhookKey]
@@ -117,26 +116,9 @@ var _ = Describe("Actuator", func() {
 			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
 		)
 
-		DescribeTable("Should return an empty object selector for the webhooks when shoot is in the garden namespace",
-			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, v1beta1constants.GardenNamespace, scope)
-				Expect(err).ToNot(HaveOccurred())
-
-				mutatingWebhook, ok := resources[mutatingWebhookKey]
-				Expect(ok).To(BeTrue())
-				Expect(string(mutatingWebhook)).To(MatchYAML(expectedShootMutatingWebhook(ca, ns, emptyObjectSelector, kubeSystemNamespaceSelector)))
-
-				validatingWebhook, ok := resources[validatingWebhookKey]
-				Expect(ok).To(BeTrue())
-				Expect(string(validatingWebhook)).To(MatchYAML(expectedSeedValidatingWebhook(ca, ns, emptyObjectSelector, kubeSystemNamespaceSelector)))
-			},
-			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
-			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
-		)
-
 		DescribeTable("Should ensure the rolebinding is correctly set",
 			func(saName string) {
-				resources, err := getShootResources(caBundle, extensionNamespace, saName, shootNamespace, scope)
+				resources, err := getShootResources(caBundle, extensionNamespace, saName, scope)
 				Expect(err).ToNot(HaveOccurred())
 
 				roleBinding, ok := resources[roleBindingKey]
@@ -149,7 +131,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should return the correct object and namespace selectors based on scope",
 			func(scope lakom.ScopeType, objectSelector, namespaceSelector string) {
-				resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, shootNamespace, scope)
+				resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope)
 				Expect(err).ToNot(HaveOccurred())
 
 				mutatingWebhook, ok := resources[mutatingWebhookKey]

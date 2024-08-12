@@ -111,7 +111,8 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 
 	lakomConfig := &lakom.LakomConfig{}
 	if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomConfig); err != nil {
-		return fmt.Errorf("failed to decode provider config: %w", err)
+                // Apply default values if provider config has not been provided
+                lakomConfig.Scope = lakom.KubeSystemManagedByGardener
 	}
 
 	// initialize SecretsManager based on Cluster object
@@ -173,7 +174,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
-		cluster.Shoot.GetNamespace(),
 		lakomConfig.Scope,
 	)
 
@@ -647,7 +647,7 @@ func scopeToNamespaceSelector(scope lakom.ScopeType) metav1.LabelSelector {
 	return namespaceSelector
 }
 
-func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName, projectNamespace string, scope lakom.ScopeType) (map[string][]byte, error) {
+func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName string, scope lakom.ScopeType) (map[string][]byte, error) {
 	var (
 		matchPolicy          = admissionregistration.Equivalent
 		sideEffectClass      = admissionregistration.SideEffectClassNone
@@ -667,15 +667,6 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 			},
 		}}
 	)
-
-	// This effectively overrides the scope set by the client in the shoot if the seed is a managed one.
-	// Needs to be discussed
-        // TODO(rrhubenov): Remove. Default will be KubeSystemManagerByGardener
-	isManagedSeed := projectNamespace == v1beta1constants.GardenNamespace
-	if isManagedSeed {
-		objectSelector = scopeToObjectSelector(lakom.KubeSystem)
-		namespaceSelector = scopeToNamespaceSelector(lakom.KubeSystem)
-	}
 
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
 	shootResources, err := shootRegistry.AddAllAndSerialize(
