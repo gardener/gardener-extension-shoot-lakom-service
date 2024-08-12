@@ -1,6 +1,7 @@
 # Gardener Lakom Service for Shoots
 
 ## Introduction
+
 Gardener allows Shoot clusters to use `Lakom` admission controller for cosign image signing verification. To support this the Gardener must be installed with the `shoot-lakom-service` extension.
 
 ## Configuration

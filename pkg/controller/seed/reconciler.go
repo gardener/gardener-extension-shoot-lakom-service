@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
@@ -43,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/yaml"
 )
 
 type kubeSystemReconciler struct {
@@ -103,10 +103,15 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
+	lakomConfig, err := yaml.JSONToYAML(kcr.serviceConfig.CosignPublicKeys.Raw)
+	if err != nil {
+		return fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
+	}
+
 	resources, err := getResources(
 		generatedSecrets[constants.SeedWebhookTLSSecretName].Name,
 		image.String(),
-		kcr.serviceConfig.CosignPublicKeys,
+		string(lakomConfig),
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		kcr.serviceConfig.UseOnlyImagePullSecrets,
 		kcr.serviceConfig.AllowUntrustedImages,
@@ -175,27 +180,27 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	return nil
 }
 
-func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, webhookCaBundle []byte, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version) (map[string][]byte, error) {
+func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundle []byte, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
-		tcpProto                   = corev1.ProtocolTCP
-		serverPort                 = intstr.FromInt(10250)
-		metricsPort                = intstr.FromInt(8080)
-		healthPort                 = intstr.FromInt(8081)
-		cacheTTL                   = time.Minute * 10
-		cacheRefreshInterval       = time.Second * 30
-		cosignPublicKeysDir        = "/etc/lakom/cosign"
-		cosignPublicKeysSecretName = constants.SeedExtensionServiceName + "-cosign-public-keys"
-		webhookTLSCertDir          = "/etc/lakom/tls"
-		registry                   = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestCPU                 = resource.MustParse("50m")
-		requestMemory              = resource.MustParse("64Mi")
-		vpaUpdateMode              = vpaautoscalingv1.UpdateModeAuto
-		kubeSystemNamespace        = metav1.NamespaceSystem
-		matchPolicy                = admissionregistration.Equivalent
-		sideEffectClass            = admissionregistration.SideEffectClassNone
-		failurePolicy              = admissionregistration.Fail
-		timeOutSeconds             = ptr.To[int32](25)
-		namespaceSelector          = metav1.LabelSelector{
+		tcpProto                 = corev1.ProtocolTCP
+		serverPort               = intstr.FromInt(10250)
+		metricsPort              = intstr.FromInt(8080)
+		healthPort               = intstr.FromInt(8081)
+		cacheTTL                 = time.Minute * 10
+		cacheRefreshInterval     = time.Second * 30
+		lakomConfigDir           = "/etc/lakom/config"
+		lakomConfigConfigMapName = constants.SeedExtensionServiceName + "-lakom-config"
+		webhookTLSCertDir        = "/etc/lakom/tls"
+		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
+		requestCPU               = resource.MustParse("50m")
+		requestMemory            = resource.MustParse("64Mi")
+		vpaUpdateMode            = vpaautoscalingv1.UpdateModeAuto
+		kubeSystemNamespace      = metav1.NamespaceSystem
+		matchPolicy              = admissionregistration.Equivalent
+		sideEffectClass          = admissionregistration.SideEffectClassNone
+		failurePolicy            = admissionregistration.Fail
+		timeOutSeconds           = ptr.To[int32](25)
+		namespaceSelector        = metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
 					Key:      corev1.LabelMetadataName,
@@ -215,19 +220,18 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 		webhookName = constants.GardenerExtensionName + "-seed"
 	)
 
-	cosignPublicKeysSecret := corev1.Secret{
+	lakomConfigConfigMap := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cosignPublicKeysSecretName,
+			Name:      lakomConfigConfigMapName,
 			Namespace: kubeSystemNamespace,
 			Labels:    getLabels(),
 		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			"cosign.pub": strings.Join(cosignPublicKeys, "\n"),
+		Data: map[string]string{
+			"config.yaml": lakomConfig,
 		},
 	}
 
-	if err := kutil.MakeUnique(&cosignPublicKeysSecret); err != nil {
+	if err := kutil.MakeUnique(&lakomConfigConfigMap); err != nil {
 		return nil, err
 	}
 
@@ -280,7 +284,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 						Args: []string{
 							"--cache-ttl=" + cacheTTL.String(),
 							"--cache-refresh-interval=" + cacheRefreshInterval.String(),
-							"--cosign-public-key-path=" + cosignPublicKeysDir + "/cosign.pub",
+							"--lakom-config-path=" + lakomConfigDir + "/config.yaml",
 							"--tls-cert-dir=" + webhookTLSCertDir,
 							"--health-bind-address=:" + healthPort.String(),
 							"--metrics-bind-address=:" + metricsPort.String(),
@@ -329,8 +333,8 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
-								Name:      "lakom-public-keys",
-								MountPath: cosignPublicKeysDir,
+								Name:      "lakom-config",
+								MountPath: lakomConfigDir,
 								ReadOnly:  true,
 							},
 							{
@@ -343,10 +347,12 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 					PriorityClassName: v1beta1constants.PriorityClassNameSeedSystem900,
 					Volumes: []corev1.Volume{
 						{
-							Name: "lakom-public-keys",
+							Name: "lakom-config",
 							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: cosignPublicKeysSecret.Name,
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: lakomConfigConfigMap.Name,
+									},
 								},
 							},
 						},
@@ -415,7 +421,7 @@ func getResources(serverTLSSecretName, image string, cosignPublicKeys []string, 
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
 		pdb,
-		&cosignPublicKeysSecret,
+		&lakomConfigConfigMap,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      constants.SeedExtensionServiceName,

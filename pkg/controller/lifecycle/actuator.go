@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
@@ -54,6 +53,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -151,13 +151,18 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
+	lakomConfig, err := yaml.JSONToYAML(a.serviceConfig.CosignPublicKeys.Raw)
+	if err != nil {
+		return fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
+	}
+
 	seedResources, err := getSeedResources(
 		getLakomReplicas(controller.IsHibernationEnabled(cluster)),
 		namespace,
 		extensions.GenericTokenKubeconfigSecretNameFromCluster(cluster),
 		lakomShootAccessSecret.Secret.Name,
 		generatedSecrets[constants.WebhookTLSSecretName].Name,
-		a.serviceConfig.CosignPublicKeys,
+		string(lakomConfig),
 		image.String(),
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
@@ -282,36 +287,35 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName string, cosignPublicKeys []string, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version, gep19Monitoring bool) (map[string][]byte, error) {
+func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version, gep19Monitoring bool) (map[string][]byte, error) {
 	var (
-		tcpProto                   = corev1.ProtocolTCP
-		serverPort                 = intstr.FromInt(10250)
-		metricsPort                = intstr.FromInt(8080)
-		healthPort                 = intstr.FromInt(8081)
-		cacheTTL                   = time.Minute * 10
-		cacheRefreshInterval       = time.Second * 30
-		cosignPublicKeysDir        = "/etc/lakom/cosign"
-		cosignPublicKeysSecretName = constants.ExtensionServiceName + "-cosign-public-keys"
-		webhookTLSCertDir          = "/etc/lakom/tls"
-		registry                   = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestCPU                 = resource.MustParse("50m")
-		requestMemory              = resource.MustParse("64Mi")
-		vpaUpdateMode              = vpaautoscalingv1.UpdateModeAuto
+		tcpProto                 = corev1.ProtocolTCP
+		serverPort               = intstr.FromInt(10250)
+		metricsPort              = intstr.FromInt(8080)
+		healthPort               = intstr.FromInt(8081)
+		cacheTTL                 = time.Minute * 10
+		cacheRefreshInterval     = time.Second * 30
+		lakomConfigDir           = "/etc/lakom/config"
+		lakomConfigConfigMapName = constants.ExtensionServiceName + "-lakom-config"
+		webhookTLSCertDir        = "/etc/lakom/tls"
+		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
+		requestCPU               = resource.MustParse("50m")
+		requestMemory            = resource.MustParse("64Mi")
+		vpaUpdateMode            = vpaautoscalingv1.UpdateModeAuto
 	)
 
-	cosignPublicKeysSecret := corev1.Secret{
+	lakomConfigConfigMap := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cosignPublicKeysSecretName,
+			Name:      lakomConfigConfigMapName,
 			Namespace: namespace,
 			Labels:    getLabels(),
 		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			"cosign.pub": strings.Join(cosignPublicKeys, "\n"),
+		Data: map[string]string{
+			"config.yaml": lakomConfig,
 		},
 	}
 
-	if err := kutil.MakeUnique(&cosignPublicKeysSecret); err != nil {
+	if err := kutil.MakeUnique(&lakomConfigConfigMap); err != nil {
 		return nil, err
 	}
 
@@ -365,7 +369,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 						Args: []string{
 							"--cache-ttl=" + cacheTTL.String(),
 							"--cache-refresh-interval=" + cacheRefreshInterval.String(),
-							"--cosign-public-key-path=" + cosignPublicKeysDir + "/cosign.pub",
+							"--lakom-config-path=" + lakomConfigDir + "/config.yaml",
 							"--tls-cert-dir=" + webhookTLSCertDir,
 							"--health-bind-address=:" + healthPort.String(),
 							"--metrics-bind-address=:" + metricsPort.String(),
@@ -415,8 +419,8 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
-								Name:      "lakom-public-keys",
-								MountPath: cosignPublicKeysDir,
+								Name:      "lakom-config",
+								MountPath: lakomConfigDir,
 								ReadOnly:  true,
 							},
 							{
@@ -429,10 +433,12 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 					PriorityClassName: v1beta1constants.PriorityClassNameShootControlPlane300,
 					Volumes: []corev1.Volume{
 						{
-							Name: "lakom-public-keys",
+							Name: "lakom-config",
 							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: cosignPublicKeysSecret.Name,
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: lakomConfigConfigMap.Name,
+									},
 								},
 							},
 						},
@@ -558,7 +564,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
 		pdb,
-		&cosignPublicKeysSecret,
+		&lakomConfigConfigMap,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      constants.ExtensionServiceName,

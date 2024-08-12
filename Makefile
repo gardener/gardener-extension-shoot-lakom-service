@@ -50,10 +50,9 @@ start-lakom:
 		./cmd/$(ADMISSION_NAME) \
 		--kubeconfig=$(KUBECONFIG) \
 		--tls-cert-dir=example/lakom/tls/ \
-		--cosign-public-key-path=example/lakom/cosign/cosign.pub \
+		--lakom-config-path=example/lakom/cosign/config.yaml \
 		--cache-ttl=$(CACHE_TTL) \
-		--cache-refresh-interval=$(CACHE_REFRESH_INTERVAL) \
-		--insecure-allow-untrusted-images=true
+		--cache-refresh-interval=$(CACHE_REFRESH_INTERVAL)
 
 .PHONE: dev-setup
 dev-setup: $(COSIGN)
@@ -103,7 +102,7 @@ check-generate:
 check: $(GOIMPORTS) $(GOLANGCI_LINT) $(HELM)
 	@bash $(GARDENER_HACK_DIR)/check.sh --golangci-lint-config=./.golangci.yaml ./cmd/... ./pkg/... ./test/...
 	@bash $(GARDENER_HACK_DIR)/check-charts.sh ./charts
-	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) $(HACK_DIR)/check-skaffold-deps.sh 
+	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) $(HACK_DIR)/check-skaffold-deps.sh
 
 .PHONY: generate
 generate: $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ) $(VGOPATH)
@@ -153,4 +152,3 @@ extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL) $(CRANE) $(KIND)
 
 extension-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
 	$(SKAFFOLD) delete
-

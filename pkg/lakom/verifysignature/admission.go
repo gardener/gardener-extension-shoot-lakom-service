@@ -7,11 +7,11 @@ package verifysignature
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
@@ -31,7 +31,7 @@ import (
 type HandleBuilder struct {
 	mgr                     manager.Manager
 	logger                  logr.Logger
-	cosignPublicKeysReader  io.Reader
+	lakomConfig             config.Config
 	cacheTTL                time.Duration
 	cacheRefreshInterval    time.Duration
 	useOnlyImagePullSecrets bool
@@ -69,9 +69,9 @@ func (hb HandleBuilder) WithAllowInsecureRegistries(allowInsecureRegistries bool
 	return hb
 }
 
-// WithCosignPublicKeysReader sets the reader with the cosign public keys.
-func (hb HandleBuilder) WithCosignPublicKeysReader(cosignPublicKeysReader io.Reader) HandleBuilder {
-	hb.cosignPublicKeysReader = cosignPublicKeysReader
+// WithLakomConfig sets the lakom config with the public keys and their properties.
+func (hb HandleBuilder) WithLakomConfig(config config.Config) HandleBuilder {
+	hb.lakomConfig = config
 	return hb
 }
 
@@ -106,17 +106,12 @@ func (hb HandleBuilder) Build() (*handler, error) {
 		verifier Verifier
 	)
 
-	rawKeys, err := io.ReadAll(hb.cosignPublicKeysReader)
+	lakomConfig, err := hb.lakomConfig.Complete()
 	if err != nil {
 		return nil, err
 	}
 
-	cosignPublicKeys, err := utils.GetCosignPublicKeys(rawKeys)
-	if err != nil {
-		return nil, err
-	}
-
-	verifier = NewDirectVerifier(cosignPublicKeys, hb.allowInsecureRegistries)
+	verifier = NewDirectVerifier(*lakomConfig, hb.allowInsecureRegistries)
 	if hb.cacheTTL != 0 {
 		cache, err := NewSignatureVerificationResultCache(hb.cacheRefreshInterval, hb.cacheTTL)
 		if err != nil {

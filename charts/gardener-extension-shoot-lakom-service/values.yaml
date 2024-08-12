@@ -5,7 +5,10 @@
 serviceName: shoot-lakom-service
 replicaCount: 3
 
-image: europe-docker.pkg.dev/gardener-project/public/gardener/extensions/shoot-lakom-service
+image:
+  repository: europe-docker.pkg.dev/gardener-project/public/gardener/extensions/shoot-lakom-service
+  tag: latest
+  pullPolicy: IfNotPresent
 
 imageVectorOverwrite: {}
   # images:
@@ -34,15 +37,20 @@ controllers:
     concurrentSyncs: 20
   heartbeat:
     renewIntervalSeconds: 30
-  cosignPublicKeys: []
-    # - |
-    #   -----BEGIN PUBLIC KEY-----
-    #   1234
-    #   -----END PUBLIC KEY-----
-    # - |
-    #   -----BEGIN PUBLIC KEY-----
-    #   abcd
-    #   -----END PUBLIC KEY-----
+  cosignPublicKeys: {}
+    # publicKeys:
+    # - name: key1
+    #   algorithm: RSASSA-PKCS1-v1_5-SHA256
+    #   key: |-
+    #     -----BEGIN PUBLIC KEY-----
+    #     1234
+    #     -----END PUBLIC KEY-----
+    # - name: key2
+    #   algorithm: RSASSA-PKCS1-v1_5-SHA256
+    #   key: |-
+    #     -----BEGIN PUBLIC KEY-----
+    #     abcd
+    #     -----END PUBLIC KEY-----
   healthPort: 8080
   metricsPort: 8081
   useOnlyImagePullSecrets: false

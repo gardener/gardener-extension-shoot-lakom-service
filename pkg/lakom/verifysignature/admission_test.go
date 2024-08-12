@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
+	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
 
 	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
@@ -37,6 +37,16 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhyQCx0E9wQWSFI9ULGwy3BuRklnt
 IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 -----END PUBLIC KEY-----
 `
+
+	cosignConfig = lakomconfig.Config{
+		PublicKeys: []lakomconfig.Key{
+			{
+				Name:      "test",
+				Key:       cosignPublicKey,
+				Algorithm: lakomconfig.RSAPKCS1v15SHA256,
+			},
+		},
+	}
 
 	scheme    *runtime.Scheme
 	ctrl      *gomock.Controller
@@ -95,12 +105,11 @@ var _ = Describe("Admission Handler", func() {
 		mgr.EXPECT().GetScheme().Return(scheme)
 
 		logger = logzap.New(logzap.WriteTo(GinkgoWriter))
-		reader := strings.NewReader(cosignPublicKey)
 		h, err := verifysignature.
 			NewHandleBuilder().
 			WithManager(mgr).
 			WithLogger(logger.WithName("test-cosign-signature-verifier")).
-			WithCosignPublicKeysReader(reader).
+			WithLakomConfig(cosignConfig).
 			WithCacheTTL(time.Minute * 10).
 			WithCacheRefreshInterval(time.Second * 30).
 			WithAllowUntrustedImages(false).
@@ -139,13 +148,12 @@ var _ = Describe("Admission Handler", func() {
 	It("Should allow untrusted images", func() {
 		mgr.EXPECT().GetAPIReader().Return(apiReader)
 		mgr.EXPECT().GetScheme().Return(scheme)
-		reader := strings.NewReader(cosignPublicKey)
 
 		allowUntrustedHandler, err := verifysignature.
 			NewHandleBuilder().
 			WithManager(mgr).
 			WithLogger(logger.WithName("test-cosign-untrusted-handler")).
-			WithCosignPublicKeysReader(reader).
+			WithLakomConfig(cosignConfig).
 			WithCacheTTL(time.Minute * 10).
 			WithCacheRefreshInterval(time.Second * 30).
 			WithAllowUntrustedImages(true).

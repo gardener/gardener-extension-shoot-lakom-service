@@ -26,7 +26,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret-lakom-cosign-public-keys: {{ include (print $.Template.BasePath "/secret-lakom-cosign-public-keys.yaml") . | sha256sum }}
+        checksum/configmap-lakom-config: {{ include (print $.Template.BasePath "/configmap-lakom-config.yaml") . | sha256sum }}
         checksum/secret-lakom-server-tls: {{ include (print $.Template.BasePath "/secret-lakom-server-tls.yaml") . | sha256sum }}
         {{- if .Values.kubeconfig }}
         checksum/secret-lakom-target-kubeconfig: {{ include (print $.Template.BasePath "/secret-lakom-target-kubeconfig.yaml") . | sha256sum }}
@@ -73,7 +73,7 @@ spec:
         - /lakom
         - --cache-ttl={{ .Values.cache.ttl }}
         - --cache-refresh-interval={{ .Values.cache.refreshInterval }}
-        - --cosign-public-key-path=/etc/lakom/cosign/cosign.pub
+        - --lakom-config-path=/etc/lakom/config/config.yaml
         - --tls-cert-dir=/etc/lakom/tls
         - --health-bind-address=:{{ .Values.healthPort }}
         - --metrics-bind-address=:{{ .Values.metricsPort }}
@@ -101,8 +101,8 @@ spec:
             scheme: HTTP
           initialDelaySeconds: 5
         volumeMounts:
-        - name: lakom-cosign-public-keys
-          mountPath: /etc/lakom/cosign
+        - name: lakom-config
+          mountPath: /etc/lakom/config
           readOnly: true
         - name: lakom-server-tls
           mountPath: /etc/lakom/tls
@@ -117,9 +117,9 @@ spec:
           readOnly: true
         {{- end }}
       volumes:
-      - name: lakom-cosign-public-keys
-        secret:
-          secretName: lakom-cosign-public-keys
+      - name: lakom-config
+        configMap:
+          name: lakom-config
       - name: lakom-server-tls
         secret:
           secretName: lakom-server-tls

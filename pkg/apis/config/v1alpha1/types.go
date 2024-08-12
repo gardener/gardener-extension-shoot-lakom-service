@@ -7,6 +7,7 @@ package v1alpha1
 import (
 	healthcheckconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -19,7 +20,8 @@ type Configuration struct {
 	// +optional
 	HealthCheckConfig *healthcheckconfigv1alpha1.HealthCheckConfig `json:"healthCheckConfig,omitempty"`
 	// CosignPublicKeys is the cosign public keys used to verify image signatures.
-	CosignPublicKeys []string `json:"cosignPublicKeys,omitempty"`
+	// +optional
+	CosignPublicKeys *runtime.RawExtension `json:"cosignPublicKeys,omitempty"`
 	// DebugConfig contains debug configurations for the controller.
 	// +optional
 	DebugConfig *DebugConfig `json:"debugConfig,omitempty"`
