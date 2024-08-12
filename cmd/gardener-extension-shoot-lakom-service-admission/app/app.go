@@ -44,7 +44,7 @@ func GardenWebhookSwitchOptions() *webhookcmd.SwitchOptions {
 	)
 }
 
-// NewAdmissionCommand creates a new command for running an registry cache validator.
+// NewAdmissionCommand creates a new command for running a shoot lakom validator
 func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 	var (
 		restOpts = &controllercmd.RESTOptions{}

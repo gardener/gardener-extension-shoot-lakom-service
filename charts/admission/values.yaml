@@ -28,7 +28,7 @@ global:
 # projectedKubeconfig:
 #   baseMountPath: /var/run/secrets/gardener.cloud
 #   genericKubeconfigSecretName: generic-token-kubeconfig
-#   tokenSecretName: access-registry-cache-admission
+#   tokenSecretName: access-shoot-lakom-service-admission
   serviceAccountTokenVolumeProjection:
     enabled: false
     expirationSeconds: 43200
