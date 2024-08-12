@@ -18,3 +18,13 @@ spec:
       scope: kubeSystem
 ...
 ```
+
+The `scope` field instruct lakom which pods to validate. The possible values are:
+
+- `kubeSystem`
+Lakom will validate all pods in the `kube-system` namespace.
+- `kubeSystemManagedByGardener`
+Lakom will validate all pods in the `kube-system` namespace that are annotated with "managed-by/gardener"
+- `cluster`
+Lakom will validate all pods in all namespaces.
+
