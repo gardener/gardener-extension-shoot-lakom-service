@@ -68,7 +68,7 @@ func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
 
 	providerConfigPath := field.NewPath("spec", "extensions").Index(i).Child("providerConfig")
 	if lakomExt.ProviderConfig == nil {
-		return field.Required(providerConfigPath, "providerConfig is required for the lakom extension")
+		return nil
 	}
 
 	lakomConfig := &lakom.LakomConfig{}

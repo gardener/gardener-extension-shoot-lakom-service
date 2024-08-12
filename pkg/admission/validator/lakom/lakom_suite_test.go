@@ -88,16 +88,6 @@ var _ = Describe("Shoot validator", func() {
 			Expect(shootValidator.Validate(ctx, shoot, nil)).To(Succeed())
 		})
 
-		It("should return err when shoot-lakom-service providerConfig is nil", func() {
-			shoot.Spec.Extensions[0].ProviderConfig = nil
-
-			err := shootValidator.Validate(ctx, shoot, nil)
-			Expect(err).To(PointTo(MatchFields(IgnoreExtras, Fields{
-				"Type":  Equal(field.ErrorTypeRequired),
-				"Field": Equal("spec.extensions[0].providerConfig"),
-			})))
-		})
-
 		It("should return err when shoot-lakom-service providerConfig cannot be decoded", func() {
 			shoot.Spec.Extensions[0].ProviderConfig = &runtime.RawExtension{
 				Raw: []byte(`{"bar": "baz"}`),
