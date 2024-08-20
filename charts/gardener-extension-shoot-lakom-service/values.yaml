@@ -63,4 +63,4 @@ controllers:
 gardener:
   seed:
     annotations:
-      service.lakom.extensions.gardener.cloud/deploySeedResources: false
+      service.lakom.extensions.gardener.cloud/deploySeedResources: true
