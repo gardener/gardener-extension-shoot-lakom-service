@@ -33,6 +33,8 @@ type Configuration struct {
 	// AllowInsecureRegistries sets the lakom webhook to allow HTTP communication with OCI registries.
 	// It first tries HTTPS and then falls back to HTTP.
 	AllowInsecureRegistries bool
+	// DeploySeedResources instruct the lakom-controller whether it should deploy lakom to the seed cluster.
+	DeploySeedResources bool
 }
 
 // DebugConfig contains debug configurations for the controller.

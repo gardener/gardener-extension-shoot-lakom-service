@@ -128,6 +128,17 @@ bool
 <p>AllowInsecureRegistries allows Lakom to use HTTP for communication with the registries</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>deploySeedResources</code></br>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>DeploySeedResources instruct the lakom-controller whether it should deploy lakom to the seed cluster.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="lakom.extensions.config.gardener.cloud/v1alpha1.DebugConfig">DebugConfig

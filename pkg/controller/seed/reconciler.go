@@ -80,6 +80,16 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	const (
 		kubeSystemNamespaceName = metav1.NamespaceSystem
 	)
+	var (
+		ownerNamespace = kcr.serviceConfig.SeedBootstrap.OwnerNamespace
+	)
+
+	if !kcr.serviceConfig.DeploySeedResources {
+		if err := managedresources.DeleteForSeed(ctx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeed); err != nil {
+			return err
+		}
+		return nil
+	}
 
 	secretsConfig := ConfigsFor(kubeSystemNamespaceName)
 	secretsManager, err := secretsmanager.New(ctx, logger.WithName("seed-secretsmanager"), clock.RealClock{}, kcr.client, kubeSystemNamespaceName, ManagerIdentity, secretsmanager.Config{CASecretAutoRotation: true})
@@ -121,10 +131,6 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	if err != nil {
 		return err
 	}
-
-	var (
-		ownerNamespace = kcr.serviceConfig.SeedBootstrap.OwnerNamespace
-	)
 
 	if err := managedresources.CreateForSeed(ctx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeed, false, resources); err != nil {
 		return err

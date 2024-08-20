@@ -69,6 +69,7 @@ func autoConvert_v1alpha1_Configuration_To_config_Configuration(in *Configuratio
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
 	out.AllowUntrustedImages = in.AllowUntrustedImages
 	out.AllowInsecureRegistries = in.AllowInsecureRegistries
+	out.DeploySeedResources = in.DeploySeedResources
 	return nil
 }
 
@@ -87,6 +88,7 @@ func autoConvert_config_Configuration_To_v1alpha1_Configuration(in *config.Confi
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
 	out.AllowUntrustedImages = in.AllowUntrustedImages
 	out.AllowInsecureRegistries = in.AllowInsecureRegistries
+	out.DeploySeedResources = in.DeploySeedResources
 	return nil
 }
 

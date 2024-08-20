@@ -36,6 +36,8 @@ type Configuration struct {
 	AllowUntrustedImages bool `json:"allowUntrustedImages"`
 	// AllowInsecureRegistries allows Lakom to use HTTP for communication with the registries
 	AllowInsecureRegistries bool `json:"allowInsecureRegistries"`
+	// DeploySeedResources instruct the lakom-controller whether it should deploy lakom to the seed cluster.
+	DeploySeedResources bool `json:"deploySeedResources"`
 }
 
 // DebugConfig contains debug configurations for the controller.
