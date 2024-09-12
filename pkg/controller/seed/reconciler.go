@@ -84,7 +84,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		ownerNamespace = kcr.serviceConfig.SeedBootstrap.OwnerNamespace
 	)
 
-	if !kcr.serviceConfig.DeploySeedResources {
+	if !kcr.serviceConfig.SeedBootstrap.Enabled {
 		if err := managedresources.DeleteForSeed(ctx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeed); err != nil {
 			return err
 		}

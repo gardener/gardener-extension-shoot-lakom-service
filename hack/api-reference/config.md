@@ -128,17 +128,6 @@ bool
 <p>AllowInsecureRegistries allows Lakom to use HTTP for communication with the registries</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>deploySeedResources</code></br>
-<em>
-bool
-</em>
-</td>
-<td>
-<p>DeploySeedResources instruct the lakom-controller whether it should deploy lakom to the seed cluster.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="lakom.extensions.config.gardener.cloud/v1alpha1.DebugConfig">DebugConfig
@@ -210,6 +199,18 @@ string
 <td>
 <p>OwnerNamespace is the name of the namespace owning the resources related
 to the seed bootstrap, as well as where the managed resources are deployed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>enabled</code></br>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>Enabled determines whether any seed bootstrapping will occur.
+Existing lakom resources will be removed from the seed.</p>
 </td>
 </tr>
 </tbody>

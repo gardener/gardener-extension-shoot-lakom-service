@@ -36,8 +36,6 @@ type Configuration struct {
 	AllowUntrustedImages bool `json:"allowUntrustedImages"`
 	// AllowInsecureRegistries allows Lakom to use HTTP for communication with the registries
 	AllowInsecureRegistries bool `json:"allowInsecureRegistries"`
-	// DeploySeedResources instruct the lakom-controller whether it should deploy lakom to the seed cluster.
-	DeploySeedResources bool `json:"deploySeedResources"`
 }
 
 // DebugConfig contains debug configurations for the controller.
@@ -54,4 +52,7 @@ type SeedBootstrap struct {
 	// OwnerNamespace is the name of the namespace owning the resources related
 	// to the seed bootstrap, as well as where the managed resources are deployed.
 	OwnerNamespace string `json:"ownerNamespace"`
+	// Enabled determines whether any seed bootstrapping will occur.
+        // Existing lakom resources will be removed from the seed.
+	Enabled bool `json:"enabled"`
 }

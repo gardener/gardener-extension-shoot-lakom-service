@@ -33,8 +33,6 @@ type Configuration struct {
 	// AllowInsecureRegistries sets the lakom webhook to allow HTTP communication with OCI registries.
 	// It first tries HTTPS and then falls back to HTTP.
 	AllowInsecureRegistries bool
-	// DeploySeedResources instruct the lakom-controller whether it should deploy lakom to the seed cluster.
-	DeploySeedResources bool
 }
 
 // DebugConfig contains debug configurations for the controller.
@@ -51,4 +49,7 @@ type SeedBootstrap struct {
 	// OwnerNamespace is the name of the namespace owning the resources related
 	// to the seed bootstrap, as well as where the managed resources are deployed.
 	OwnerNamespace string
+	// Enabled determines whether any seed bootstrapping will occur.
+        // Existing lakom resources will be removed from the seed.
+	Enabled bool
 }
