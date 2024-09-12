@@ -1,5 +1,5 @@
 {{- define "name" -}}
-gardener-extension-shoot-lakom-service-admission
+gardener-extension-shoot-lakom-admission
 {{- end -}}
 
 {{- define "labels.app.key" -}}
@@ -23,5 +23,5 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{- define "leaderelectionid" -}}
-gardener-extension-shoot-lakom-service-admission
+gardener-extension-shoot-lakom-admission
 {{- end -}}

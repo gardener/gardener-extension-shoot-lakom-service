@@ -4,7 +4,7 @@ global:
     user:
       name: ""
   image:
-    repository: europe-docker.pkg.dev/gardener-project/public/gardener/extensions/lakom-service-admission
+    repository: europe-docker.pkg.dev/gardener-project/public/gardener/extensions/shoot-lakom-admission
     tag: latest
     pullPolicy: IfNotPresent
   replicaCount: 1
@@ -28,7 +28,7 @@ global:
 # projectedKubeconfig:
 #   baseMountPath: /var/run/secrets/gardener.cloud
 #   genericKubeconfigSecretName: generic-token-kubeconfig
-#   tokenSecretName: access-shoot-lakom-service-admission
+#   tokenSecretName: access-shoot-lakom-admission
   serviceAccountTokenVolumeProjection:
     enabled: false
     expirationSeconds: 43200

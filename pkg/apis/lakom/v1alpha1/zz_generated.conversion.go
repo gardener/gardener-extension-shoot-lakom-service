@@ -10,6 +10,8 @@
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	lakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +38,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_LakomConfig_To_lakom_LakomConfig(in *LakomConfig, out *lakom.LakomConfig, s conversion.Scope) error {
-	out.Scope = lakom.ScopeType(in.Scope)
+	out.Scope = (*lakom.ScopeType)(unsafe.Pointer(in.Scope))
 	return nil
 }
 
@@ -46,7 +48,7 @@ func Convert_v1alpha1_LakomConfig_To_lakom_LakomConfig(in *LakomConfig, out *lak
 }
 
 func autoConvert_lakom_LakomConfig_To_v1alpha1_LakomConfig(in *lakom.LakomConfig, out *LakomConfig, s conversion.Scope) error {
-	out.Scope = lakom.ScopeType(in.Scope)
+	out.Scope = (*lakom.ScopeType)(unsafe.Pointer(in.Scope))
 	return nil
 }
 

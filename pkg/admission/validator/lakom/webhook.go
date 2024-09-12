@@ -32,7 +32,7 @@ func New(mgr manager.Manager) (*extensionswebhook.Webhook, error) {
 	return extensionswebhook.New(mgr, extensionswebhook.Args{
 		Provider: constants.ExtensionType,
 		Name:     Name,
-		Path:     "/webhooks/shoot-lakom-service",
+		Path:     "/webhooks/shoot-lakom-admission",
 		Validators: map[extensionswebhook.Validator][]extensionswebhook.Type{
 			NewShootValidator(apiReader, decoder): {{Obj: &core.Shoot{}}},
 		},

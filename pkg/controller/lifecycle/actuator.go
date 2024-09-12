@@ -105,15 +105,15 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
-	if ex.Spec.ProviderConfig == nil {
-		return fmt.Errorf(".spec.providerConfig is required for the lakom extension")
-	}
-
 	lakomProviderConfig := &lakom.LakomConfig{}
 	if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
 		// Apply default values if provider config has not been provided
 		logger.Error(err, "Could not decode provider config. Using default value `kubeSystemManagedByGardener` for scope")
-		lakomProviderConfig.Scope = lakom.KubeSystemManagedByGardener
+		lakomProviderConfig.Scope = ptr.To(lakom.KubeSystemManagedByGardener)
+	}
+	if lakomProviderConfig.Scope == nil {
+		logger.Info("No scope specified. Using default value `kubeSystemManagedByGardener` for scope")
+		lakomProviderConfig.Scope = ptr.To(lakom.KubeSystemManagedByGardener)
 	}
 
 	// initialize SecretsManager based on Cluster object
@@ -180,7 +180,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
-		lakomProviderConfig.Scope,
+		*lakomProviderConfig.Scope,
 	)
 
 	if err != nil {

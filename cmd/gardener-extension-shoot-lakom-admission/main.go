@@ -7,7 +7,7 @@ package main
 import (
 	"os"
 
-	"github.com/gardener/gardener-extension-shoot-lakom-service/cmd/gardener-extension-shoot-lakom-service-admission/app"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/cmd/gardener-extension-shoot-lakom-admission/app"
 
 	"github.com/gardener/gardener/pkg/logger"
 	runtimelog "sigs.k8s.io/controller-runtime/pkg/log"

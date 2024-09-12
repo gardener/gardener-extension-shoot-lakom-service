@@ -22,8 +22,10 @@ rm -f $GOPATH/bin/*-gen
 
 PROJECT_ROOT=$(dirname $0)/..
 
+
+# Code generation for pkg/apis/config
 bash "${CODE_GEN_DIR}"/generate-internal-groups.sh \
-  deepcopy,defaulter,conversion \
+  deepcopy,defaulter \
   github.com/gardener/gardener-extension-shoot-lakom-service/pkg/client/componentconfig \
   github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis \
   github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis \
@@ -31,10 +33,28 @@ bash "${CODE_GEN_DIR}"/generate-internal-groups.sh \
   --go-header-file "${PROJECT_ROOT}/hack/LICENSE_BOILERPLATE.txt"
 
 bash "${CODE_GEN_DIR}"/generate-internal-groups.sh \
-  deepcopy,defaulter,conversion \
+  conversion \
+  github.com/gardener/gardener-extension-shoot-lakom-service/pkg/client/componentconfig \
+  github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis \
+  github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis \
+  "config:v1alpha1" \
+  --extra-peer-dirs=github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config,github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/conversion,k8s.io/apimachinery/pkg/runtime,github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1 \
+  --go-header-file "${PROJECT_ROOT}/hack/LICENSE_BOILERPLATE.txt"
+
+# Code generation for pkg/apis/lakom
+bash "${CODE_GEN_DIR}"/generate-internal-groups.sh \
+  deepcopy,defaulter \
   github.com/gardener/gardener-extension-shoot-lakom-service/pkg/client/componentconfig \
   github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis \
   github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis \
   "lakom:v1alpha1" \
   --go-header-file "${PROJECT_ROOT}/hack/LICENSE_BOILERPLATE.txt"
 
+bash "${CODE_GEN_DIR}"/generate-internal-groups.sh \
+  conversion \
+  github.com/gardener/gardener-extension-shoot-lakom-service/pkg/client/componentconfig \
+  github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis \
+  github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis \
+  "lakom:v1alpha1" \
+  --extra-peer-dirs=github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config,github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/conversion,k8s.io/apimachinery/pkg/runtime,github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1 \
+  --go-header-file "${PROJECT_ROOT}/hack/LICENSE_BOILERPLATE.txt"

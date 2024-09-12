@@ -12,12 +12,11 @@ import (
 	lakomvalidator "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission/validator/lakom"
 	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	v1alpha1apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	controllercmd "github.com/gardener/gardener/extensions/pkg/controller/cmd"
 	webhookcmd "github.com/gardener/gardener/extensions/pkg/webhook/cmd"
 	coreinstall "github.com/gardener/gardener/pkg/apis/core/install"
-	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
+	corev1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	gardenerhealthz "github.com/gardener/gardener/pkg/healthz"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -33,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-const admissionName = "shoot-lakom-service-admission"
+const admissionName = "shoot-lakom-admission"
 
-var log = logf.Log.WithName("gardener-extension-shoot-lakom-service-admission")
+var log = logf.Log.WithName("gardener-extension-shoot-lakom-admission")
 
 // GardenWebhookSwitchOptions are the webhookcmd.SwitchOptions for the admission webhooks.
 func GardenWebhookSwitchOptions() *webhookcmd.SwitchOptions {
@@ -78,12 +77,12 @@ func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use: fmt.Sprintf("gardener-extension-%s-admission", constants.ExtensionType),
+		Use: "gardener-extension-shoot-lakom-admission",
 
 		RunE: func(_ *cobra.Command, _ []string) error {
 			verflag.PrintAndExitIfRequested()
 
-			log.Info("Starting lakom-admission", "version", version.Get())
+			log.Info("Starting shoot-lakom-admission", "version", version.Get())
 
 			if err := aggOption.Complete(); err != nil {
 				return fmt.Errorf("error completing options: %w", err)
@@ -117,14 +116,14 @@ func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 
 			mgr, err := manager.New(restOpts.Completed().Config, managerOptions)
 			if err != nil {
-				return fmt.Errorf("could not instantiate manager: %w", err)
+				return fmt.Errorf("failed to instantiate manager: %w", err)
 			}
 
 			if err := v1alpha1apilakom.AddToScheme(mgr.GetScheme()); err != nil {
-				return fmt.Errorf("could not update manager scheme: %w", err)
+				return fmt.Errorf("failed to add `lakom.extensions.gardener.cloud/v1alpha1` to manager scheme: %w", err)
 			}
 			if err := apilakom.AddToScheme(mgr.GetScheme()); err != nil {
-				return fmt.Errorf("could not update manager scheme: %w", err)
+				return fmt.Errorf("failed to add internal version of `lakom.extensions.config.gardener.cloud` to manager scheme: %w", err)
 			}
 			coreinstall.Install(mgr.GetScheme())
 
@@ -132,7 +131,7 @@ func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 			if sourceClusterConfig != nil {
 				sourceCluster, err = cluster.New(sourceClusterConfig, func(opts *cluster.Options) {
 					opts.Logger = log
-					opts.Cache.DefaultNamespaces = map[string]cache.Config{v1beta1constants.GardenNamespace: {}}
+					opts.Cache.DefaultNamespaces = map[string]cache.Config{corev1beta1constants.GardenNamespace: {}}
 				})
 				if err != nil {
 					return err
@@ -153,11 +152,11 @@ func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 			}
 
 			if err := mgr.AddReadyzCheck("informer-sync", gardenerhealthz.NewCacheSyncHealthz(mgr.GetCache())); err != nil {
-				return fmt.Errorf("could not add ready check for informers: %w", err)
+				return fmt.Errorf("failed to add readiness check for informers: %w", err)
 			}
 
 			if err := mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
-				return fmt.Errorf("could not add health check to manager: %w", err)
+				return fmt.Errorf("failed to add healthiness check to manager: %w", err)
 			}
 
 			if err := mgr.AddReadyzCheck("webhook-server", mgr.GetWebhookServer().StartedChecker()); err != nil {

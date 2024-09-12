@@ -8,7 +8,7 @@ spec:
   {{- if .Values.global.vpa.resourcePolicy }}
   resourcePolicy:
     containerPolicies:
-    - containerName: '*'
+    - containerName: {{ include "name" . }}
       minAllowed:
         memory: {{ required ".Values.global.vpa.resourcePolicy.minAllowed.memory is required" .Values.global.vpa.resourcePolicy.minAllowed.memory }}
       maxAllowed:

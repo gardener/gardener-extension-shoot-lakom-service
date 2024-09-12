@@ -46,7 +46,7 @@ func (s *shoot) validateScopeType(fldPath *field.Path, scopeType lakom.ScopeType
 	errList := field.ErrorList{}
 
 	if !lakom.AllowedScopes.Has(scopeType) {
-		errList = append(errList, field.Invalid(fldPath, scopeType, fmt.Sprintf("Invalid scope %s. Please refer to the documentation for available scopes", scopeType)))
+		errList = append(errList, field.NotSupported(fldPath, scopeType, lakom.AllowedScopes.UnsortedList()))
 	}
 
 	return errList
@@ -54,8 +54,6 @@ func (s *shoot) validateScopeType(fldPath *field.Path, scopeType lakom.ScopeType
 
 // Validate validates the given shoot object
 func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
-	allErrs := field.ErrorList{}
-
 	shoot, ok := new.(*core.Shoot)
 	if !ok {
 		return fmt.Errorf("wrong object type %T", new)
@@ -66,17 +64,18 @@ func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
 		return nil
 	}
 
+	lakomConfig := &lakom.LakomConfig{}
+	if err := runtime.DecodeInto(s.decoder, lakomExt.ProviderConfig.Raw, lakomConfig); err != nil {
+		return fmt.Errorf("failed to decode providerConfig: %w", err)
+	}
+	if lakomConfig.Scope == nil {
+		return nil
+	}
+
 	providerConfigPath := field.NewPath("spec", "extensions").Index(i).Child("providerConfig")
 	if lakomExt.ProviderConfig == nil {
 		return nil
 	}
 
-	lakomConfig := &lakom.LakomConfig{}
-	if err := runtime.DecodeInto(s.decoder, lakomExt.ProviderConfig.Raw, lakomConfig); err != nil {
-		return fmt.Errorf("failed to decode providerConfig: %w", err)
-	}
-
-	allErrs = append(allErrs, s.validateScopeType(providerConfigPath.Child("scope"), lakomConfig.Scope)...)
-
-	return allErrs.ToAggregate()
+	return s.validateScopeType(providerConfigPath.Child("scope"), *lakomConfig.Scope).ToAggregate()
 }

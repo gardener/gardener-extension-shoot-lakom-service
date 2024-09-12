@@ -100,12 +100,12 @@ metadata:
   name: admission
 build:
   artifacts:
-    - image: local-skaffold/gardener-extension-shoot-lakom-service-admission
+    - image: local-skaffold/gardener-extension-shoot-lakom-admission
       ko:
         dependencies:
           paths:
-            - cmd/gardener-extension-shoot-lakom-service-admission
-            - cmd/gardener-extension-shoot-lakom-service-admission/app
+            - cmd/gardener-extension-shoot-lakom-admission
+            - cmd/gardener-extension-shoot-lakom-admission/app
             - pkg/admission/validator/lakom
             - pkg/apis/lakom
             - pkg/apis/lakom/v1alpha1
@@ -113,7 +113,7 @@ build:
             - VERSION
         ldflags:
           - '{{.LD_FLAGS}}'
-        main: ./cmd/gardener-extension-shoot-lakom-service-admission
+        main: ./cmd/gardener-extension-shoot-lakom-admission
 deploy:
   helm:
     releases:

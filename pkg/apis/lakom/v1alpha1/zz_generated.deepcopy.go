@@ -10,6 +10,7 @@
 package v1alpha1
 
 import (
+	lakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -17,6 +18,11 @@ import (
 func (in *LakomConfig) DeepCopyInto(out *LakomConfig) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.Scope != nil {
+		in, out := &in.Scope, &out.Scope
+		*out = new(lakom.ScopeType)
+		**out = **in
+	}
 	return
 }
 

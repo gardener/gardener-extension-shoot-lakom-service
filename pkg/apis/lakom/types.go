@@ -16,11 +16,11 @@ type ScopeType string
 
 const (
 	// KubeSystem denotes the `kube-system` namespace
-	KubeSystem ScopeType = "kubeSystem"
+	KubeSystem ScopeType = "KubeSystem"
 	// KubeSystemManagedByGardener denoes pods in the `kube-system` namespace that have a `managed-by/gardener` label
-	KubeSystemManagedByGardener ScopeType = "kubeSystemManagedByGardener"
+	KubeSystemManagedByGardener ScopeType = "KubeSystemManagedByGardener"
 	// Cluster denotes the whole cluster
-	Cluster ScopeType = "cluster"
+	Cluster ScopeType = "Cluster"
 )
 
 // AllowedScopes lists the scopes that can be chosen for lakom
@@ -33,5 +33,5 @@ type LakomConfig struct {
 	metav1.TypeMeta
 
 	// The scope in which lakom will verify pods
-	Scope ScopeType
+	Scope *ScopeType
 }

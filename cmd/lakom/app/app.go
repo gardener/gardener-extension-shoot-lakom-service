@@ -12,8 +12,6 @@ import (
 	goruntime "runtime"
 	"time"
 
-	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
-	v1alpha1apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
@@ -168,12 +166,6 @@ func (o *Options) Run(ctx context.Context) error {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
 		return err
-	}
-	if err := v1alpha1apilakom.AddToScheme(scheme); err != nil {
-		return fmt.Errorf("could not update manager scheme: %w", err)
-	}
-	if err := apilakom.AddToScheme(scheme); err != nil {
-		return fmt.Errorf("could not update manager scheme: %w", err)
 	}
 
 	var extraHandlers map[string]http.Handler

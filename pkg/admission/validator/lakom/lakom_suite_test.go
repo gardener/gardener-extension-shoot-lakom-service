@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+//
+// SPDX-License-Identifier: Apache-2.0
+
 package lakom_test
 
 import (
@@ -5,9 +9,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	lakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission/validator/lakom"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission/validator/lakom"
 	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
-	v1alpha1 "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
 
 	extensionswebhook "github.com/gardener/gardener/extensions/pkg/webhook"
 	"github.com/gardener/gardener/pkg/apis/core"
@@ -22,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
 func TestLakom(t *testing.T) {
@@ -67,7 +72,7 @@ var _ = Describe("Shoot validator", func() {
 										APIVersion: v1alpha1.SchemeGroupVersion.String(),
 										Kind:       "LakomConfig",
 									},
-									Scope: apilakom.Cluster,
+									Scope: ptr.To(apilakom.Cluster),
 								}),
 							},
 						},
@@ -80,6 +85,7 @@ var _ = Describe("Shoot validator", func() {
 			err := shootValidator.Validate(ctx, &corev1.Pod{}, nil)
 
 			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("wrong object type"))
 		})
 
 		It("should do nothing when the Shoot does no specify a shoot-lakom-service extension", func() {
@@ -102,21 +108,21 @@ var _ = Describe("Shoot validator", func() {
 		})
 
 		It("should fail if the given scope is not recognized", func() {
-			extension := &runtime.RawExtension{
+			var scope apilakom.ScopeType = "invalid"
+
+			shoot.Spec.Extensions[0].ProviderConfig = &runtime.RawExtension{
 				Raw: encode(&v1alpha1.LakomConfig{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: v1alpha1.SchemeGroupVersion.String(),
 						Kind:       "LakomConfig",
 					},
-					Scope: "invalid",
+					Scope: &scope,
 				}),
 			}
 
-			shoot.Spec.Extensions[0].ProviderConfig = extension
-
 			err := shootValidator.Validate(ctx, shoot, nil)
 			Expect(err).To(ConsistOf(PointTo(MatchFields(IgnoreExtras, Fields{
-				"Type":  Equal(field.ErrorTypeInvalid),
+				"Type":  Equal(field.ErrorTypeNotSupported),
 				"Field": Equal("spec.extensions[0].providerConfig.scope"),
 			}))))
 		})

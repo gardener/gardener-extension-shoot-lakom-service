@@ -7,17 +7,17 @@ metadata:
 {{ include "labels" . | indent 4 }}
     high-availability-config.resources.gardener.cloud/type: server
 spec:
-  revisionHistoryLimit: 5
+  revisionHistoryLimit: 2
   replicas: {{ .Values.global.replicaCount }}
   selector:
     matchLabels:
 {{ include "labels" . | indent 6 }}
   template:
     metadata:
+      {{- if .Values.global.kubeconfig }}
       annotations:
-        {{- if .Values.global.kubeconfig }}
         checksum/secret-kubeconfig: {{ include (print $.Template.BasePath "/secret-kubeconfig.yaml") . | sha256sum }}
-        {{- end }}
+      {{- end }}
       labels:
         networking.gardener.cloud/to-dns: allowed
         networking.gardener.cloud/to-runtime-apiserver: allowed
@@ -44,7 +44,7 @@ spec:
         {{- end}}
         - --webhook-config-namespace={{ .Release.Namespace }}
         {{- if .Values.global.kubeconfig }}
-        - --kubeconfig=/kubeconfig/kubeconfig
+        - --kubeconfig=/etc/gardener-extension-shoot-lakom-admission/kubeconfig/kubeconfig
         {{- end }}
         {{- if .Values.global.projectedKubeconfig }}
         - --kubeconfig={{ required ".Values.global.projectedKubeconfig.baseMountPath is required" .Values.global.projectedKubeconfig.baseMountPath }}/kubeconfig
@@ -82,7 +82,7 @@ spec:
         volumeMounts:
         {{- if .Values.global.kubeconfig }}
         - name: kubeconfig
-          mountPath: /kubeconfig
+          mountPath: /etc/gardener-extension-shoot-lakom-admission/kubeconfig
           readOnly: true
         {{- end }}
         {{- if .Values.global.serviceAccountTokenVolumeProjection.enabled }}
@@ -99,7 +99,7 @@ spec:
       {{- if .Values.global.kubeconfig }}
       - name: kubeconfig
         secret:
-          secretName: gardener-extension-shoot-lakom-service-admission-kubeconfig
+          secretName: gardener-extension-shoot-lakom-admission-kubeconfig
           defaultMode: 420
       {{- end }}
       {{- if .Values.global.serviceAccountTokenVolumeProjection.enabled }}

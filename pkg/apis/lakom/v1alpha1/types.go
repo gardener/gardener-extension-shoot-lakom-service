@@ -20,5 +20,5 @@ type LakomConfig struct {
 
 	// The scope in which lakom will verify pods
 	// +optional
-	Scope lakom.ScopeType `json:"scope"`
+	Scope *lakom.ScopeType `json:"scope"`
 }

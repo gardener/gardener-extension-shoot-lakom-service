@@ -17,6 +17,11 @@ import (
 func (in *LakomConfig) DeepCopyInto(out *LakomConfig) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.Scope != nil {
+		in, out := &in.Scope, &out.Scope
+		*out = new(ScopeType)
+		**out = **in
+	}
 	return
 }
 

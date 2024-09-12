@@ -109,20 +109,20 @@ func (o *Options) run(ctx context.Context) error {
 
 	mgr, err := manager.New(o.restOptions.Completed().Config, mgrOpts)
 	if err != nil {
-		return fmt.Errorf("could not instantiate controller-manager: %s", err)
+		return fmt.Errorf("failed to instantiate controller-manager: %s", err)
 	}
 
 	if err := extensionscontroller.AddToScheme(mgr.GetScheme()); err != nil {
-		return fmt.Errorf("could not update manager scheme: %s", err)
+		return fmt.Errorf("failed to update manager scheme: %s", err)
 	}
 	if err := monitoringv1.AddToScheme(mgr.GetScheme()); err != nil {
-		return fmt.Errorf("could not update manager scheme: %w", err)
+		return fmt.Errorf("failed to add `monitoring.prometheus/v1` to manager scheme: %w", err)
 	}
 	if err := v1alpha1apilakom.AddToScheme(mgr.GetScheme()); err != nil {
-		return fmt.Errorf("could not update manager scheme: %w", err)
+		return fmt.Errorf("failed to add `lakom.extensions.gardener.cloud/v1alpha1` to manager scheme : %w", err)
 	}
 	if err := apilakom.AddToScheme(mgr.GetScheme()); err != nil {
-		return fmt.Errorf("could not update manager scheme: %w", err)
+		return fmt.Errorf("failed to add internal version of `lakom.extensions.gardener.cloud/v1alpha1` to manager scheme: %w", err)
 	}
 
 	ctrlConfig.ApplyHealthCheckConfig(&healthcheck.DefaultAddOptions.HealthCheckConfig)
