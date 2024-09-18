@@ -277,9 +277,9 @@ func getLabels() map[string]string {
 func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
-		serverPort               = intstr.FromInt(10250)
-		metricsPort              = intstr.FromInt(8080)
-		healthPort               = intstr.FromInt(8081)
+		serverPort               = intstr.FromInt32(10250)
+		metricsPort              = intstr.FromInt32(8080)
+		healthPort               = intstr.FromInt32(8081)
 		cacheTTL                 = time.Minute * 10
 		cacheRefreshInterval     = time.Second * 30
 		lakomConfigDir           = "/etc/lakom/config"
@@ -370,12 +370,12 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 							{
 								Name:          "https",
 								Protocol:      tcpProto,
-								ContainerPort: int32(serverPort.IntValue()),
+								ContainerPort: serverPort.IntVal,
 							},
 							{
 								Name:          "metrics",
 								Protocol:      tcpProto,
-								ContainerPort: int32(metricsPort.IntValue()),
+								ContainerPort: metricsPort.IntVal,
 							},
 						},
 						LivenessProbe: &corev1.Probe{
