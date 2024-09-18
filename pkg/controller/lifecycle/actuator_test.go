@@ -58,15 +58,11 @@ var _ = Describe("Actuator", func() {
 		)
 
 		It("Should ensure the correct shoot resources are created", func() {
-
 			resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, shootNamespace)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(resources).To(HaveKey("data.yaml.br"))
-			compressedData := resources["data.yaml.br"]
-			data, err := test.BrotliDecompression(compressedData)
-			Expect(err).NotTo(HaveOccurred())
+			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+			Expect(err).ToNot(HaveOccurred())
 
-			manifests := strings.Split(string(data), "---\n")
 			Expect(manifests).To(ConsistOf(
 				expectedSeedValidatingWebhook(caBundle, extensionNamespace, false),
 				expectedShootMutatingWebhook(caBundle, extensionNamespace, false),
@@ -79,13 +75,9 @@ var _ = Describe("Actuator", func() {
 			func(ca []byte, ns string) {
 				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, shootNamespace)
 				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				Expect(resources).To(HaveKey("data.yaml.br"))
-				compressedData := resources["data.yaml.br"]
-				data, err := test.BrotliDecompression(compressedData)
-				Expect(err).NotTo(HaveOccurred())
-
-				manifests := strings.Split(string(data), "---\n")
 				Expect(manifests).To(ContainElement(expectedShootMutatingWebhook(ca, ns, false)))
 			},
 			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
@@ -96,13 +88,9 @@ var _ = Describe("Actuator", func() {
 			func(ca []byte, ns string) {
 				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, shootNamespace)
 				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				Expect(resources).To(HaveKey("data.yaml.br"))
-				compressedData := resources["data.yaml.br"]
-				data, err := test.BrotliDecompression(compressedData)
-				Expect(err).NotTo(HaveOccurred())
-
-				manifests := strings.Split(string(data), "---\n")
 				Expect(manifests).To(ContainElement(expectedSeedValidatingWebhook(ca, ns, false)))
 			},
 			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
@@ -113,13 +101,9 @@ var _ = Describe("Actuator", func() {
 			func(ca []byte, ns string) {
 				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, v1beta1constants.GardenNamespace)
 				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				Expect(resources).To(HaveKey("data.yaml.br"))
-				compressedData := resources["data.yaml.br"]
-				data, err := test.BrotliDecompression(compressedData)
-				Expect(err).NotTo(HaveOccurred())
-
-				manifests := strings.Split(string(data), "---\n")
 				Expect(manifests).To(ContainElements(
 					expectedShootMutatingWebhook(ca, ns, true),
 					expectedSeedValidatingWebhook(ca, ns, true),
@@ -133,13 +117,9 @@ var _ = Describe("Actuator", func() {
 			func(saName string) {
 				resources, err := getShootResources(caBundle, extensionNamespace, saName, shootNamespace)
 				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				Expect(resources).To(HaveKey("data.yaml.br"))
-				compressedData := resources["data.yaml.br"]
-				data, err := test.BrotliDecompression(compressedData)
-				Expect(err).NotTo(HaveOccurred())
-
-				manifests := strings.Split(string(data), "---\n")
 				Expect(manifests).To(ContainElement(expectedShootRoleBinding(saName)))
 			},
 			Entry("ServiceAccount name: test", "test"),
@@ -205,10 +185,10 @@ var _ = Describe("Actuator", func() {
 				data, err := test.BrotliDecompression(compressedData)
 				Expect(err).NotTo(HaveOccurred())
 
-				manifests := strings.Split(string(data), "\n---\n") // Just '--\n' does not work because of the header/footer in the public keys that match the same manifest separator
+				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
 				Expect(manifests).To(HaveLen(7))
 
-				for i := 0; i < len(manifests)-1; i++ { // Re-add the leading '\n' removed during the split from the separator above
+				for i := 0; i < len(manifests)-1; i++ { // Re-add the trailing '\n' removed during the split from the separator above
 					manifests[i] += "\n"
 				}
 

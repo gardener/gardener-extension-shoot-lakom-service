@@ -89,10 +89,10 @@ var _ = Describe("Reconciler", func() {
 				data, err := test.BrotliDecompression(compressedData)
 				Expect(err).NotTo(HaveOccurred())
 
-				manifests := strings.Split(string(data), "\n---\n") // Just '--\n' does not work because of the header/footer in the public keys that match the same manifest separator
+				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
 				Expect(manifests).To(HaveLen(10))
 
-				for i := 0; i < len(manifests)-1; i++ { // Re-add the leading '\n' removed during the split from the separator above
+				for i := 0; i < len(manifests)-1; i++ { // Re-add the trailing '\n' removed during the split from the separator above
 					manifests[i] += "\n"
 				}
 
@@ -129,12 +129,9 @@ var _ = Describe("Reconciler", func() {
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(resources).To(HaveKey("data.yaml.br"))
-				compressedData := resources["data.yaml.br"]
-				data, err := test.BrotliDecompression(compressedData)
-				Expect(err).NotTo(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				manifests := strings.Split(string(data), "---\n")
 				Expect(manifests).To(ContainElement(expectedMutatingWebhook(ca)))
 			},
 			Entry("Global CA bundle", caBundle),
@@ -154,13 +151,9 @@ var _ = Describe("Reconciler", func() {
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				Expect(resources).To(HaveKey("data.yaml.br"))
-				compressedData := resources["data.yaml.br"]
-				data, err := test.BrotliDecompression(compressedData)
-				Expect(err).NotTo(HaveOccurred())
-
-				manifests := strings.Split(string(data), "---\n")
 				Expect(manifests).To(ContainElement(expectedValidatingWebhook(ca)))
 			},
 			Entry("Global CA bundle", caBundle),
@@ -179,13 +172,9 @@ var _ = Describe("Reconciler", func() {
 				k8sVersion,
 			)
 			Expect(err).ToNot(HaveOccurred())
+			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+			Expect(err).ToNot(HaveOccurred())
 
-			Expect(resources).To(HaveKey("data.yaml.br"))
-			compressedData := resources["data.yaml.br"]
-			data, err := test.BrotliDecompression(compressedData)
-			Expect(err).NotTo(HaveOccurred())
-
-			manifests := strings.Split(string(data), "---\n")
 			Expect(manifests).To(ContainElement(expectedClusterRoleBinding()))
 		})
 	})
