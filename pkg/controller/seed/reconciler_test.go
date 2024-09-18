@@ -11,6 +11,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
+	"github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -40,17 +41,6 @@ var _ = Describe("Reconciler", func() {
 			useOnlyImagePullSecrets  = true
 			allowUntrustedImages     = false
 			insecureRegistries       = false
-
-			validatingWebhookKey        = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
-			mutatingWebhookKey          = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-seed.yaml"
-			clusterRoleKey              = "clusterrole____extension-shoot-lakom-service-seed.yaml"
-			clusterRoleBindingKey       = "clusterrolebinding____extension-shoot-lakom-service-seed.yaml"
-			lakomConfigConfigMapNameKey = "configmap__" + namespace + "__" + lakomConfigConfigMapName + ".yaml"
-			deploymentKey               = "deployment__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			pdbKey                      = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			serviceKey                  = "service__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			serviceAccountKey           = "serviceaccount__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
-			vpaKey                      = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service-seed.yaml"
 		)
 
 		var (
@@ -94,28 +84,30 @@ var _ = Describe("Reconciler", func() {
 				)
 
 				Expect(err).ToNot(HaveOccurred())
-				Expect(resources).To(HaveLen(10))
+				Expect(resources).To(HaveKey("data.yaml.br"))
+				compressedData := resources["data.yaml.br"]
+				data, err := test.BrotliDecompression(compressedData)
+				Expect(err).NotTo(HaveOccurred())
 
-				expectedResources := map[string]string{
-					validatingWebhookKey:        expectedValidatingWebhook(caBundle),
-					mutatingWebhookKey:          expectedMutatingWebhook(caBundle),
-					clusterRoleKey:              expectedClusterRole(),
-					clusterRoleBindingKey:       expectedClusterRoleBinding(),
-					deploymentKey:               expectedDeployment(namespace, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages), strconv.FormatBool(insecureRegistries)),
-					pdbKey:                      expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
-					lakomConfigConfigMapNameKey: expectedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
-					serviceKey:                  expectedService(namespace),
-					serviceAccountKey:           expectedServiceAccount(namespace),
-					vpaKey:                      expectedVPA(namespace),
+				manifests := strings.Split(string(data), "\n---\n") // Just '--\n' does not work because of the header/footer in the public keys that match the same manifest separator
+				Expect(manifests).To(HaveLen(10))
+
+				for i := 0; i < len(manifests)-1; i++ { // Re-add the leading '\n' removed during the split from the separator above
+					manifests[i] += "\n"
 				}
 
-				for key, expectedResource := range expectedResources {
-					resource, ok := resources[key]
-					Expect(ok).To(BeTrue())
-
-					strResource := string(resource)
-					Expect(strResource).To(Equal(expectedResource), key, string(resource))
-				}
+				Expect(manifests).To(ConsistOf(
+					expectedValidatingWebhook(caBundle),
+					expectedMutatingWebhook(caBundle),
+					expectedClusterRole(),
+					expectedClusterRoleBinding(),
+					expectedDeployment(namespace, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages), strconv.FormatBool(insecureRegistries)),
+					expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					expectedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					expectedService(namespace),
+					expectedServiceAccount(namespace),
+					expectedVPA(namespace),
+				))
 			},
 			Entry("Kubernetes version < 1.26", "1.25.0", false, false, false, false),
 			Entry("Kubernetes version >= 1.26", "1.26.0", true, false, false, false),
@@ -137,10 +129,13 @@ var _ = Describe("Reconciler", func() {
 					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
+				Expect(resources).To(HaveKey("data.yaml.br"))
+				compressedData := resources["data.yaml.br"]
+				data, err := test.BrotliDecompression(compressedData)
+				Expect(err).NotTo(HaveOccurred())
 
-				mutatingWebhook, ok := resources[mutatingWebhookKey]
-				Expect(ok).To(BeTrue())
-				Expect(string(mutatingWebhook)).To(Equal(expectedMutatingWebhook(ca)))
+				manifests := strings.Split(string(data), "---\n")
+				Expect(manifests).To(ContainElement(expectedMutatingWebhook(ca)))
 			},
 			Entry("Global CA bundle", caBundle),
 			Entry("Custom CA bundle", []byte("anotherCABundle")),
@@ -160,9 +155,13 @@ var _ = Describe("Reconciler", func() {
 				)
 				Expect(err).ToNot(HaveOccurred())
 
-				validatingWebhook, ok := resources[validatingWebhookKey]
-				Expect(ok).To(BeTrue())
-				Expect(string(validatingWebhook)).To(Equal(expectedValidatingWebhook(ca)))
+				Expect(resources).To(HaveKey("data.yaml.br"))
+				compressedData := resources["data.yaml.br"]
+				data, err := test.BrotliDecompression(compressedData)
+				Expect(err).NotTo(HaveOccurred())
+
+				manifests := strings.Split(string(data), "---\n")
+				Expect(manifests).To(ContainElement(expectedValidatingWebhook(ca)))
 			},
 			Entry("Global CA bundle", caBundle),
 			Entry("Custom ca bundle", []byte("anotherCABundle")),
@@ -179,12 +178,15 @@ var _ = Describe("Reconciler", func() {
 				insecureRegistries,
 				k8sVersion,
 			)
-
 			Expect(err).ToNot(HaveOccurred())
-			crb, ok := resources[clusterRoleBindingKey]
 
-			Expect(ok).To(BeTrue())
-			Expect(string(crb)).To(Equal(expectedClusterRoleBinding()))
+			Expect(resources).To(HaveKey("data.yaml.br"))
+			compressedData := resources["data.yaml.br"]
+			data, err := test.BrotliDecompression(compressedData)
+			Expect(err).NotTo(HaveOccurred())
+
+			manifests := strings.Split(string(data), "---\n")
+			Expect(manifests).To(ContainElement(expectedClusterRoleBinding()))
 		})
 	})
 })
