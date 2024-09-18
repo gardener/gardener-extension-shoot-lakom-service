@@ -2,9 +2,6 @@ run:
   concurrency: 4
   deadline: 10m
 
-  skip-files:
-  - "zz_generated\\..*\\.go$"
-
 linters:
   enable:
   - gocritic
@@ -23,3 +20,5 @@ issues:
   - unexported-return # exported func .* returns unexported type .*, which can be annoying to use
   - indent-error-flow # if block ends with a return statement, so drop this else and outdent its block
   - "exported: (type|func) name will be used as .* by other packages, and that stutters;"
+  exclude-files:
+  - "zz_generated\\..*\\.go$"
