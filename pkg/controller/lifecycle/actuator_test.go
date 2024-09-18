@@ -178,7 +178,7 @@ var _ = Describe("Actuator", func() {
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries, gep19Monitoring bool) {
+			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
 				resources, err := getSeedResources(
 					&replicas,
 					namespace,
@@ -191,7 +191,6 @@ var _ = Describe("Actuator", func() {
 					allowUntrustedImages,
 					allowInsecureRegistries,
 					k8sVersion,
-					gep19Monitoring,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveLen(7))
@@ -221,12 +220,11 @@ var _ = Describe("Actuator", func() {
 					})
 				}
 			},
-			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false, false, false),
-			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false, false, false),
-			Entry("With GEP-19 Monitoring", semver.MustParse("1.26.0"), true, false, false, false, true),
-			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false, false),
-			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false, false),
-			Entry("Allow insecure registries", semver.MustParse("1.29.0"), true, false, true, false, true),
+			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false, false),
+			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false, false),
+			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false),
+			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false),
+			Entry("Allow insecure registries", semver.MustParse("1.29.0"), true, false, false, true),
 		)
 	})
 })
@@ -377,45 +375,6 @@ subjects:
 - kind: ServiceAccount
   name: ` + saName + `
   namespace: kube-system
-`
-}
-
-func expectedSeedConfigMap(namespace string) string {
-	return `apiVersion: v1
-data:
-  scrape_config: |
-    - job_name: extension-shoot-lakom-service
-      honor_labels: false
-      kubernetes_sd_configs:
-      - role: endpoints
-        namespaces:
-          names: [` + namespace + `]
-      relabel_configs:
-      - source_labels:
-        - __meta_kubernetes_service_name
-        - __meta_kubernetes_endpoint_port_name
-        action: keep
-        regex: extension-shoot-lakom-service;metrics
-      # common metrics
-      - action: drop
-        regex: __meta_kubernetes_service_label_(.+)
-      - source_labels: [ __meta_kubernetes_pod_name ]
-        target_label: pod
-      - source_labels: [ __meta_kubernetes_pod_container_name ]
-        target_label: container
-      metric_relabel_configs:
-      - source_labels: [ __name__ ]
-        regex: ^lakom.*$
-        action: keep
-kind: ConfigMap
-metadata:
-  creationTimestamp: null
-  labels:
-    app.kubernetes.io/name: lakom
-    app.kubernetes.io/part-of: shoot-lakom-service
-    extensions.gardener.cloud/configuration: monitoring
-  name: extension-shoot-lakom-service-monitoring
-  namespace: ` + namespace + `
 `
 }
 

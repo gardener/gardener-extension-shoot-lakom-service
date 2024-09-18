@@ -157,8 +157,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.AllowUntrustedImages,
 		a.serviceConfig.AllowInsecureRegistries,
 		seedK8sSemverVersion,
-		// TODO(rfranzke): Delete this after August 2024.
-		a.client.Get(ctx, client.ObjectKey{Name: "prometheus-shoot", Namespace: ex.Namespace}, &appsv1.StatefulSet{}) == nil,
 	)
 	if err != nil {
 		return err
@@ -276,7 +274,7 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version, gep19Monitoring bool) (map[string][]byte, error) {
+func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
 		serverPort               = intstr.FromInt(10250)
@@ -498,58 +496,6 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 
 	kutil.SetAlwaysAllowEviction(pdb, k8sVersion)
 
-	var (
-		legacyObservabilityConfigMap *corev1.ConfigMap
-		serviceMonitor               *monitoringv1.ServiceMonitor
-	)
-
-	if !gep19Monitoring {
-		legacyObservabilityConfigMap = &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName + "-monitoring",
-				Namespace: namespace,
-				Labels:    utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExtensionConfiguration: v1beta1constants.LabelMonitoring}),
-			},
-			Data: map[string]string{
-				v1beta1constants.PrometheusConfigMapScrapeConfig: `- job_name: ` + constants.ExtensionServiceName + `
-  honor_labels: false
-  kubernetes_sd_configs:
-  - role: endpoints
-    namespaces:
-      names: [` + namespace + `]
-  relabel_configs:
-  - source_labels:
-    - __meta_kubernetes_service_name
-    - __meta_kubernetes_endpoint_port_name
-    action: keep
-    regex: ` + constants.ExtensionServiceName + `;metrics
-  # common metrics
-  - action: drop
-    regex: __meta_kubernetes_service_label_(.+)
-  - source_labels: [ __meta_kubernetes_pod_name ]
-    target_label: pod
-  - source_labels: [ __meta_kubernetes_pod_container_name ]
-    target_label: container
-  metric_relabel_configs:
-  - source_labels: [ __name__ ]
-    regex: ^lakom.*$
-    action: keep
-`,
-			},
-		}
-	} else {
-		serviceMonitor = &monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.ExtensionServiceName, namespace, "shoot"),
-			Spec: monitoringv1.ServiceMonitorSpec{
-				Selector: metav1.LabelSelector{MatchLabels: getLabels()},
-				Endpoints: []monitoringv1.Endpoint{{
-					Port:                 "metrics",
-					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
-				}},
-			},
-		}
-	}
-
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
 		pdb,
@@ -590,8 +536,16 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 				},
 			},
 		},
-		legacyObservabilityConfigMap,
-		serviceMonitor,
+		&monitoringv1.ServiceMonitor{
+			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.ExtensionServiceName, namespace, "shoot"),
+			Spec: monitoringv1.ServiceMonitorSpec{
+				Selector: metav1.LabelSelector{MatchLabels: getLabels()},
+				Endpoints: []monitoringv1.Endpoint{{
+					Port:                 "metrics",
+					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
+				}},
+			},
+		},
 	)
 
 	if err != nil {
