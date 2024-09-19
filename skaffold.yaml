@@ -71,8 +71,6 @@ build:
           paths:
             - cmd/lakom
             - cmd/lakom/app
-            - pkg/apis/lakom
-            - pkg/apis/lakom/v1alpha1
             - pkg/constants
             - pkg/lakom/config
             - pkg/lakom/metrics
