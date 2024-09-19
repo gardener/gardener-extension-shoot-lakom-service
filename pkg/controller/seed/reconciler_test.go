@@ -92,8 +92,10 @@ var _ = Describe("Reconciler", func() {
 				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
 				Expect(manifests).To(HaveLen(10))
 
-				for i := 0; i < len(manifests)-1; i++ { // Re-add the trailing '\n' removed during the split from the separator above
-					manifests[i] += "\n"
+				for i := range manifests { // Re-add the trailing '\n' removed during the split from the separator above
+					if i < len(manifests)-1 {
+						manifests[i] += "\n"
+					}
 				}
 
 				Expect(manifests).To(ConsistOf(
