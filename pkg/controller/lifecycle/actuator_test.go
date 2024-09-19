@@ -11,8 +11,9 @@ import (
 	"strings"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
-        v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
+
 	"github.com/Masterminds/semver/v3"
+	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
@@ -155,8 +156,8 @@ var _ = Describe("Actuator", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(manifests).To(ContainElements(
-                                        expectedShootMutatingWebhook(caBundle, extensionNamespace, objectSelector, namespaceSelector),
-                                        expectedSeedValidatingWebhook(caBundle, extensionNamespace, objectSelector, namespaceSelector),
+					expectedShootMutatingWebhook(caBundle, extensionNamespace, objectSelector, namespaceSelector),
+					expectedSeedValidatingWebhook(caBundle, extensionNamespace, objectSelector, namespaceSelector),
 				))
 			},
 			Entry("KubeSystem managed by Gardener scope", lakom.KubeSystemManagedByGardener, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
