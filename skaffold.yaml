@@ -27,6 +27,7 @@ build:
         dependencies:
           paths:
             - charts
+            - charts/images.yaml
             - cmd/gardener-extension-shoot-lakom-service
             - cmd/gardener-extension-shoot-lakom-service/app
             - pkg/apis/config
