@@ -11,9 +11,10 @@ import (
 	"strings"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
-
+        v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
+	"github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -80,24 +81,25 @@ var _ = Describe("Actuator", func() {
 
 			resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(resources).To(HaveLen(4))
+			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+			Expect(err).ToNot(HaveOccurred())
 
-			Expect(resources).To(Equal(map[string][]byte{
-				validatingWebhookKey: []byte(expectedSeedValidatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector)),
-				mutatingWebhookKey:   []byte(expectedShootMutatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector)),
-				roleKey:              []byte(expectedShootRole()),
-				roleBindingKey:       []byte(expectedShootRoleBinding(shootAccessServiceAccountName)),
-			}))
+			Expect(manifests).To(ConsistOf(
+				expectedSeedValidatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
+				expectedShootMutatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
+				expectedShootRole(),
+				expectedShootRoleBinding(shootAccessServiceAccountName),
+			))
 		})
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, ns string) {
 				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope)
 				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				mutatingWebhook, ok := resources[mutatingWebhookKey]
-				Expect(ok).To(BeTrue())
-				Expect(string(mutatingWebhook)).To(MatchYAML(expectedShootMutatingWebhook(ca, ns, managedByGardenerObjectSelector, kubeSystemNamespaceSelector)))
+				Expect(manifests).To(ContainElement(expectedShootMutatingWebhook(ca, ns, managedByGardenerObjectSelector, kubeSystemNamespaceSelector)))
 			},
 			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
 			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
@@ -107,10 +109,26 @@ var _ = Describe("Actuator", func() {
 			func(ca []byte, ns string) {
 				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope)
 				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				validatingWebhook, ok := resources[validatingWebhookKey]
-				Expect(ok).To(BeTrue())
-				Expect(string(validatingWebhook)).To(Equal(expectedSeedValidatingWebhook(ca, ns, managedByGardenerObjectSelector, kubeSystemNamespaceSelector)))
+				Expect(manifests).To(ContainElement(expectedSeedValidatingWebhook(ca, ns, managedByGardenerObjectSelector, kubeSystemNamespaceSelector)))
+			},
+			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
+			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
+		)
+
+		DescribeTable("Should return an empty object selector for the webhooks when shoot is in the garden namespace",
+			func(ca []byte, ns string) {
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, v1beta1constants.GardenNamespace)
+				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(manifests).To(ContainElements(
+					expectedShootMutatingWebhook(ca, ns, emptyObjectSelector, kubeSystemNamespaceSelector),
+					expectedSeedValidatingWebhook(ca, ns, emptyObjectSelector, kubeSystemNamespaceSelector),
+				))
 			},
 			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
 			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
@@ -120,10 +138,10 @@ var _ = Describe("Actuator", func() {
 			func(saName string) {
 				resources, err := getShootResources(caBundle, extensionNamespace, saName, scope)
 				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				roleBinding, ok := resources[roleBindingKey]
-				Expect(ok).To(BeTrue())
-				Expect(string(roleBinding)).To(Equal(expectedShootRoleBinding(saName)))
+				Expect(manifests).To(ContainElement(expectedShootRoleBinding(saName)))
 			},
 			Entry("ServiceAccount name: test", "test"),
 			Entry("ServiceAccount name: foo-bar", "foo-bar"),
@@ -133,14 +151,13 @@ var _ = Describe("Actuator", func() {
 			func(scope lakom.ScopeType, objectSelector, namespaceSelector string) {
 				resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope)
 				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
 
-				mutatingWebhook, ok := resources[mutatingWebhookKey]
-				Expect(ok).To(BeTrue())
-				Expect(string(mutatingWebhook)).To(MatchYAML(expectedShootMutatingWebhook(caBundle, extensionNamespace, objectSelector, namespaceSelector)))
-
-				validatingWebhook, ok := resources[validatingWebhookKey]
-				Expect(ok).To(BeTrue())
-				Expect(string(validatingWebhook)).To(MatchYAML(expectedSeedValidatingWebhook(caBundle, extensionNamespace, objectSelector, namespaceSelector)))
+				Expect(manifests).To(ContainElements(
+                                        expectedShootMutatingWebhook(caBundle, extensionNamespace, objectSelector, namespaceSelector),
+                                        expectedSeedValidatingWebhook(caBundle, extensionNamespace, objectSelector, namespaceSelector),
+				))
 			},
 			Entry("KubeSystem managed by Gardener scope", lakom.KubeSystemManagedByGardener, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
 			Entry("KubeSystem scope", lakom.KubeSystem, emptyObjectSelector, kubeSystemNamespaceSelector),
@@ -157,15 +174,6 @@ var _ = Describe("Actuator", func() {
 			serverTLSSecretName           = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
 			image                         = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			lakomConfigConfigMapName      = "extension-shoot-lakom-service-lakom-config-5ccba116"
-
-			lakomConfigConfigMapNameKey = "configmap__" + namespace + "__" + lakomConfigConfigMapName + ".yaml"
-			configMapKey                = "configmap__" + namespace + "__extension-shoot-lakom-service-monitoring.yaml"
-			serviceMonitorKey           = "servicemonitor__" + namespace + "__shoot-extension-shoot-lakom-service.yaml"
-			deploymentKey               = "deployment__" + namespace + "__extension-shoot-lakom-service.yaml"
-			pdbKey                      = "poddisruptionbudget__" + namespace + "__extension-shoot-lakom-service.yaml"
-			serviceKey                  = "service__" + namespace + "__extension-shoot-lakom-service.yaml"
-			serviceAccountKey           = "serviceaccount__" + namespace + "__extension-shoot-lakom-service.yaml"
-			vpaKey                      = "verticalpodautoscaler__" + namespace + "__extension-shoot-lakom-service.yaml"
 		)
 
 		var (
@@ -195,7 +203,7 @@ var _ = Describe("Actuator", func() {
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries, gep19Monitoring bool) {
+			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
 				resources, err := getSeedResources(
 					&replicas,
 					namespace,
@@ -208,42 +216,37 @@ var _ = Describe("Actuator", func() {
 					allowUntrustedImages,
 					allowInsecureRegistries,
 					k8sVersion,
-					gep19Monitoring,
 				)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(resources).To(HaveLen(7))
+				Expect(resources).To(HaveKey("data.yaml.br"))
+				compressedData := resources["data.yaml.br"]
+				data, err := test.BrotliDecompression(compressedData)
+				Expect(err).NotTo(HaveOccurred())
 
-				expectedResources := map[string]string{
-					deploymentKey:               expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
-					pdbKey:                      expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
-					lakomConfigConfigMapNameKey: expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
-					serviceKey:                  expectedSeedService(namespace),
-					serviceAccountKey:           expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
-					vpaKey:                      expectedSeedVPA(namespace),
+				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
+				Expect(manifests).To(HaveLen(7))
+
+				for i := range manifests { // Re-add the trailing '\n' removed during the split from the separator above
+					if i < len(manifests)-1 {
+						manifests[i] += "\n"
+					}
 				}
 
-				if gep19Monitoring {
-					expectedResources[serviceMonitorKey] = expectedSeedServiceMonitor(namespace)
-				} else {
-					expectedResources[configMapKey] = expectedSeedConfigMap(namespace)
-				}
-
-				for key, expectedResource := range expectedResources {
-					resource, ok := resources[key]
-					Expect(ok).To(BeTrue(), key)
-
-					strResource := string(resource)
-					Expect(strResource).To(Equal(expectedResource), func() string {
-						return fmt.Sprintf("\nkey=%q\ngenerated resource\n%s\nexpectedResource\n%s\n", key, strResource, expectedResource)
-					})
-				}
+				Expect(manifests).To(ConsistOf(
+					expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
+					expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					expectedSeedService(namespace),
+					expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
+					expectedSeedVPA(namespace),
+					expectedSeedServiceMonitor(namespace),
+				))
 			},
-			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false, false, false),
-			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false, false, false),
-			Entry("With GEP-19 Monitoring", semver.MustParse("1.26.0"), true, false, false, false, true),
-			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false, false),
-			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false, false),
-			Entry("Allow insecure registries", semver.MustParse("1.29.0"), true, false, true, false, true),
+			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false, false),
+			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false, false),
+			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false),
+			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false),
+			Entry("Allow insecure registries", semver.MustParse("1.29.0"), true, false, false, true),
 		)
 	})
 })
@@ -364,45 +367,6 @@ subjects:
 - kind: ServiceAccount
   name: ` + saName + `
   namespace: kube-system
-`
-}
-
-func expectedSeedConfigMap(namespace string) string {
-	return `apiVersion: v1
-data:
-  scrape_config: |
-    - job_name: extension-shoot-lakom-service
-      honor_labels: false
-      kubernetes_sd_configs:
-      - role: endpoints
-        namespaces:
-          names: [` + namespace + `]
-      relabel_configs:
-      - source_labels:
-        - __meta_kubernetes_service_name
-        - __meta_kubernetes_endpoint_port_name
-        action: keep
-        regex: extension-shoot-lakom-service;metrics
-      # common metrics
-      - action: drop
-        regex: __meta_kubernetes_service_label_(.+)
-      - source_labels: [ __meta_kubernetes_pod_name ]
-        target_label: pod
-      - source_labels: [ __meta_kubernetes_pod_container_name ]
-        target_label: container
-      metric_relabel_configs:
-      - source_labels: [ __name__ ]
-        regex: ^lakom.*$
-        action: keep
-kind: ConfigMap
-metadata:
-  creationTimestamp: null
-  labels:
-    app.kubernetes.io/name: lakom
-    app.kubernetes.io/part-of: shoot-lakom-service
-    extensions.gardener.cloud/configuration: monitoring
-  name: extension-shoot-lakom-service-monitoring
-  namespace: ` + namespace + `
 `
 }
 
