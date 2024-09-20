@@ -131,6 +131,8 @@ var _ = Describe("Shoot validator", func() {
 })
 
 func encode(obj runtime.Object) []byte {
-	data, _ := json.Marshal(obj)
+	data, err := json.Marshal(obj)
+        Expect(err).ToNot(HaveOccurred())
+
 	return data
 }
