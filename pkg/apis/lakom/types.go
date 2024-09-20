@@ -17,13 +17,13 @@ type ScopeType string
 const (
 	// KubeSystem denotes the `kube-system` namespace
 	KubeSystem ScopeType = "KubeSystem"
-	// KubeSystemManagedByGardener denoes pods in the `kube-system` namespace that have a `managed-by/gardener` label
+	// KubeSystemManagedByGardener denotes pods in the `kube-system` namespace that have a `managed-by/gardener` label
 	KubeSystemManagedByGardener ScopeType = "KubeSystemManagedByGardener"
 	// Cluster denotes the whole cluster
 	Cluster ScopeType = "Cluster"
 )
 
-// AllowedScopes lists the scopes that can be chosen for lakom
+// AllowedScopes lists the scopes that can be chosen for lakom.
 var AllowedScopes sets.Set[ScopeType] = sets.New(KubeSystem, KubeSystemManagedByGardener, Cluster)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

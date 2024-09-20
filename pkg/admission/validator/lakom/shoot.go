@@ -56,7 +56,7 @@ func (s *shoot) validateScopeType(fldPath *field.Path, scopeType lakom.ScopeType
 func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
 	shoot, ok := new.(*core.Shoot)
 	if !ok {
-		return fmt.Errorf("wrong object type %T", new)
+		return fmt.Errorf("wrong object type %T, expected core.Shoot", new)
 	}
 
 	i, lakomExt := findExtension(shoot.Spec.Extensions, constants.ExtensionType)

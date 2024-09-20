@@ -160,7 +160,7 @@ var _ = Describe("Actuator", func() {
 					expectedSeedValidatingWebhook(caBundle, extensionNamespace, objectSelector, namespaceSelector),
 				))
 			},
-			Entry("KubeSystem managed by Gardener scope", lakom.KubeSystemManagedByGardener, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
+			Entry("KubeSystemManagedByGardener scope", lakom.KubeSystemManagedByGardener, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
 			Entry("KubeSystem scope", lakom.KubeSystem, emptyObjectSelector, kubeSystemNamespaceSelector),
 			Entry("Cluster scope", lakom.Cluster, emptyObjectSelector, emptyNamespaceSelector),
 		)
