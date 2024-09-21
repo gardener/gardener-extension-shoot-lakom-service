@@ -286,8 +286,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 		lakomConfigConfigMapName = constants.ExtensionServiceName + "-lakom-config"
 		webhookTLSCertDir        = "/etc/lakom/tls"
 		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestCPU               = resource.MustParse("50m")
-		requestMemory            = resource.MustParse("64Mi")
+		requestMemory            = resource.MustParse("25M")
 		vpaUpdateMode            = vpaautoscalingv1.UpdateModeAuto
 	)
 
@@ -400,7 +399,6 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    requestCPU,
 								corev1.ResourceMemory: requestMemory,
 							},
 						},
@@ -520,8 +518,8 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
 						{
 							ContainerName: constants.ApplicationName,
-							MinAllowed: corev1.ResourceList{
-								corev1.ResourceMemory: resource.MustParse("32Mi"),
+							ControlledResources: &[]corev1.ResourceName{
+								corev1.ResourceMemory,
 							},
 						},
 					},

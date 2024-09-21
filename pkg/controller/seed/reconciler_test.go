@@ -411,8 +411,7 @@ spec:
           initialDelaySeconds: 5
         resources:
           requests:
-            cpu: 50m
-            memory: 64Mi
+            memory: 25M
         volumeMounts:
         - mountPath: /etc/lakom/config
           name: lakom-config
@@ -541,8 +540,8 @@ spec:
   resourcePolicy:
     containerPolicies:
     - containerName: lakom-seed
-      minAllowed:
-        memory: 32Mi
+      controlledResources:
+      - memory
   targetRef:
     apiVersion: apps/v1
     kind: Deployment

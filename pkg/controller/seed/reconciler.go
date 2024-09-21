@@ -192,8 +192,7 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 		lakomConfigConfigMapName = constants.SeedExtensionServiceName + "-lakom-config"
 		webhookTLSCertDir        = "/etc/lakom/tls"
 		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestCPU               = resource.MustParse("50m")
-		requestMemory            = resource.MustParse("64Mi")
+		requestMemory            = resource.MustParse("25M")
 		vpaUpdateMode            = vpaautoscalingv1.UpdateModeAuto
 		kubeSystemNamespace      = metav1.NamespaceSystem
 		matchPolicy              = admissionregistration.Equivalent
@@ -327,7 +326,6 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    requestCPU,
 								corev1.ResourceMemory: requestMemory,
 							},
 						},
@@ -442,8 +440,8 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
 						{
 							ContainerName: constants.SeedApplicationName,
-							MinAllowed: corev1.ResourceList{
-								corev1.ResourceMemory: resource.MustParse("32Mi"),
+							ControlledResources: &[]corev1.ResourceName{
+								corev1.ResourceMemory,
 							},
 						},
 					},
