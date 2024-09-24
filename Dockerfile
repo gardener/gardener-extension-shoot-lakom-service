@@ -33,3 +33,10 @@ FROM base AS gardener-extension-shoot-lakom-service
 COPY charts /charts
 COPY --from=builder /go/bin/gardener-extension-shoot-lakom-service /gardener-extension-shoot-lakom-service
 ENTRYPOINT ["/gardener-extension-shoot-lakom-service"]
+
+
+############# gardener-extension-shoot-lakom-admission
+FROM base AS gardener-extension-shoot-lakom-admission
+
+COPY --from=builder /go/bin/gardener-extension-shoot-lakom-admission /gardener-extension-shoot-lakom-admission
+ENTRYPOINT ["/gardener-extension-shoot-lakom-admission"]
