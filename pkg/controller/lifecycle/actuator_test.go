@@ -55,10 +55,6 @@ var _ = Describe("Actuator", func() {
 			extensionNamespace              = "shoot--foo--bar"
 			scope                           = lakom.KubeSystemManagedByGardener
 			shootAccessServiceAccountName   = "extension-shoot-lakom-service-access"
-			validatingWebhookKey            = "validatingwebhookconfiguration____gardener-extension-shoot-lakom-service-shoot.yaml"
-			mutatingWebhookKey              = "mutatingwebhookconfiguration____gardener-extension-shoot-lakom-service-shoot.yaml"
-			roleKey                         = "role__kube-system__gardener-extension-shoot-lakom-service-resource-reader.yaml"
-			roleBindingKey                  = "rolebinding__kube-system__gardener-extension-shoot-lakom-service-resource-reader.yaml"
 			managedByGardenerObjectSelector = `
     matchExpressions:
     - key: resources.gardener.cloud/managed-by
