@@ -123,7 +123,7 @@ func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 				return fmt.Errorf("failed to add `lakom.extensions.gardener.cloud/v1alpha1` to manager scheme: %w", err)
 			}
 			if err := apilakom.AddToScheme(mgr.GetScheme()); err != nil {
-				return fmt.Errorf("failed to add internal version of `lakom.extensions.config.gardener.cloud` to manager scheme: %w", err)
+				return fmt.Errorf("failed to add internal version of `lakom.extensions.gardener.cloud` to manager scheme: %w", err)
 			}
 			coreinstall.Install(mgr.GetScheme())
 

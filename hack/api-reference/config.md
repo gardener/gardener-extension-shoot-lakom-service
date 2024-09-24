@@ -9,9 +9,7 @@
 <p>Package v1alpha1 contains the Lakom Shoot Service extension configuration.</p>
 </p>
 Resource Types:
-<ul><li>
-<a href="#lakom.extensions.gardener.cloud/v1alpha1.LakomConfig">LakomConfig</a>
-</li></ul>
+<ul></ul>
 <h3 id="lakom.extensions.gardener.cloud/v1alpha1.LakomConfig">LakomConfig
 </h3>
 <p>
@@ -25,23 +23,6 @@ Resource Types:
 </tr>
 </thead>
 <tbody>
-<tr>
-<td>
-<code>apiVersion</code></br>
-string</td>
-<td>
-<code>
-lakom.extensions.gardener.cloud/v1alpha1
-</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code></br>
-string
-</td>
-<td><code>LakomConfig</code></td>
-</tr>
 <tr>
 <td>
 <code>scope</code></br>
