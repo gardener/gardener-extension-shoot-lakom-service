@@ -64,16 +64,16 @@ func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
 		return nil
 	}
 
+	providerConfigPath := field.NewPath("spec", "extensions").Index(i).Child("providerConfig")
+	if lakomExt.ProviderConfig == nil {
+		return nil
+	}
+
 	lakomConfig := &lakom.LakomConfig{}
 	if err := runtime.DecodeInto(s.decoder, lakomExt.ProviderConfig.Raw, lakomConfig); err != nil {
 		return fmt.Errorf("failed to decode providerConfig: %w", err)
 	}
 	if lakomConfig.Scope == nil {
-		return nil
-	}
-
-	providerConfigPath := field.NewPath("spec", "extensions").Index(i).Child("providerConfig")
-	if lakomExt.ProviderConfig == nil {
 		return nil
 	}
 
