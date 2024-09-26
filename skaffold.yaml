@@ -32,6 +32,8 @@ build:
             - cmd/gardener-extension-shoot-lakom-service/app
             - pkg/apis/config
             - pkg/apis/config/v1alpha1
+            - pkg/apis/lakom
+            - pkg/apis/lakom/v1alpha1
             - pkg/cmd
             - pkg/constants
             - pkg/controller/config
@@ -90,3 +92,34 @@ manifests:
       - local-setup
 deploy:
   kubectl: {}
+---
+apiVersion: skaffold/v4beta3
+kind: Config
+metadata:
+  name: admission
+build:
+  artifacts:
+    - image: local-skaffold/gardener-extension-shoot-lakom-admission
+      ko:
+        dependencies:
+          paths:
+            - cmd/gardener-extension-shoot-lakom-admission
+            - cmd/gardener-extension-shoot-lakom-admission/app
+            - pkg/admission/validator/lakom
+            - pkg/apis/lakom
+            - pkg/apis/lakom/v1alpha1
+            - pkg/constants
+            - VERSION
+        ldflags:
+          - '{{.LD_FLAGS}}'
+        main: ./cmd/gardener-extension-shoot-lakom-admission
+deploy:
+  helm:
+    releases:
+      - name: gardener-extension-shoot-lakom-admission
+        namespace: garden
+        wait: true
+        chartPath: charts/gardener-extension-shoot-lakom-admission
+        setValueTemplates:
+          global.image.repository: '{{.IMAGE_REPO_local_skaffold_gardener_extension_shoot_lakom_admission}}'
+          global.image.tag: '{{.IMAGE_TAG_local_skaffold_gardener_extension_shoot_lakom_admission}}@{{.IMAGE_DIGEST_local_skaffold_gardener_extension_shoot_lakom_admission}}'

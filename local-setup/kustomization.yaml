@@ -12,7 +12,7 @@ patches:
 - path: patch-imagevector-overwrite.yaml
 - patch: |
     - op: add
-      path: /providerConfig/values/controllers
+      path: /helm/values/controllers
       value:
           allowUntrustedImages: true
           allowInsecureRegistries: true

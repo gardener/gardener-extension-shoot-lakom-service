@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/secrets"
@@ -104,6 +105,18 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
+	lakomProviderConfig := &lakom.LakomConfig{}
+	if ex.Spec.ProviderConfig != nil {
+		if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
+			// Apply default values if provider config has not been provided
+			logger.Error(err, "Could not decode provider config. Using default value `KubeSystemManagedByGardener` for scope")
+		}
+	}
+	if lakomProviderConfig.Scope == nil {
+		logger.Info("No scope specified. Using default value `KubeSystemManagedByGardener` for scope")
+		lakomProviderConfig.Scope = ptr.To(lakom.KubeSystemManagedByGardener)
+	}
+
 	// initialize SecretsManager based on Cluster object
 	configs := secrets.ConfigsFor(namespace)
 
@@ -166,7 +179,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
-		cluster.Shoot.GetNamespace(),
+		*lakomProviderConfig.Scope,
 	)
 
 	if err != nil {
@@ -553,37 +566,10 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	return resources, nil
 }
 
-func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName, projectNamespace string) (map[string][]byte, error) {
-	var (
-		matchPolicy          = admissionregistration.Equivalent
-		sideEffectClass      = admissionregistration.SideEffectClassNone
-		failurePolicy        = admissionregistration.Fail
-		timeOutSeconds       = ptr.To[int32](25)
-		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, extensionNamespace)
-		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
-		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
-		namespaceSelector    = metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key:      corev1.LabelMetadataName,
-					Operator: metav1.LabelSelectorOpIn,
-					Values:   []string{metav1.NamespaceSystem},
-				},
-			},
-		}
-		objectSelector = metav1.LabelSelector{}
-		rules          = []admissionregistration.RuleWithOperations{{
-			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
-			Rule: admissionregistration.Rule{
-				APIGroups:   []string{""},
-				APIVersions: []string{"v1"},
-				Resources:   []string{"pods", "pods/ephemeralcontainers"},
-			},
-		}}
-	)
-
-	isManagedSeed := projectNamespace == v1beta1constants.GardenNamespace
-	if !isManagedSeed {
+func scopeToObjectSelector(scope lakom.ScopeType) metav1.LabelSelector {
+	var objectSelector = metav1.LabelSelector{}
+	switch scope {
+	case lakom.KubeSystemManagedByGardener:
 		objectSelector = metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
@@ -593,7 +579,54 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 				},
 			},
 		}
+	case lakom.KubeSystem:
+	case lakom.Cluster:
 	}
+
+	return objectSelector
+}
+
+func scopeToNamespaceSelector(scope lakom.ScopeType) metav1.LabelSelector {
+	namespaceSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      corev1.LabelMetadataName,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{metav1.NamespaceSystem},
+			},
+		},
+	}
+
+	switch scope {
+	case lakom.KubeSystemManagedByGardener:
+	case lakom.KubeSystem:
+	case lakom.Cluster:
+		namespaceSelector = metav1.LabelSelector{}
+	}
+
+	return namespaceSelector
+}
+
+func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName string, scope lakom.ScopeType) (map[string][]byte, error) {
+	var (
+		matchPolicy          = admissionregistration.Equivalent
+		sideEffectClass      = admissionregistration.SideEffectClassNone
+		failurePolicy        = admissionregistration.Fail
+		timeOutSeconds       = ptr.To[int32](25)
+		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, extensionNamespace)
+		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
+		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
+		namespaceSelector    = scopeToNamespaceSelector(scope)
+		objectSelector       = scopeToObjectSelector(scope)
+		rules                = []admissionregistration.RuleWithOperations{{
+			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
+			Rule: admissionregistration.Rule{
+				APIGroups:   []string{""},
+				APIVersions: []string{"v1"},
+				Resources:   []string{"pods", "pods/ephemeralcontainers"},
+			},
+		}}
+	)
 
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
 	shootResources, err := shootRegistry.AddAllAndSerialize(
