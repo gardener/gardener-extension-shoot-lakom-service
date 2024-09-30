@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/secrets"
@@ -104,6 +105,18 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
+	lakomProviderConfig := &lakom.LakomConfig{}
+	if ex.Spec.ProviderConfig != nil {
+		if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
+			// Apply default values if provider config has not been provided
+			logger.Error(err, "Could not decode provider config. Using default value `KubeSystemManagedByGardener` for scope")
+		}
+	}
+	if lakomProviderConfig.Scope == nil {
+		logger.Info("No scope specified. Using default value `KubeSystemManagedByGardener` for scope")
+		lakomProviderConfig.Scope = ptr.To(lakom.KubeSystemManagedByGardener)
+	}
+
 	// initialize SecretsManager based on Cluster object
 	configs := secrets.ConfigsFor(namespace)
 
@@ -157,8 +170,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.AllowUntrustedImages,
 		a.serviceConfig.AllowInsecureRegistries,
 		seedK8sSemverVersion,
-		// TODO(rfranzke): Delete this after August 2024.
-		a.client.Get(ctx, client.ObjectKey{Name: "prometheus-shoot", Namespace: ex.Namespace}, &appsv1.StatefulSet{}) == nil,
 	)
 	if err != nil {
 		return err
@@ -168,7 +179,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
-		cluster.Shoot.GetNamespace(),
+		*lakomProviderConfig.Scope,
 	)
 
 	if err != nil {
@@ -276,20 +287,19 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version, gep19Monitoring bool) (map[string][]byte, error) {
+func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
-		serverPort               = intstr.FromInt(10250)
-		metricsPort              = intstr.FromInt(8080)
-		healthPort               = intstr.FromInt(8081)
+		serverPort               = intstr.FromInt32(10250)
+		metricsPort              = intstr.FromInt32(8080)
+		healthPort               = intstr.FromInt32(8081)
 		cacheTTL                 = time.Minute * 10
 		cacheRefreshInterval     = time.Second * 30
 		lakomConfigDir           = "/etc/lakom/config"
 		lakomConfigConfigMapName = constants.ExtensionServiceName + "-lakom-config"
 		webhookTLSCertDir        = "/etc/lakom/tls"
 		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestCPU               = resource.MustParse("50m")
-		requestMemory            = resource.MustParse("64Mi")
+		requestMemory            = resource.MustParse("25M")
 		vpaUpdateMode            = vpaautoscalingv1.UpdateModeAuto
 	)
 
@@ -372,12 +382,12 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 							{
 								Name:          "https",
 								Protocol:      tcpProto,
-								ContainerPort: int32(serverPort.IntValue()),
+								ContainerPort: serverPort.IntVal,
 							},
 							{
 								Name:          "metrics",
 								Protocol:      tcpProto,
-								ContainerPort: int32(metricsPort.IntValue()),
+								ContainerPort: metricsPort.IntVal,
 							},
 						},
 						LivenessProbe: &corev1.Probe{
@@ -402,7 +412,6 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    requestCPU,
 								corev1.ResourceMemory: requestMemory,
 							},
 						},
@@ -498,58 +507,6 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 
 	kutil.SetAlwaysAllowEviction(pdb, k8sVersion)
 
-	var (
-		legacyObservabilityConfigMap *corev1.ConfigMap
-		serviceMonitor               *monitoringv1.ServiceMonitor
-	)
-
-	if !gep19Monitoring {
-		legacyObservabilityConfigMap = &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName + "-monitoring",
-				Namespace: namespace,
-				Labels:    utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExtensionConfiguration: v1beta1constants.LabelMonitoring}),
-			},
-			Data: map[string]string{
-				v1beta1constants.PrometheusConfigMapScrapeConfig: `- job_name: ` + constants.ExtensionServiceName + `
-  honor_labels: false
-  kubernetes_sd_configs:
-  - role: endpoints
-    namespaces:
-      names: [` + namespace + `]
-  relabel_configs:
-  - source_labels:
-    - __meta_kubernetes_service_name
-    - __meta_kubernetes_endpoint_port_name
-    action: keep
-    regex: ` + constants.ExtensionServiceName + `;metrics
-  # common metrics
-  - action: drop
-    regex: __meta_kubernetes_service_label_(.+)
-  - source_labels: [ __meta_kubernetes_pod_name ]
-    target_label: pod
-  - source_labels: [ __meta_kubernetes_pod_container_name ]
-    target_label: container
-  metric_relabel_configs:
-  - source_labels: [ __name__ ]
-    regex: ^lakom.*$
-    action: keep
-`,
-			},
-		}
-	} else {
-		serviceMonitor = &monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.ExtensionServiceName, namespace, "shoot"),
-			Spec: monitoringv1.ServiceMonitorSpec{
-				Selector: metav1.LabelSelector{MatchLabels: getLabels()},
-				Endpoints: []monitoringv1.Endpoint{{
-					Port:                 "metrics",
-					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
-				}},
-			},
-		}
-	}
-
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
 		pdb,
@@ -574,8 +531,8 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
 						{
 							ContainerName: constants.ApplicationName,
-							MinAllowed: corev1.ResourceList{
-								corev1.ResourceMemory: resource.MustParse("32Mi"),
+							ControlledResources: &[]corev1.ResourceName{
+								corev1.ResourceMemory,
 							},
 						},
 					},
@@ -590,8 +547,16 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 				},
 			},
 		},
-		legacyObservabilityConfigMap,
-		serviceMonitor,
+		&monitoringv1.ServiceMonitor{
+			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.ExtensionServiceName, namespace, "shoot"),
+			Spec: monitoringv1.ServiceMonitorSpec{
+				Selector: metav1.LabelSelector{MatchLabels: getLabels()},
+				Endpoints: []monitoringv1.Endpoint{{
+					Port:                 "metrics",
+					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
+				}},
+			},
+		},
 	)
 
 	if err != nil {
@@ -601,37 +566,10 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	return resources, nil
 }
 
-func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName, projectNamespace string) (map[string][]byte, error) {
-	var (
-		matchPolicy          = admissionregistration.Equivalent
-		sideEffectClass      = admissionregistration.SideEffectClassNone
-		failurePolicy        = admissionregistration.Fail
-		timeOutSeconds       = ptr.To[int32](25)
-		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, extensionNamespace)
-		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
-		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
-		namespaceSelector    = metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key:      corev1.LabelMetadataName,
-					Operator: metav1.LabelSelectorOpIn,
-					Values:   []string{metav1.NamespaceSystem},
-				},
-			},
-		}
-		objectSelector = metav1.LabelSelector{}
-		rules          = []admissionregistration.RuleWithOperations{{
-			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
-			Rule: admissionregistration.Rule{
-				APIGroups:   []string{""},
-				APIVersions: []string{"v1"},
-				Resources:   []string{"pods", "pods/ephemeralcontainers"},
-			},
-		}}
-	)
-
-	isManagedSeed := projectNamespace == v1beta1constants.GardenNamespace
-	if !isManagedSeed {
+func scopeToObjectSelector(scope lakom.ScopeType) metav1.LabelSelector {
+	var objectSelector = metav1.LabelSelector{}
+	switch scope {
+	case lakom.KubeSystemManagedByGardener:
 		objectSelector = metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
@@ -641,7 +579,54 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 				},
 			},
 		}
+	case lakom.KubeSystem:
+	case lakom.Cluster:
 	}
+
+	return objectSelector
+}
+
+func scopeToNamespaceSelector(scope lakom.ScopeType) metav1.LabelSelector {
+	namespaceSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      corev1.LabelMetadataName,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{metav1.NamespaceSystem},
+			},
+		},
+	}
+
+	switch scope {
+	case lakom.KubeSystemManagedByGardener:
+	case lakom.KubeSystem:
+	case lakom.Cluster:
+		namespaceSelector = metav1.LabelSelector{}
+	}
+
+	return namespaceSelector
+}
+
+func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName string, scope lakom.ScopeType) (map[string][]byte, error) {
+	var (
+		matchPolicy          = admissionregistration.Equivalent
+		sideEffectClass      = admissionregistration.SideEffectClassNone
+		failurePolicy        = admissionregistration.Fail
+		timeOutSeconds       = ptr.To[int32](25)
+		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, extensionNamespace)
+		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
+		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
+		namespaceSelector    = scopeToNamespaceSelector(scope)
+		objectSelector       = scopeToObjectSelector(scope)
+		rules                = []admissionregistration.RuleWithOperations{{
+			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
+			Rule: admissionregistration.Rule{
+				APIGroups:   []string{""},
+				APIVersions: []string{"v1"},
+				Resources:   []string{"pods", "pods/ephemeralcontainers"},
+			},
+		}}
+	)
 
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
 	shootResources, err := shootRegistry.AddAllAndSerialize(

@@ -23,6 +23,15 @@ gardener-extension-shoot-lakom-service:
         attribute: image.repository
       - ref: ocm-resource:lakom.tag
         attribute: image.tag
+    - &shoot-lakom-admission
+      name: shoot-lakom-admission
+      dir: charts/gardener-extension-shoot-lakom-admission
+      registry: europe-docker.pkg.dev/gardener-project/snapshots/charts/gardener/extensions
+      mappings:
+      - ref: ocm-resource:gardener-extension-shoot-lakom-admission.repository
+        attribute: image.repository
+      - ref: ocm-resource:gardener-extension-shoot-lakom-admission.tag
+        attribute: image.tag
 
   base_definition:
     traits:
@@ -44,6 +53,10 @@ gardener-extension-shoot-lakom-service:
             image: europe-docker.pkg.dev/gardener-project/snapshots/gardener/extensions/lakom
             dockerfile: 'Dockerfile'
             target: lakom
+          gardener-extension-shoot-lakom-admission:
+            image: europe-docker.pkg.dev/gardener-project/snapshots/gardener/extensions/shoot-lakom-admission
+            dockerfile: 'Dockerfile'
+            target: gardener-extension-shoot-lakom-admission
   jobs:
     head-update:
       traits:
@@ -57,6 +70,7 @@ gardener-extension-shoot-lakom-service:
           helmcharts:
           - *shoot-lakom-service
           - *lakom
+          - *shoot-lakom-admission
     pull-request:
       traits:
         pull-request: ~
@@ -69,6 +83,7 @@ gardener-extension-shoot-lakom-service:
           helmcharts:
           - *shoot-lakom-service
           - *lakom
+          - *shoot-lakom-admission
     release:
       traits:
         version:
@@ -83,10 +98,15 @@ gardener-extension-shoot-lakom-service:
             lakom:
               image: europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom
               tag_as_latest: true
+            gardener-extension-shoot-lakom-admission:
+              image: europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/shoot-lakom-admission
+              tag_as_latest: true
           helmcharts:
           - <<: *shoot-lakom-service
             registry: europe-docker.pkg.dev/gardener-project/releases/charts/gardener/extensions
           - <<: *lakom
+            registry: europe-docker.pkg.dev/gardener-project/releases/charts/gardener/extensions
+          - <<: *shoot-lakom-admission
             registry: europe-docker.pkg.dev/gardener-project/releases/charts/gardener/extensions
         release:
           nextversion: 'bump_minor'

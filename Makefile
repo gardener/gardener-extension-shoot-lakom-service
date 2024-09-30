@@ -6,7 +6,9 @@ ENSURE_GARDENER_MOD         := $(shell go get github.com/gardener/gardener@$$(go
 GARDENER_HACK_DIR           := $(shell go list -m -f "{{.Dir}}" github.com/gardener/gardener)/hack
 EXTENSION_PREFIX            := gardener-extension
 EXTENSION_NAME              := shoot-lakom-service
+SHOOT_ADMISSION_NAME        := shoot-lakom-admission
 EXTENSION_FULL_NAME         := $(EXTENSION_PREFIX)-$(EXTENSION_NAME)
+SHOOT_ADMISSION_FULL_NAME   := $(EXTENSION_PREFIX)-$(SHOOT_ADMISSION_NAME)
 ADMISSION_NAME              := lakom
 REGISTRY                    := europe-docker.pkg.dev/gardener-project/public
 IMAGE_PREFIX                := $(REGISTRY)/gardener/extensions
@@ -32,6 +34,7 @@ endif
 
 EXTENSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(EXTENSION_NAME))"
 ADMISSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(ADMISSION_NAME))"
+SHOOT_ADMISSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(SHOOT_ADMISSION_NAME))"
 
 .PHONY: start
 start:
@@ -70,11 +73,14 @@ install:
 		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(EXTENSION_FULL_NAME)
 	@LD_FLAGS=$(ADMISSION_LD_FLAGS) \
 		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(ADMISSION_NAME)
+	@LD_FLAGS=$(SHOOT_ADMISSION_LD_FLAGS) \
+		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(SHOOT_ADMISSION_FULL_NAME)
 
 .PHONY: docker-images
 docker-images:
 	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):latest -f Dockerfile -m 6g --target $(EXTENSION_FULL_NAME) .
 	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):latest -f Dockerfile -m 6g --target $(ADMISSION_NAME) .
+	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(SHOOT_ADMISSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(SHOOT_ADMISSION_NAME):latest -f Dockerfile -m 6g --target $(SHOOT_ADMISSION_FULL_NAME) .
 
 #####################################################################
 # Rules for verification, formatting, linting, testing and cleaning #
@@ -147,8 +153,8 @@ extension-up extension-dev extension-down: export SKAFFOLD_LABEL = skaffold.dev/
 extension-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL) $(CRANE)
 	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) --cache-artifacts=false run
 
-extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL) $(CRANE)
-	$(SKAFFOLD) dev --cleanup=false --trigger=manual
+extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL) $(CRANE) $(KIND)
+	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) dev --cleanup=false --trigger=manual
 
 extension-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
 	$(SKAFFOLD) delete

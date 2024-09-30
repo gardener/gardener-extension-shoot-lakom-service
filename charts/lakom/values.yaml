@@ -12,8 +12,7 @@ image:
 replicaCount: 3
 resources:
   requests:
-    cpu: 100m
-    memory: 128Mi
+    memory: 25M
 metricsPort: 8080
 healthPort: 8081
 serverPort: 10250
@@ -59,9 +58,6 @@ priorityClass:
   name: lakom-system
 vpa:
   enabled: true
-  resourcePolicy:
-    minAllowed:
-      memory: 64Mi
   updatePolicy:
     updateMode: "Auto"
 additionalAnnotations:

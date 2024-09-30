@@ -13,5 +13,19 @@ spec:
   extensions:
   - type: shoot-lakom-service
     disabled: true
+    providerConfig:
+      apiVersion: lakom.extensions.gardener.cloud/v1alpha1
+      kind: LakomConfig
+      scope: KubeSystem
 ...
 ```
+
+The `scope` field instruct lakom which pods to validate. The possible values are:
+
+- `KubeSystem`
+Lakom will validate all pods in the `kube-system` namespace.
+- `KubeSystemManagedByGardener`
+Lakom will validate all pods in the `kube-system` namespace that are annotated with "managed-by/gardener"
+- `Cluster`
+Lakom will validate all pods in all namespaces.
+

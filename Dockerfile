@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ############# builder
-FROM golang:1.22.5 AS builder
+FROM golang:1.23.1 AS builder
 
 ARG EFFECTIVE_VERSION
 ARG TARGETARCH
@@ -33,3 +33,10 @@ FROM base AS gardener-extension-shoot-lakom-service
 COPY charts /charts
 COPY --from=builder /go/bin/gardener-extension-shoot-lakom-service /gardener-extension-shoot-lakom-service
 ENTRYPOINT ["/gardener-extension-shoot-lakom-service"]
+
+
+############# gardener-extension-shoot-lakom-admission
+FROM base AS gardener-extension-shoot-lakom-admission
+
+COPY --from=builder /go/bin/gardener-extension-shoot-lakom-admission /gardener-extension-shoot-lakom-admission
+ENTRYPOINT ["/gardener-extension-shoot-lakom-admission"]

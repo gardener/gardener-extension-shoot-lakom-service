@@ -188,17 +188,16 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundle []byte, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
-		serverPort               = intstr.FromInt(10250)
-		metricsPort              = intstr.FromInt(8080)
-		healthPort               = intstr.FromInt(8081)
+		serverPort               = intstr.FromInt32(10250)
+		metricsPort              = intstr.FromInt32(8080)
+		healthPort               = intstr.FromInt32(8081)
 		cacheTTL                 = time.Minute * 10
 		cacheRefreshInterval     = time.Second * 30
 		lakomConfigDir           = "/etc/lakom/config"
 		lakomConfigConfigMapName = constants.SeedExtensionServiceName + "-lakom-config"
 		webhookTLSCertDir        = "/etc/lakom/tls"
 		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestCPU               = resource.MustParse("50m")
-		requestMemory            = resource.MustParse("64Mi")
+		requestMemory            = resource.MustParse("25M")
 		vpaUpdateMode            = vpaautoscalingv1.UpdateModeAuto
 		kubeSystemNamespace      = metav1.NamespaceSystem
 		matchPolicy              = admissionregistration.Equivalent
@@ -302,12 +301,12 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 							{
 								Name:          "https",
 								Protocol:      tcpProto,
-								ContainerPort: int32(serverPort.IntValue()),
+								ContainerPort: serverPort.IntVal,
 							},
 							{
 								Name:          "metrics",
 								Protocol:      tcpProto,
-								ContainerPort: int32(metricsPort.IntValue()),
+								ContainerPort: metricsPort.IntVal,
 							},
 						},
 						LivenessProbe: &corev1.Probe{
@@ -332,7 +331,6 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    requestCPU,
 								corev1.ResourceMemory: requestMemory,
 							},
 						},
@@ -447,8 +445,8 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
 						{
 							ContainerName: constants.SeedApplicationName,
-							MinAllowed: corev1.ResourceList{
-								corev1.ResourceMemory: resource.MustParse("32Mi"),
+							ControlledResources: &[]corev1.ResourceName{
+								corev1.ResourceMemory,
 							},
 						},
 					},
