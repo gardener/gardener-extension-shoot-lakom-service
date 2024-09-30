@@ -16,10 +16,10 @@ data:
 {{ toYaml .Values.controllers.cosignPublicKeys | indent 6 }}
     seedBootstrap:
       ownerNamespace: {{ .Release.Namespace }}
+      enabled: true
     useOnlyImagePullSecrets: {{ .Values.controllers.useOnlyImagePullSecrets }}
     allowUntrustedImages: {{ .Values.controllers.allowUntrustedImages }}
     allowInsecureRegistries: {{ .Values.controllers.allowInsecureRegistries }}
-    deploySeedResources: {{ get .Values.gardener.seed.annotations "service.lakom.extensions.gardener.cloud/deploySeedResources" }}
     debugConfig:
       enableProfiling: {{ .Values.controllers.debugConfig.enableProfiling | default false }}
       enableContentionProfiling: {{ .Values.controllers.debugConfig.enableContentionProfiling | default false }}
