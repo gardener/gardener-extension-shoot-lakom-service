@@ -16,7 +16,7 @@ data:
 {{ toYaml .Values.controllers.cosignPublicKeys | indent 6 }}
     seedBootstrap:
       ownerNamespace: {{ .Release.Namespace }}
-      enabled: true
+      enabled: {{ get .Values.gardener.seed.annotations "service.lakom.extensions.gardener.cloud/enable-lakom-admission-controller" | default true }}
     useOnlyImagePullSecrets: {{ .Values.controllers.useOnlyImagePullSecrets }}
     allowUntrustedImages: {{ .Values.controllers.allowUntrustedImages }}
     allowInsecureRegistries: {{ .Values.controllers.allowInsecureRegistries }}

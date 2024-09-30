@@ -59,8 +59,3 @@ controllers:
   debugConfig:
     enableProfiling: false
     enableContentionProfiling: false
-
-gardener:
-  seed:
-    annotations:
-      service.lakom.extensions.gardener.cloud/deploySeedResources: true
