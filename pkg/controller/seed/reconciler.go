@@ -85,10 +85,10 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	)
 
 	if !kcr.serviceConfig.SeedBootstrap.Enabled {
-                logger.Info("Deleting lakom admission controller from the seed cluster")
+		logger.Info("Deleting lakom admission controller from the seed cluster")
 		return managedresources.DeleteForSeed(ctx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeed)
 	}
-        logger.Info("Installing lakom admission controller to the seed cluster")
+	logger.Info("Installing lakom admission controller to the seed cluster")
 
 	secretsConfig := ConfigsFor(kubeSystemNamespaceName)
 	secretsManager, err := secretsmanager.New(ctx, logger.WithName("seed-secretsmanager"), clock.RealClock{}, kcr.client, kubeSystemNamespaceName, ManagerIdentity, secretsmanager.Config{CASecretAutoRotation: true})

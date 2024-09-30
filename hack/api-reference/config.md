@@ -35,18 +35,6 @@ github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom.ScopeT
 <p>The scope in which lakom will verify pods</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>enabled</code></br>
-<em>
-bool
-</em>
-</td>
-<td>
-<p>Enabled determines whether any seed bootstrapping will occur.
-Existing lakom resources will be removed from the seed.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <hr/>

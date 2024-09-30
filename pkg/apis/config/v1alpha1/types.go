@@ -52,6 +52,6 @@ type SeedBootstrap struct {
 	// to the seed bootstrap, as well as where the managed resources are deployed.
 	OwnerNamespace string `json:"ownerNamespace"`
 	// Enabled determines whether any seed bootstrapping will occur.
-        // Existing lakom resources will be removed from the seed.
+	// Existing lakom resources will be removed from the seed.
 	Enabled bool `json:"enabled"`
 }
