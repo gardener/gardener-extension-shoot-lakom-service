@@ -16,6 +16,10 @@ data:
 {{ toYaml .Values.controllers.cosignPublicKeys | indent 6 }}
     seedBootstrap:
       ownerNamespace: {{ .Release.Namespace }}
+      # We want to ensure that enabled receives a default value of "true" if the annotation is not passed with the helm chart values.
+      # Check https://github.com/helm/helm/issues/8026#issuecomment-833059490 for an explanation on why dig is needed.
+      # Dig only traverses maps but `.Values` is of another type. The `merge (dict)` part transforms it into a map.
+      enabled: {{ dig "gardener" "seed" "annotations" "service.lakom.extensions.gardener.cloud/enable-lakom-admission-controller" "true" (.Values | merge (dict)) }}
     useOnlyImagePullSecrets: {{ .Values.controllers.useOnlyImagePullSecrets }}
     allowUntrustedImages: {{ .Values.controllers.allowUntrustedImages }}
     allowInsecureRegistries: {{ .Values.controllers.allowInsecureRegistries }}

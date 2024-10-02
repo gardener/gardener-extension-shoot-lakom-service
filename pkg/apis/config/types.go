@@ -49,4 +49,7 @@ type SeedBootstrap struct {
 	// OwnerNamespace is the name of the namespace owning the resources related
 	// to the seed bootstrap, as well as where the managed resources are deployed.
 	OwnerNamespace string
+	// Enabled determines whether any seed bootstrapping will occur.
+	// Existing lakom resources will be removed from the seed.
+	Enabled bool
 }

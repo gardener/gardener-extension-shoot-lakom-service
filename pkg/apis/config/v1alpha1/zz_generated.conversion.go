@@ -119,6 +119,7 @@ func Convert_config_DebugConfig_To_v1alpha1_DebugConfig(in *config.DebugConfig, 
 
 func autoConvert_v1alpha1_SeedBootstrap_To_config_SeedBootstrap(in *SeedBootstrap, out *config.SeedBootstrap, s conversion.Scope) error {
 	out.OwnerNamespace = in.OwnerNamespace
+	out.Enabled = in.Enabled
 	return nil
 }
 
@@ -129,6 +130,7 @@ func Convert_v1alpha1_SeedBootstrap_To_config_SeedBootstrap(in *SeedBootstrap, o
 
 func autoConvert_config_SeedBootstrap_To_v1alpha1_SeedBootstrap(in *config.SeedBootstrap, out *SeedBootstrap, s conversion.Scope) error {
 	out.OwnerNamespace = in.OwnerNamespace
+	out.Enabled = in.Enabled
 	return nil
 }
 
