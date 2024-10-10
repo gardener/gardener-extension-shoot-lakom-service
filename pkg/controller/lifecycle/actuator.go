@@ -153,7 +153,12 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
-	lakomConfig, err := yaml.JSONToYAML(a.serviceConfig.CosignPublicKeys.Raw)
+        lakomPublicKeys := append(a.serviceConfig.CosignPublicKeys.Raw, '\n')
+        if lakomProviderConfig.CosignPublicKeys != nil {
+            lakomPublicKeys = append(lakomPublicKeys, lakomProviderConfig.CosignPublicKeys.Raw...) 
+        }
+
+	lakomConfig, err := yaml.JSONToYAML(lakomPublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
 	}

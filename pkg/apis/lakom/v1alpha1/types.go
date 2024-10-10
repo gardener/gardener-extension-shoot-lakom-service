@@ -8,6 +8,7 @@ import (
 	lakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//"k8s.io/apimachinery/pkg/runtime"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -19,4 +20,7 @@ type LakomConfig struct {
 	// The scope in which lakom will verify pods
 	// +optional
 	Scope *lakom.ScopeType `json:"scope"`
+	// CosignPublicKeys is the cosign public keys used to verify image signatures.
+	// +optional
+	CosignPublicKeys []lakom.Key `json:"cosignPublicKeys,omitempty"`
 }
