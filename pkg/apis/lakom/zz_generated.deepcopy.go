@@ -38,10 +38,10 @@ func (in *LakomConfig) DeepCopyInto(out *LakomConfig) {
 		*out = new(ScopeType)
 		**out = **in
 	}
-	if in.CosignPublicKeys != nil {
-		in, out := &in.CosignPublicKeys, &out.CosignPublicKeys
-		*out = make([]Key, len(*in))
-		copy(*out, *in)
+	if in.PublicKeysSecretReference != nil {
+		in, out := &in.PublicKeysSecretReference, &out.PublicKeysSecretReference
+		*out = new(string)
+		**out = **in
 	}
 	return
 }

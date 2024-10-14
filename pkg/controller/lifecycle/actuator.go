@@ -161,17 +161,30 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
 	}
 
-        fmt.Println("Gardener public keys", string(gardenerPublicKeys))
-        if lakomProviderConfig.CosignPublicKeys != nil {
-            clientPublicKeys, err := yaml.Marshal(lakomProviderConfig.CosignPublicKeys)
-            if err != nil {
-                return fmt.Errorf("failed to marshal client public keys to yaml")
-            }
-            fmt.Println("ClientPublicKeys: ", string(clientPublicKeys))
-            lakomPublicKeys = append(gardenerPublicKeys, clientPublicKeys...) 
-        }
+        if lakomProviderConfig.PublicKeysSecretReference != nil {
+                var secretRef *autoscalingv1.CrossVersionObjectReference = nil
+                for _, reference := range cluster.Shoot.Spec.Resources {
+                    if reference.Name == *lakomProviderConfig.PublicKeysSecretReference {
+                        secretRef = &reference.ResourceRef
+                        break
+                    }
+                }
 
-        fmt.Println("Combined keys: ", string(lakomPublicKeys))
+                if secretRef == nil {
+                    return fmt.Errorf("failed to find resources matching referece: %s", *lakomProviderConfig.PublicKeysSecretReference)
+                }
+
+                secret := &corev1.Secret{}
+                if err := controller.GetObjectByReference(ctx, a.client, secretRef, namespace, secret); err != nil {
+                    return fmt.Errorf("failed to find provided secret %s: %c", *lakomProviderConfig.PublicKeysSecretReference, err)
+                }
+
+                clientPublicKeys, ok := secret.Data["keys"]
+                if ok != true {
+                    return fmt.Errorf("failed to extract public keys from secret")
+                }
+                lakomPublicKeys = append(gardenerPublicKeys, clientPublicKeys...) 
+        }
 
 	seedResources, err := getSeedResources(
 		getLakomReplicas(controller.IsHibernationEnabled(cluster)),
