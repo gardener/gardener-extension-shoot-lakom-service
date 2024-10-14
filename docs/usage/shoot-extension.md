@@ -17,6 +17,14 @@ spec:
       apiVersion: lakom.extensions.gardener.cloud/v1alpha1
       kind: LakomConfig
       scope: KubeSystem
+      cosignPublicKeys:
+      - name: example-client-key
+        algorithm: RSASSA-PSS-SHA256
+        key: |-
+          -----BEGIN PUBLIC KEY-----
+          MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAPeQXbIWMMXYV+9+j9b4jXTflnpfwn4E
+          GMrmqYVhm0sclXb2FPP5aV/NFH6SZdHDZcT8LCNsNgxzxV4N+UE/JIsCAwEAAQ==
+          -----END PUBLIC KEY-----
 ...
 ```
 

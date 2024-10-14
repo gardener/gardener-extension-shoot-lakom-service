@@ -153,15 +153,25 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
+        // TODO: ProviderConfig gets decoded to a go struct, then the public keys get marshaled back to yaml... pretty stupid
+        // TODO: Gardener keys are passed as json. Don't know why. Maybe might be optimized?
         lakomPublicKeys := append(a.serviceConfig.CosignPublicKeys.Raw, '\n')
-        if lakomProviderConfig.CosignPublicKeys != nil {
-            lakomPublicKeys = append(lakomPublicKeys, lakomProviderConfig.CosignPublicKeys.Raw...) 
-        }
-
-	lakomConfig, err := yaml.JSONToYAML(lakomPublicKeys)
+        gardenerPublicKeys, err := yaml.JSONToYAML(lakomPublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
 	}
+
+        fmt.Println("Gardener public keys", string(gardenerPublicKeys))
+        if lakomProviderConfig.CosignPublicKeys != nil {
+            clientPublicKeys, err := yaml.Marshal(lakomProviderConfig.CosignPublicKeys)
+            if err != nil {
+                return fmt.Errorf("failed to marshal client public keys to yaml")
+            }
+            fmt.Println("ClientPublicKeys: ", string(clientPublicKeys))
+            lakomPublicKeys = append(gardenerPublicKeys, clientPublicKeys...) 
+        }
+
+        fmt.Println("Combined keys: ", string(lakomPublicKeys))
 
 	seedResources, err := getSeedResources(
 		getLakomReplicas(controller.IsHibernationEnabled(cluster)),
@@ -169,7 +179,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		extensions.GenericTokenKubeconfigSecretNameFromCluster(cluster),
 		lakomShootAccessSecret.Secret.Name,
 		generatedSecrets[constants.WebhookTLSSecretName].Name,
-		string(lakomConfig),
+		string(lakomPublicKeys),
 		image.String(),
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
