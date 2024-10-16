@@ -10,6 +10,12 @@ In most of the Gardener setups the `shoot-lakom-service` extension is enabled gl
 kind: Shoot
 ...
 spec:
+  resources:
+  - name: lakom-ref
+    resourceRef:
+      apiVersion: v1
+      kind: Secret
+      name: lakom-secret
   extensions:
   - type: shoot-lakom-service
     disabled: true
@@ -17,6 +23,7 @@ spec:
       apiVersion: lakom.extensions.gardener.cloud/v1alpha1
       kind: LakomConfig
       scope: KubeSystem
+      publicKeysSecretReference: lakom-ref
 ...
 ```
 

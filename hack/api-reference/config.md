@@ -35,6 +35,18 @@ github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom.ScopeT
 <p>The scope in which lakom will verify pods</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>cosignPublicKeys</code></br>
+<em>
+[]github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom.Key
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CosignPublicKeys is the cosign public keys used to verify image signatures.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <hr/>

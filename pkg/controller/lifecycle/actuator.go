@@ -153,10 +153,38 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
-	lakomConfig, err := yaml.JSONToYAML(a.serviceConfig.CosignPublicKeys.Raw)
+        // TODO: ProviderConfig gets decoded to a go struct, then the public keys get marshaled back to yaml... pretty stupid
+        // TODO: Gardener keys are passed as json. Don't know why. Maybe might be optimized?
+        lakomPublicKeys := append(a.serviceConfig.CosignPublicKeys.Raw, '\n')
+        gardenerPublicKeys, err := yaml.JSONToYAML(lakomPublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
 	}
+
+        if lakomProviderConfig.PublicKeysSecretReference != nil {
+                var secretRef *autoscalingv1.CrossVersionObjectReference = nil
+                for _, reference := range cluster.Shoot.Spec.Resources {
+                    if reference.Name == *lakomProviderConfig.PublicKeysSecretReference {
+                        secretRef = &reference.ResourceRef
+                        break
+                    }
+                }
+
+                if secretRef == nil {
+                    return fmt.Errorf("failed to find resources matching referece: %s", *lakomProviderConfig.PublicKeysSecretReference)
+                }
+
+                secret := &corev1.Secret{}
+                if err := controller.GetObjectByReference(ctx, a.client, secretRef, namespace, secret); err != nil {
+                    return fmt.Errorf("failed to find provided secret %s: %c", *lakomProviderConfig.PublicKeysSecretReference, err)
+                }
+
+                clientPublicKeys, ok := secret.Data["keys"]
+                if ok != true {
+                    return fmt.Errorf("failed to extract public keys from secret")
+                }
+                lakomPublicKeys = append(gardenerPublicKeys, clientPublicKeys...) 
+        }
 
 	seedResources, err := getSeedResources(
 		getLakomReplicas(controller.IsHibernationEnabled(cluster)),
@@ -164,7 +192,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		extensions.GenericTokenKubeconfigSecretNameFromCluster(cluster),
 		lakomShootAccessSecret.Secret.Name,
 		generatedSecrets[constants.WebhookTLSSecretName].Name,
-		string(lakomConfig),
+		string(lakomPublicKeys),
 		image.String(),
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
