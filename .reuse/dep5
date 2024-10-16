@@ -9,6 +9,7 @@ Comment:
 # --------------------------------------------------
 # source code
 Files:
+  .github/*
   .gitignore
   .golangci.yaml
   .github/dependabot.yaml
