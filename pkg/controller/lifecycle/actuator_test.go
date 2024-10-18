@@ -84,8 +84,8 @@ var _ = Describe("Actuator", func() {
 			Expect(manifests).To(ConsistOf(
 				expectedSeedValidatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
 				expectedShootMutatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
-				expectedShootRole(),
-				expectedShootRoleBinding(shootAccessServiceAccountName),
+				expectedShootClusterRole(),
+				expectedShootRoleBinding(shootAccessServiceAccountName, scope),
 			))
 		})
 
@@ -132,16 +132,17 @@ var _ = Describe("Actuator", func() {
 		)
 
 		DescribeTable("Should ensure the rolebinding is correctly set",
-			func(saName string) {
-				resources, err := getShootResources(caBundle, extensionNamespace, saName, scope)
+			func(saName string, lakomScope lakom.ScopeType) {
+				resources, err := getShootResources(caBundle, extensionNamespace, saName, lakomScope)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(manifests).To(ContainElement(expectedShootRoleBinding(saName)))
+				Expect(manifests).To(ContainElement(expectedShootRoleBinding(saName, lakomScope)))
 			},
-			Entry("ServiceAccount name: test", "test"),
-			Entry("ServiceAccount name: foo-bar", "foo-bar"),
+			Entry("ServiceAccount name: test, scope: KubeSystemManagedByGardener", "test", lakom.KubeSystemManagedByGardener),
+			Entry("ServiceAccount name: foo-bar, scope: KubeSystem", "foo-bar", lakom.KubeSystem),
+			Entry("ServiceAccount name: foo-bar, scope: Cluster", "foo-bar", lakom.Cluster),
 		)
 
 		DescribeTable("Should return the correct object and namespace selectors based on scope",
@@ -326,16 +327,15 @@ webhooks:
 `
 }
 
-func expectedShootRole() string {
+func expectedShootClusterRole() string {
 	return `apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
   name: gardener-extension-shoot-lakom-service-resource-reader
-  namespace: kube-system
 rules:
 - apiGroups:
   - ""
@@ -346,7 +346,27 @@ rules:
 `
 }
 
-func expectedShootRoleBinding(saName string) string {
+func expectedShootRoleBinding(saName string, lakomScope lakom.ScopeType) string {
+	if lakomScope == lakom.Cluster {
+		return `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: gardener-extension-shoot-lakom-service-resource-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gardener-extension-shoot-lakom-service-resource-reader
+subjects:
+- kind: ServiceAccount
+  name: ` + saName + `
+  namespace: kube-system
+`
+	}
+
 	return `apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -358,7 +378,7 @@ metadata:
   namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
+  kind: ClusterRole
   name: gardener-extension-shoot-lakom-service-resource-reader
 subjects:
 - kind: ServiceAccount
