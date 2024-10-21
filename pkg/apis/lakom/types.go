@@ -9,22 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// AlgorithmKey is key type alias for the algorithm.
-type AlgorithmKey string
-
-// Key contains a public crypto key used for signature verification.
-// Attributes to the key are its name and the algorithm that should be
-// used during signature verification.
-type Key struct {
-	// Name is a human readable name associated with the key.
-	Name string `json:"name"`
-	// Key is the public crypto key.
-	Key string `json:"key"`
-	// Algorithm describes how the signature verifier to be configured
-	// with the given key.
-	Algorithm AlgorithmKey `json:"algorithm,omitempty"`
-}
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ScopeType determines the namespaces and labels that will be monitored by lakom webhooks
