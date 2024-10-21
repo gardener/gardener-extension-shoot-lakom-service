@@ -10,7 +10,6 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
 	extensionswebhook "github.com/gardener/gardener/extensions/pkg/webhook"
 	"github.com/gardener/gardener/pkg/apis/core"
@@ -53,29 +52,29 @@ func (s *shoot) validateScopeType(fldPath *field.Path, scopeType lakom.ScopeType
 }
 
 // TODO: This check exists in the validation of the lakom config as well. It can be extracted as a util function
-func (s *shoot) validateCosignPublicKeys(fldPath *field.Path, cosignPublicKeys []lakom.Key) field.ErrorList {
-	errList := field.ErrorList{}
+// func (s *shoot) validateCosignPublicKeys(fldPath *field.Path, cosignPublicKeys []lakom.Key) field.ErrorList {
+// 	errList := field.ErrorList{}
 
-	usedNames := map[string]any{}
-	for idx, k := range cosignPublicKeys {
-		if k.Name == "" {
-			errList = append(errList, field.Required(fldPath.Index(idx), "key name should no be empty"))
-		}
+// 	usedNames := map[string]any{}
+// 	for idx, k := range cosignPublicKeys {
+// 		if k.Name == "" {
+// 			errList = append(errList, field.Required(fldPath.Index(idx), "key name should no be empty"))
+// 		}
 
-		if _, ok := usedNames[k.Name]; ok {
-			errList = append(errList, field.Duplicate(fldPath.Index(idx), k.Name))
-		}
-		usedNames[k.Name] = nil
+// 		if _, ok := usedNames[k.Name]; ok {
+// 			errList = append(errList, field.Duplicate(fldPath.Index(idx), k.Name))
+// 		}
+// 		usedNames[k.Name] = nil
 
-		if keys, err := utils.GetCosignPublicKeys([]byte(k.Key)); err != nil {
-			errList = append(errList, field.Invalid(fldPath.Index(idx), k.Key, "key could not be parsed"))
-		} else if len(keys) != 1 {
-			errList = append(errList, field.Invalid(fldPath.Index(idx), k.Key, "expected exactly one key for the given name"))
-		}
-	}
+// 		if keys, err := utils.GetCosignPublicKeys([]byte(k.Key)); err != nil {
+// 			errList = append(errList, field.Invalid(fldPath.Index(idx), k.Key, "key could not be parsed"))
+// 		} else if len(keys) != 1 {
+// 			errList = append(errList, field.Invalid(fldPath.Index(idx), k.Key, "expected exactly one key for the given name"))
+// 		}
+// 	}
 
-	return errList
-}
+// 	return errList
+// }
 
 // Validate validates the given shoot object
 func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
