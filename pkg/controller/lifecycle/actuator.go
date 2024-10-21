@@ -22,7 +22,7 @@ import (
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	v1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
-	v1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
+	corev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
@@ -165,7 +165,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
                 var err error
                 clientPublicKeys, err = getClientKeys(ctx, a.client, cluster.Shoot.Spec.Resources, *lakomProviderConfig.PublicKeysSecretReference, namespace)
                 if err != nil {
-                    return fmt.Errorf("failed to find client public keys from the given reference %s", *lakomProviderConfig.PublicKeysSecretReference)
+                    return fmt.Errorf("failed to get the additional keys: %w", err)
                 }
 	}
 
@@ -722,12 +722,12 @@ func getClientKeys(ctx context.Context, client client.Client, resources []v1beta
     }
 
     if err := controller.GetObjectByReference(ctx, client, &ref.ResourceRef, namespace, refSecret); err != nil {
-        return nil, fmt.Errorf("failed to read referenced secret %s%s for reference %s: %s", v1beta1constants.ReferencedResourcesPrefix, ref.ResourceRef.Name, resourceName, err)
+        return nil, fmt.Errorf("failed to read referenced secret %s%s for reference %s: %w", v1beta1constants.ReferencedResourcesPrefix, ref.ResourceRef.Name, resourceName, err)
     }
 
     clientKeys, ok := refSecret.Data["keys"]
-    if ok != true {
-        return nil, fmt.Errorf("failed to extract public keys from secret. No data with name `keys` in secret.")
+    if !ok {
+        return nil, fmt.Errorf("secret %s/%s is missing date key 'keys'", refSecret.Namespace, refSecret.Name)
     }
 
     return clientKeys, nil
