@@ -25,7 +25,6 @@ type Key struct {
 	Algorithm AlgorithmKey `json:"algorithm,omitempty"`
 }
 
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ScopeType determines the namespaces and labels that will be monitored by lakom webhooks
