@@ -37,9 +37,9 @@ github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom.ScopeT
 </tr>
 <tr>
 <td>
-<code>cosignPublicKeys</code></br>
+<code>publicKeysSecretReference</code></br>
 <em>
-[]github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom.Key
+string
 </em>
 </td>
 <td>

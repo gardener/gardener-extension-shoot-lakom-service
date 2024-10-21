@@ -21,6 +21,7 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
+	v1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
@@ -153,38 +154,37 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
-        // TODO: ProviderConfig gets decoded to a go struct, then the public keys get marshaled back to yaml... pretty stupid
-        // TODO: Gardener keys are passed as json. Don't know why. Maybe might be optimized?
-        lakomPublicKeys := append(a.serviceConfig.CosignPublicKeys.Raw, '\n')
-        gardenerPublicKeys, err := yaml.JSONToYAML(lakomPublicKeys)
+	// TODO: ProviderConfig gets decoded to a go struct, then the public keys get marshaled back to yaml... pretty stupid
+	lakomPublicKeys := append(a.serviceConfig.CosignPublicKeys.Raw, '\n')
+	gardenerPublicKeys, err := yaml.JSONToYAML(lakomPublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
 	}
 
-        if lakomProviderConfig.PublicKeysSecretReference != nil {
-                var secretRef *autoscalingv1.CrossVersionObjectReference = nil
-                for _, reference := range cluster.Shoot.Spec.Resources {
-                    if reference.Name == *lakomProviderConfig.PublicKeysSecretReference {
-                        secretRef = &reference.ResourceRef
-                        break
-                    }
-                }
+	if lakomProviderConfig.PublicKeysSecretReference != nil {
+		ref := v1beta1helper.GetResourceByName(cluster.Shoot.Spec.Resources, *lakomProviderConfig.PublicKeysSecretReference)
+		if ref == nil || ref.ResourceRef.Kind != "Secret" {
+			return fmt.Errorf("failed to find referenced resource with name %s and kind Secret", *lakomProviderConfig.PublicKeysSecretReference)
+		}
 
-                if secretRef == nil {
-                    return fmt.Errorf("failed to find resources matching referece: %s", *lakomProviderConfig.PublicKeysSecretReference)
-                }
+		refSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ref.ResourceRef.Name,
+				Namespace: namespace,
+			},
+		}
 
-                secret := &corev1.Secret{}
-                if err := controller.GetObjectByReference(ctx, a.client, secretRef, namespace, secret); err != nil {
-                    return fmt.Errorf("failed to find provided secret %s: %c", *lakomProviderConfig.PublicKeysSecretReference, err)
-                }
+		if err := controller.GetObjectByReference(ctx, a.client, &ref.ResourceRef, namespace, refSecret); err != nil {
+			return fmt.Errorf("failed to read referenced secret %s%s for reference %s", v1beta1constants.ReferencedResourcesPrefix, ref.ResourceRef.Name, *lakomProviderConfig.PublicKeysSecretReference)
+		}
 
-                clientPublicKeys, ok := secret.Data["keys"]
-                if ok != true {
-                    return fmt.Errorf("failed to extract public keys from secret")
-                }
-                lakomPublicKeys = append(gardenerPublicKeys, clientPublicKeys...) 
-        }
+		clientPublicKeys, ok := refSecret.Data["keys"]
+		if ok != true {
+			return fmt.Errorf("failed to extract public keys from secret")
+		}
+
+		lakomPublicKeys = append(gardenerPublicKeys, clientPublicKeys...)
+	}
 
 	seedResources, err := getSeedResources(
 		getLakomReplicas(controller.IsHibernationEnabled(cluster)),
