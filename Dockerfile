@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ############# builder
-FROM golang:1.23.1 AS builder
+FROM golang:1.23.2 AS builder
 
 ARG EFFECTIVE_VERSION
 ARG TARGETARCH

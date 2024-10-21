@@ -685,11 +685,10 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 				ObjectSelector:    &objectSelector,
 			}},
 		},
-		&rbacv1.Role{
+		&rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.LakomResourceReader,
-				Namespace: metav1.NamespaceSystem,
-				Labels:    getLabels(),
+				Name:   constants.LakomResourceReader,
+				Labels: getLabels(),
 			},
 			Rules: []rbacv1.PolicyRule{
 				{
@@ -699,25 +698,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 				},
 			},
 		},
-		&rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.LakomResourceReader,
-				Namespace: metav1.NamespaceSystem,
-				Labels:    getLabels(),
-			},
-			RoleRef: rbacv1.RoleRef{
-				APIGroup: "rbac.authorization.k8s.io",
-				Kind:     "Role",
-				Name:     constants.LakomResourceReader,
-			},
-			Subjects: []rbacv1.Subject{
-				{
-					Kind:      rbacv1.ServiceAccountKind,
-					Name:      shootAccessServiceAccountName,
-					Namespace: metav1.NamespaceSystem,
-				},
-			},
-		},
+		getRoleBinding(scope, shootAccessServiceAccountName),
 	)
 
 	if err != nil {
@@ -752,3 +733,38 @@ func getClientKeys(ctx context.Context, client client.Client, resources []v1beta
     return clientKeys, nil
 }
 
+func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string) client.Object {
+	roleRef := rbacv1.RoleRef{
+		APIGroup: "rbac.authorization.k8s.io",
+		Kind:     "ClusterRole",
+		Name:     constants.LakomResourceReader,
+	}
+	subjects := []rbacv1.Subject{
+		{
+			Kind:      rbacv1.ServiceAccountKind,
+			Name:      shootAccessServiceAccountName,
+			Namespace: metav1.NamespaceSystem,
+		},
+	}
+
+	if scope == lakom.Cluster {
+		return &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   constants.LakomResourceReader,
+				Labels: getLabels(),
+			},
+			RoleRef:  roleRef,
+			Subjects: subjects,
+		}
+	}
+
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      constants.LakomResourceReader,
+			Namespace: metav1.NamespaceSystem,
+			Labels:    getLabels(),
+		},
+		RoleRef:  roleRef,
+		Subjects: subjects,
+	}
+}
