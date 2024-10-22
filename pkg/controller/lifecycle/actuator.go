@@ -710,8 +710,11 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 
 func getClientKeys(ctx context.Context, client client.Client, resources []v1beta1.NamedResourceReference, resourceName, namespace string) ([]byte, error) {
     ref := v1beta1helper.GetResourceByName(resources, resourceName)
-    if ref == nil || ref.ResourceRef.Kind != "Secret" {
-        return nil, fmt.Errorf("failed to find referenced resource with name %s and kind Secret", resourceName)
+    if ref == nil {
+        return nil, fmt.Errorf("failed to find referenced resource with name %s", resourceName)
+    }
+    if ref.ResourceRef.Kind != "Secret" {
+        return nil, fmt.Errorf("references resource with name %s is not of kind 'Secret'", resourceName)
     }
 
     refSecret := &corev1.Secret{
