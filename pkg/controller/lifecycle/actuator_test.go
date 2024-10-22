@@ -351,6 +351,8 @@ func expectedShootRoleBinding(saName string, lakomScope lakom.ScopeType) string 
 		return `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+  annotations:
+    resources.gardener.cloud/delete-on-invalid-update: "true"
   creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom
@@ -370,6 +372,8 @@ subjects:
 	return `apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  annotations:
+    resources.gardener.cloud/delete-on-invalid-update: "true"
   creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom

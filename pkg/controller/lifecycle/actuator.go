@@ -708,12 +708,16 @@ func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string)
 			Namespace: metav1.NamespaceSystem,
 		},
 	}
+	annotations := map[string]string{
+		resourcesv1alpha1.DeleteOnInvalidUpdate: "true",
+	}
 
 	if scope == lakom.Cluster {
 		return &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   constants.LakomResourceReader,
-				Labels: getLabels(),
+				Name:        constants.LakomResourceReader,
+				Labels:      getLabels(),
+				Annotations: annotations,
 			},
 			RoleRef:  roleRef,
 			Subjects: subjects,
@@ -722,9 +726,10 @@ func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string)
 
 	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.LakomResourceReader,
-			Namespace: metav1.NamespaceSystem,
-			Labels:    getLabels(),
+			Name:        constants.LakomResourceReader,
+			Namespace:   metav1.NamespaceSystem,
+			Labels:      getLabels(),
+			Annotations: annotations,
 		},
 		RoleRef:  roleRef,
 		Subjects: subjects,
