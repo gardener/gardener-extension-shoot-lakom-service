@@ -51,6 +51,11 @@ publicKeys:
     -----END PUBLIC KEY-----
 ```
 
+Here:
+- `name` can be set to any string.
+- `algorithm` needs to be chosen based on the key that you are adding.
+- `key` is the key that will be used for validating images using the algorithm that's specified.
+
 ### Supported RSA Signature Verification Algorithms
 
 - `RSASSA-PKCS1-v1_5-SHA256`: uses `RSASSA-PKCS1-v1_5` scheme with `SHA256` hash func
