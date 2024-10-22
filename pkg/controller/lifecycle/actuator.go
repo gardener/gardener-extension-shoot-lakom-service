@@ -161,9 +161,9 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	}
 
         var clientPublicKeys []byte
-	if lakomProviderConfig.PublicKeysSecretReference != nil {
+	if lakomProviderConfig.TrustedKeysResourceName != nil {
                 var err error
-                clientPublicKeys, err = getClientKeys(ctx, a.client, cluster.Shoot.Spec.Resources, *lakomProviderConfig.PublicKeysSecretReference, namespace)
+                clientPublicKeys, err = getClientKeys(ctx, a.client, cluster.Shoot.Spec.Resources, *lakomProviderConfig.TrustedKeysResourceName, namespace)
                 if err != nil {
                     return fmt.Errorf("failed to get the additional keys: %w", err)
                 }
@@ -708,7 +708,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 	return shootResources, nil
 }
 
-func getClientKeys(ctx context.Context, client client.Client, resources []v1beta1.NamedResourceReference, resourceName, namespace string) ([]byte, error) {
+func getClientKeys(ctx context.Context, client client.Client, resources []corev1beta1.NamedResourceReference, resourceName, namespace string) ([]byte, error) {
     ref := v1beta1helper.GetResourceByName(resources, resourceName)
     if ref == nil {
         return nil, fmt.Errorf("failed to find referenced resource with name %s", resourceName)

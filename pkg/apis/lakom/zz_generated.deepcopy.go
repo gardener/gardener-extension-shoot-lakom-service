@@ -22,8 +22,8 @@ func (in *LakomConfig) DeepCopyInto(out *LakomConfig) {
 		*out = new(ScopeType)
 		**out = **in
 	}
-	if in.PublicKeysSecretReference != nil {
-		in, out := &in.PublicKeysSecretReference, &out.PublicKeysSecretReference
+	if in.TrustedKeysResourceName != nil {
+		in, out := &in.TrustedKeysResourceName, &out.TrustedKeysResourceName
 		*out = new(string)
 		**out = **in
 	}

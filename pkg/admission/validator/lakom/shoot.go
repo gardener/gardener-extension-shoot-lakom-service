@@ -103,7 +103,7 @@ func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
 	if lakomConfig.Scope != nil {
 		errList = append(errList, s.validateScopeType(providerConfigPath.Child("scope"), *lakomConfig.Scope)...)
 	}
-	if lakomConfig.PublicKeysSecretReference != nil {
+	if lakomConfig.TrustedKeysResourceName != nil {
 		// TODO: Can the secret be checked?
 		//errList = append(errList, s.validateCosignPublicKeys(providerConfigPath.Child("cosignPublicKeys"), lakomConfig.CosignPublicKeys)...)
 	}

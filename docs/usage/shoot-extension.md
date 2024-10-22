@@ -38,7 +38,7 @@ Lakom will validate all pods in the `kube-system` namespace that are annotated w
 - `Cluster`
 Lakom will validate all pods in all namespaces.
 
-### PublicKeysSecretReference
+### TrustedKeysResourceName
 
 Lakom, by default, tries to verify only workloads that belong to Gardener. Because of this, the only public keys that it uses to do its job are the ones for the Gardener workload.
 
