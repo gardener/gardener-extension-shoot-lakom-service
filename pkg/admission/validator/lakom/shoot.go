@@ -10,12 +10,18 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 
 	extensionswebhook "github.com/gardener/gardener/extensions/pkg/webhook"
 	"github.com/gardener/gardener/pkg/apis/core"
+	gardencorehelper "github.com/gardener/gardener/pkg/apis/core/helper"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+        "sigs.k8s.io/yaml"
 )
 
 // shoot validates shoots
@@ -52,32 +58,70 @@ func (s *shoot) validateScopeType(fldPath *field.Path, scopeType lakom.ScopeType
 }
 
 // TODO: This check exists in the validation of the lakom config as well. It can be extracted as a util function
-// func (s *shoot) validateCosignPublicKeys(fldPath *field.Path, cosignPublicKeys []lakom.Key) field.ErrorList {
-// 	errList := field.ErrorList{}
+func (s *shoot) validateCosignPublicKeys(fldPath *field.Path, cosignPublicKeys []config.Key) field.ErrorList {
+	errList := field.ErrorList{}
 
-// 	usedNames := map[string]any{}
-// 	for idx, k := range cosignPublicKeys {
-// 		if k.Name == "" {
-// 			errList = append(errList, field.Required(fldPath.Index(idx), "key name should no be empty"))
-// 		}
+	usedNames := map[string]any{}
+	for idx, k := range cosignPublicKeys {
+		if k.Name == "" {
+			errList = append(errList, field.Required(fldPath.Index(idx), "key name should no be empty"))
+		}
 
-// 		if _, ok := usedNames[k.Name]; ok {
-// 			errList = append(errList, field.Duplicate(fldPath.Index(idx), k.Name))
-// 		}
-// 		usedNames[k.Name] = nil
+		if _, ok := usedNames[k.Name]; ok {
+			errList = append(errList, field.Duplicate(fldPath.Index(idx), k.Name))
+		}
+		usedNames[k.Name] = nil
 
-// 		if keys, err := utils.GetCosignPublicKeys([]byte(k.Key)); err != nil {
-// 			errList = append(errList, field.Invalid(fldPath.Index(idx), k.Key, "key could not be parsed"))
-// 		} else if len(keys) != 1 {
-// 			errList = append(errList, field.Invalid(fldPath.Index(idx), k.Key, "expected exactly one key for the given name"))
-// 		}
-// 	}
+		if keys, err := utils.GetCosignPublicKeys([]byte(k.Key)); err != nil {
+                        errList = append(errList, field.Invalid(fldPath.Index(idx), k.Key, fmt.Sprintf("key %s could not be parsed: %s", k.Name, err)))
+		} else if len(keys) != 1 {
+			errList = append(errList, field.Invalid(fldPath.Index(idx), k.Key, fmt.Sprintf("multiple keys with the name %s", k.Name)))
+		}
+	}
 
-// 	return errList
-// }
+	return errList
+}
+
+func (s *shoot) validateTrustedKeys(ctx context.Context, fldPath *field.Path, resourceName string, resources []core.NamedResourceReference, namespace string) field.ErrorList {
+    errList := field.ErrorList{}
+
+    ref := gardencorehelper.GetResourceByName(resources, resourceName)
+    if ref == nil {
+        return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("failed to find referenced resource with name %s", resourceName)));
+    }
+    if ref.ResourceRef.Kind != "Secret" {
+        return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("resource with name %s is not of type secret", resourceName)));
+    }
+
+    secret := &corev1.Secret{
+            ObjectMeta: metav1.ObjectMeta{
+                    Name:      ref.ResourceRef.Name,
+                    Namespace: namespace,
+            },
+    }
+
+    // Explicitly use the client.Reader to prevent controller-runtime to start Informer for Secrets
+    // under the hood. The latter increases the memory usage of the component.
+    if err := s.apiReader.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+            return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("failed to find secret %s from reference %s", client.ObjectKeyFromObject(secret), resourceName)))
+    }
+
+    var keys []config.Key
+
+    rawKeys, ok := secret.Data["keys"]
+    if !ok {
+        return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("could not find 'keys' in data from secret %s", client.ObjectKeyFromObject(secret))))
+    }
+
+    if err := yaml.UnmarshalStrict(rawKeys, &keys); err != nil {
+        return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("failed to serialize keys from secret %s: %s", client.ObjectKeyFromObject(secret), err)))
+    }
+
+    return append(errList, s.validateCosignPublicKeys(fldPath, keys)...)
+}
 
 // Validate validates the given shoot object
-func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
+func (s *shoot) Validate(ctx context.Context, new, _ client.Object) error {
 	shoot, ok := new.(*core.Shoot)
 	if !ok {
 		return fmt.Errorf("wrong object type %T, expected core.Shoot", new)
@@ -98,15 +142,15 @@ func (s *shoot) Validate(_ context.Context, new, _ client.Object) error {
 		return fmt.Errorf("failed to decode providerConfig: %w", err)
 	}
 
-	errList := field.ErrorList{}
+	allErrs := field.ErrorList{}
 
 	if lakomConfig.Scope != nil {
-		errList = append(errList, s.validateScopeType(providerConfigPath.Child("scope"), *lakomConfig.Scope)...)
+		allErrs = append(allErrs, s.validateScopeType(providerConfigPath.Child("scope"), *lakomConfig.Scope)...)
 	}
 	if lakomConfig.TrustedKeysResourceName != nil {
-		// TODO: Can the secret be checked?
-		//errList = append(errList, s.validateCosignPublicKeys(providerConfigPath.Child("cosignPublicKeys"), lakomConfig.CosignPublicKeys)...)
+                allErrs = append(allErrs, s.validateTrustedKeys(ctx, providerConfigPath.Child("trustedKeysResourceName"), *lakomConfig.TrustedKeysResourceName, shoot.Spec.Resources, shoot.Namespace)...)
 	}
 
-	return errList.ToAggregate()
+	return allErrs.ToAggregate()
+            
 }
