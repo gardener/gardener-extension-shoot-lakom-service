@@ -63,6 +63,6 @@ Simply:
     -----END PUBLIC KEY-----
 ```
 2. Add a reference to your secret via the `resources` field in the shoot spec as shown above.
-3. Add the name of your referenece in `publicKeysSecretReference` in the provider config as shown above.
+3. Add the name of your referenece in `trustedKeysResourceName ` in the provider config as shown above.
 
 Now, whenever Lakom tries to verify a Pod, it will make sure to use your public keys as well.

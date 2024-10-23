@@ -52,9 +52,9 @@ publicKeys:
 ```
 
 Here:
-- `name` can be set to any string.
-- `algorithm` needs to be chosen based on the key that you are adding.
-- `key` is the key that will be used for validating images using the algorithm that's specified.
+- `name` is logical human friendly name of the key.
+- `algorithm` is the algorithm that has to be used to verify the signature, see [Supported RSA Signature Verification Algorithms](#supported-rsa-signature-verification-algorithms) for the list of supported algorithms.
+- `key` is the cryptographic public key that will be used for image signature validation.
 
 ### Supported RSA Signature Verification Algorithms
 

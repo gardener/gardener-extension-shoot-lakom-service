@@ -34,6 +34,6 @@ type LakomConfig struct {
 
 	// The scope in which lakom will verify pods
 	Scope *ScopeType
-	// CosignPublicKeys is the cosign public keys used to verify image signatures.
+	// TrustedKeysResourceName is the name of the shoot resource providing additional cosign public keys for image signature validation.
 	TrustedKeysResourceName *string
 }
