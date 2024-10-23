@@ -23,7 +23,7 @@ spec:
       apiVersion: lakom.extensions.gardener.cloud/v1alpha1
       kind: LakomConfig
       scope: KubeSystem
-      publicKeysSecretReference: lakom-ref
+      trustedKeysResourceName: lakom-ref
 ...
 ```
 

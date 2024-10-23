@@ -37,7 +37,7 @@ github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom.ScopeT
 </tr>
 <tr>
 <td>
-<code>publicKeysSecretReference</code></br>
+<code>trustedKeysResourceName</code></br>
 <em>
 string
 </em>

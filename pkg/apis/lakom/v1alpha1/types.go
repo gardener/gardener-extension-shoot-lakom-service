@@ -21,5 +21,5 @@ type LakomConfig struct {
 	Scope *lakom.ScopeType `json:"scope"`
 	// CosignPublicKeys is the cosign public keys used to verify image signatures.
 	// +optional
-	TrustedKeysResourceName *string `json:"publicKeysSecretReference,omitempty"`
+	TrustedKeysResourceName *string `json:"trustedKeysResourceName,omitempty"`
 }
