@@ -5,6 +5,7 @@
 package lifecycle
 
 import (
+	"context"
 	b64 "encoding/base64"
 	"fmt"
 	"strconv"
@@ -13,11 +14,16 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 
 	"github.com/Masterminds/semver/v3"
+	corev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var _ = Describe("Actuator", func() {
@@ -162,6 +168,46 @@ var _ = Describe("Actuator", func() {
 			Entry("Cluster scope", lakom.Cluster, emptyObjectSelector, emptyNamespaceSelector),
 		)
 
+	})
+
+	Context("getClientKeys", func() {
+		It("Should return the secret when the resource is correct", func() {
+			ctx := context.TODO()
+			fakeclient := fakeclient.NewFakeClient()
+			resourceName := "resourceName"
+			refSecretName := "ref-lakom-secret"
+			secretName := "lakom-secret"
+			namespace := "namespace"
+			secretData := []byte("random")
+
+			data := make(map[string][]byte)
+			data["keys"] = []byte(secretData)
+
+			secret1 := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      refSecretName,
+					Namespace: namespace,
+				},
+				Data: data,
+			}
+
+			fakeclient.Create(ctx, secret1)
+
+			resources := []corev1beta1.NamedResourceReference{
+				{
+					Name: resourceName,
+					ResourceRef: autoscalingv1.CrossVersionObjectReference{
+						Kind:       "Secret",
+						Name:       secretName,
+						APIVersion: "v1",
+					},
+				},
+			}
+
+			result, err := getClientKeys(ctx, fakeclient, resources, resourceName, namespace)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(secretData))
+		})
 	})
 
 	Context("getSeedResources", func() {
