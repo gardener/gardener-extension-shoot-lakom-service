@@ -730,7 +730,7 @@ func getClientKeys(ctx context.Context, client client.Client, resources []corev1
 
 	clientKeys, ok := refSecret.Data["keys"]
 	if !ok {
-		return nil, fmt.Errorf("secret %s/%s is missing date key 'keys'", refSecret.Namespace, refSecret.Name)
+		return nil, fmt.Errorf("secret %s/%s is missing data key 'keys'", refSecret.Namespace, refSecret.Name)
 	}
 
 	return clientKeys, nil
