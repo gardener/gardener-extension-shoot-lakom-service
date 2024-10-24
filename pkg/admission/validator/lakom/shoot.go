@@ -152,5 +152,4 @@ func (s *shoot) Validate(ctx context.Context, new, _ client.Object) error {
 	}
 
 	return allErrs.ToAggregate()
-
 }
