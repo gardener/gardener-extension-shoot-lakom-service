@@ -83,14 +83,12 @@ func (s *shoot) validateCosignPublicKeys(fldPath *field.Path, cosignPublicKeys [
 }
 
 func (s *shoot) validateTrustedKeys(ctx context.Context, fldPath *field.Path, resourceName string, resources []core.NamedResourceReference, namespace string) field.ErrorList {
-	errList := field.ErrorList{}
-
 	ref := gardencorehelper.GetResourceByName(resources, resourceName)
 	if ref == nil {
-		return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("failed to find referenced resource with name %s", resourceName)))
+		return field.ErrorList{field.Invalid(fldPath, resourceName, "there is no resource with this name in shoot.spec.resources")}
 	}
 	if ref.ResourceRef.Kind != "Secret" {
-		return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("resource with name %s is not of type secret", resourceName)))
+		return field.ErrorList{field.Invalid(fldPath, resourceName, "resource must be of kind 'Secret'")}
 	}
 
 	secret := &corev1.Secret{
@@ -100,24 +98,26 @@ func (s *shoot) validateTrustedKeys(ctx context.Context, fldPath *field.Path, re
 		},
 	}
 
+	objectKey := client.ObjectKeyFromObject(secret)
+
 	// Explicitly use the client.Reader to prevent controller-runtime to start Informer for Secrets
 	// under the hood. The latter increases the memory usage of the component.
-	if err := s.apiReader.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
-		return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("failed to find secret %s from reference %s", client.ObjectKeyFromObject(secret), resourceName)))
+	if err := s.apiReader.Get(ctx, objectKey, secret); err != nil {
+		return field.ErrorList{field.Invalid(fldPath, resourceName, fmt.Sprintf("failed to get secret %s, %s", objectKey, err.Error()))}
 	}
 
 	var keys []config.Key
 
 	rawKeys, ok := secret.Data["keys"]
 	if !ok {
-		return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("could not find 'keys' in data from secret %s", client.ObjectKeyFromObject(secret))))
+		return field.ErrorList{field.Invalid(fldPath, resourceName, fmt.Sprintf("could not get 'keys' in data from secret %s", objectKey))}
 	}
 
 	if err := yaml.UnmarshalStrict(rawKeys, &keys); err != nil {
-		return append(errList, field.Invalid(fldPath, resourceName, fmt.Sprintf("failed to serialize keys from secret %s: %s", client.ObjectKeyFromObject(secret), err)))
+		return field.ErrorList{field.Invalid(fldPath, resourceName, fmt.Sprintf("failed to serialize keys from secret %s: %s", objectKey, err.Error()))}
 	}
 
-	return append(errList, s.validateCosignPublicKeys(fldPath, keys)...)
+	return s.validateCosignPublicKeys(fldPath, keys)
 }
 
 // Validate validates the given shoot object
