@@ -280,7 +280,7 @@ var _ = Describe("Actuator", func() {
 		It("Should return an err if the Secret does not contains a 'keys' key in its data", func() {
 			_, err := getClientKeys(ctx, fakeclient, resources, resourceNoKeysName, namespace)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("secret " + namespace + "/" + prefixedSecretNoKeysName + " is missing date key 'keys'"))
+			Expect(err.Error()).To(ContainSubstring("secret " + namespace + "/" + prefixedSecretNoKeysName + " is missing data key 'keys'"))
 		})
 	})
 
