@@ -87,7 +87,50 @@ func (c *Config) Complete() (*CompletedConfig, error) {
 		res.Keys = append(res.Keys, config)
 	}
 
+	res.Keys = uniqueKeys(res.Keys)
+
 	return &res, nil
+}
+
+type PK interface {
+	Equal(x crypto.PublicKey) bool
+}
+
+// uniqueKeys returns a new VerifierKey array that contains only the unique
+// keys from 'keys'.
+//
+// Equality between the keys is achieved via the 'Equal' function that we know
+// is implemented for every public key type. Ref: https://pkg.go.dev/crypto#PublicKey
+// Thus, casting all the keys to the PK interface enables us to call the function.
+func uniqueKeys(keys []VerifierKey) []VerifierKey {
+	var res []VerifierKey
+	var idxUniq []int
+
+	var keysCast []PK
+	for _, k := range keys {
+		keysCast = append(keysCast, k.Key.(PK))
+	}
+
+	for idx, k1 := range keysCast {
+		uniq := true
+		for _, uniqIdx := range idxUniq {
+			k2 := keysCast[uniqIdx]
+			if k1.Equal(k2) {
+				uniq = false
+				break
+			}
+		}
+
+		if uniq {
+			idxUniq = append(idxUniq, idx)
+		}
+	}
+
+	for _, idx := range idxUniq {
+		res = append(res, keys[idx])
+	}
+
+	return res
 }
 
 func parseAlgorithm(key crypto.PublicKey, algorithm AlgorithmKey) (*crypto.Hash, *RSASchemeKey, error) {
