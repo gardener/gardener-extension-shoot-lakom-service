@@ -171,29 +171,34 @@ var _ = Describe("Actuator", func() {
 	})
 
 	Context("getClientKeys", func() {
-		It("Should return the secret when the resource is correct", func() {
-			ctx := context.TODO()
-			fakeclient := fakeclient.NewFakeClient()
-			resourceName := "resourceName"
-			refSecretName := "ref-lakom-secret"
-			secretName := "lakom-secret"
-			namespace := "namespace"
-			secretData := []byte("random")
-
-			data := make(map[string][]byte)
-			data["keys"] = []byte(secretData)
-
-			secret1 := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      refSecretName,
-					Namespace: namespace,
-				},
-				Data: data,
-			}
-
-			fakeclient.Create(ctx, secret1)
-
-			resources := []corev1beta1.NamedResourceReference{
+		const (
+			resourceName             = "trusted-keys"
+			resourceNoKeysName       = resourceName + "-no-keys"
+			secretName               = "lakom-secret"
+			prefixedSecretName       = v1beta1constants.ReferencedResourcesPrefix + secretName
+			secretNoKeysName         = secretName + "-no-keys"
+			prefixedSecretNoKeysName = v1beta1constants.ReferencedResourcesPrefix + secretNoKeysName
+			namespace                = "shoot--local--local"
+		)
+		var (
+			ctx        = context.TODO()
+			fakeclient = fakeclient.NewFakeClient()
+			secretData = []byte(`- name: test-01
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
+    On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
+    -----END PUBLIC KEY-----
+- name: test-02
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
+    hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
+    -----END PUBLIC KEY-----
+`)
+			resources = []corev1beta1.NamedResourceReference{
 				{
 					Name: resourceName,
 					ResourceRef: autoscalingv1.CrossVersionObjectReference{
@@ -202,11 +207,80 @@ var _ = Describe("Actuator", func() {
 						APIVersion: "v1",
 					},
 				},
+				{
+					Name: resourceNoKeysName,
+					ResourceRef: autoscalingv1.CrossVersionObjectReference{
+						Kind:       "Secret",
+						Name:       secretNoKeysName,
+						APIVersion: "v1",
+					},
+				},
 			}
+			data       = make(map[string][]byte)
+			dataNoKeys = make(map[string][]byte)
+		)
 
+		data["keys"] = secretData
+		// When resources are registered in the shoot spec,
+		// they get copied by Gardener to the shoot namespace but
+		// prefixed with some string to avoid collisions.
+		// v1beta1constants.ReferencedResourcePrefix is the aforementioned prefix.
+		//
+		// More info can be found here: https://github.com/gardener/gardener/blob/master/docs/extensions/referenced-resources.md
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      prefixedSecretName,
+				Namespace: namespace,
+			},
+			Data: data,
+		}
+		secretNoKeys := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      prefixedSecretNoKeysName,
+				Namespace: namespace,
+			},
+			Data: dataNoKeys,
+		}
+
+		fakeclient.Create(ctx, secret)
+		fakeclient.Create(ctx, secretNoKeys)
+
+		It("Should return the secret when the resource is correct", func() {
 			result, err := getClientKeys(ctx, fakeclient, resources, resourceName, namespace)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(secretData))
+		})
+
+		It("Should return an err if the resource is not found", func() {
+			_, err := getClientKeys(ctx, fakeclient, resources[0:0], resourceName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to find referenced resource with name " + resourceName))
+		})
+
+		It("Should return an err if the reference is found but the resource with the given name is not found", func() {
+			resourcesWrongName := resources
+			wrongName := "non-existant"
+			prefixedWrongName := v1beta1constants.ReferencedResourcesPrefix + wrongName
+			resourcesWrongName[0].ResourceRef.Name = "non-existant"
+
+			_, err := getClientKeys(ctx, fakeclient, resourcesWrongName, resourceName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to read referenced secret " + prefixedWrongName + " for reference " + resourceName))
+		})
+
+		It("Should return an err if the reference is found, but its kind is not 'Secret'", func() {
+			resourcesWrongType := resources
+			resourcesWrongType[0].ResourceRef.Kind = "ConfigMap"
+
+			_, err := getClientKeys(ctx, fakeclient, resourcesWrongType, resourceName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("references resource with name " + resourceName + " is not of kind 'Secret'"))
+		})
+
+		It("Should return an err if the Secret does not contains a 'keys' key in its data", func() {
+			_, err := getClientKeys(ctx, fakeclient, resources, resourceNoKeysName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("secret " + namespace + "/" + prefixedSecretNoKeysName + " is missing date key 'keys'"))
 		})
 	})
 
