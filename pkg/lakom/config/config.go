@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
@@ -92,45 +93,29 @@ func (c *Config) Complete() (*CompletedConfig, error) {
 	return &res, nil
 }
 
-type PK interface {
-	Equal(x crypto.PublicKey) bool
-}
-
-// uniqueKeys returns a new VerifierKey array that contains only the unique
-// keys from 'keys'.
-//
-// Equality between the keys is achieved via the 'Equal' function that we know
-// is implemented for every public key type. Ref: https://pkg.go.dev/crypto#PublicKey
-// Thus, casting all the keys to the PK interface enables us to call the function.
+// uniquekeys returns the unique set of [VerifierKey] items.
 func uniqueKeys(keys []VerifierKey) []VerifierKey {
-	var res []VerifierKey
-	var idxUniq []int
+	result := make([]VerifierKey, 0)
 
-	var keysCast []PK
-	for _, k := range keys {
-		keysCast = append(keysCast, k.Key.(PK))
-	}
-
-	for idx, k1 := range keysCast {
-		uniq := true
-		for _, uniqIdx := range idxUniq {
-			k2 := keysCast[uniqIdx]
-			if k1.Equal(k2) {
-				uniq = false
-				break
-			}
+	for _, item := range keys {
+		// Equality check between the keys is achieved via the 'Equal'
+		// function that we know is implemented for every public key type.
+		// Ref: https://pkg.go.dev/crypto#PublicKey
+		// We cast to the interface to inform the compiler of the func.
+		key, ok := item.Key.(interface{ Equal(x crypto.PublicKey) bool })
+		if !ok {
+			continue
 		}
 
-		if uniq {
-			idxUniq = append(idxUniq, idx)
+		predicate := func(other VerifierKey) bool {
+			return key.Equal(other.Key)
+		}
+		if !slices.ContainsFunc(result, predicate) {
+			result = append(result, item)
 		}
 	}
 
-	for _, idx := range idxUniq {
-		res = append(res, keys[idx])
-	}
-
-	return res
+	return result
 }
 
 func parseAlgorithm(key crypto.PublicKey, algorithm AlgorithmKey) (*crypto.Hash, *RSASchemeKey, error) {
