@@ -44,7 +44,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CosignPublicKeys is the cosign public keys used to verify image signatures.</p>
+<p>TrustedKeysResourceName is the name of the shoot resource providing additional cosign public keys for image signature validation.</p>
 </td>
 </tr>
 </tbody>
