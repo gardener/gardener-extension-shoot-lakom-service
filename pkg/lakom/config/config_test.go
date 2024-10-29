@@ -29,9 +29,9 @@ var _ = Describe("Complete Lakom Config", func() {
     hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
     -----END PUBLIC KEY-----
 `)
-			config *Config
+			config     *Config
+			parsedKeys []Key
 		)
-		var parsedKeys []Key
 		err := yaml.Unmarshal(rawKeys, &parsedKeys)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -41,6 +41,7 @@ var _ = Describe("Complete Lakom Config", func() {
 
 		It("should not remove keys if they are different", func() {
 			config.PublicKeys = parsedKeys
+
 			completedConfig, err := config.Complete()
 			Expect(err).ToNot(HaveOccurred())
 
