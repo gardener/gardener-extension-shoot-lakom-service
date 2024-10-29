@@ -169,7 +169,8 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		}
 	}
 
-	lakomPublicKeys := append(gardenerPublicKeys, clientPublicKeys...)
+	lakomPublicKeys := gardenerPublicKeys
+	lakomPublicKeys = append(lakomPublicKeys, clientPublicKeys...)
 
 	seedResources, err := getSeedResources(
 		getLakomReplicas(controller.IsHibernationEnabled(cluster)),

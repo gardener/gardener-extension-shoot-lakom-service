@@ -242,8 +242,8 @@ var _ = Describe("Actuator", func() {
 			Data: dataNoKeys,
 		}
 
-		fakeclient.Create(ctx, secret)
-		fakeclient.Create(ctx, secretNoKeys)
+		Expect(fakeclient.Create(ctx, secret)).ToNot(HaveOccurred())
+		Expect(fakeclient.Create(ctx, secretNoKeys)).ToNot(HaveOccurred())
 
 		It("Should return the secret when the resource is correct", func() {
 			result, err := getClientKeys(ctx, fakeclient, resources, resourceName, namespace)
