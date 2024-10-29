@@ -109,6 +109,8 @@ build:
             - pkg/apis/lakom
             - pkg/apis/lakom/v1alpha1
             - pkg/constants
+            - pkg/lakom/config
+            - pkg/lakom/utils
             - VERSION
         ldflags:
           - '{{.LD_FLAGS}}'
