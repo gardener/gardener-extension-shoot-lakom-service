@@ -65,6 +65,7 @@ func (s *shoot) validateCosignPublicKeys(fldPath *field.Path, cosignPublicKeys [
 	for idx, k := range cosignPublicKeys {
 		if k.Name == "" {
 			errList = append(errList, field.Required(fldPath.Index(idx), "key name should no be empty"))
+			continue
 		}
 
 		if _, ok := usedNames[k.Name]; ok {
