@@ -267,21 +267,19 @@ var _ = Describe("Actuator", func() {
 		})
 
 		It("Should return an err if the reference is found but the resource with the given name is not found", func() {
-			resourcesWrongName := resources
 			wrongName := "non-existent"
 			prefixedWrongName := v1beta1constants.ReferencedResourcesPrefix + wrongName
-			resourcesWrongName[0].ResourceRef.Name = "non-existent"
+			resources[0].ResourceRef.Name = "non-existent"
 
-			_, err := getClientKeys(ctx, fakeclient, resourcesWrongName, resourceName, namespace)
+			_, err := getClientKeys(ctx, fakeclient, resources, resourceName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to read referenced secret " + prefixedWrongName + " for reference " + resourceName))
 		})
 
 		It("Should return an err if the reference is found, but its kind is not 'Secret'", func() {
-			resourcesWrongType := resources
-			resourcesWrongType[0].ResourceRef.Kind = "ConfigMap"
+			resources[0].ResourceRef.Kind = "ConfigMap"
 
-			_, err := getClientKeys(ctx, fakeclient, resourcesWrongType, resourceName, namespace)
+			_, err := getClientKeys(ctx, fakeclient, resources, resourceName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("references resource with name " + resourceName + " is not of kind 'Secret'"))
 		})
