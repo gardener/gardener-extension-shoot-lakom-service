@@ -270,7 +270,7 @@ var _ = Describe("Actuator", func() {
 			resourcesWrongName := resources
 			wrongName := "non-existent"
 			prefixedWrongName := v1beta1constants.ReferencedResourcesPrefix + wrongName
-			resourcesWrongName[0].ResourceRef.Name = "non-existant"
+			resourcesWrongName[0].ResourceRef.Name = "non-existent"
 
 			_, err := getClientKeys(ctx, fakeclient, resourcesWrongName, resourceName, namespace)
 			Expect(err).To(HaveOccurred())
