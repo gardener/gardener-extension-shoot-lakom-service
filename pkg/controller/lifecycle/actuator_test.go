@@ -198,6 +198,14 @@ var _ = Describe("Actuator", func() {
     hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
     -----END PUBLIC KEY-----
 `)
+			resources    []corev1beta1.NamedResourceReference
+			data         map[string][]byte
+			dataNoKeys   map[string][]byte
+			secret       *corev1.Secret
+			secretNoKeys *corev1.Secret
+		)
+
+		BeforeEach(func() {
 			resources = []corev1beta1.NamedResourceReference{
 				{
 					Name: resourceName,
@@ -216,10 +224,11 @@ var _ = Describe("Actuator", func() {
 					},
 				},
 			}
-			data       = make(map[string][]byte)
-			dataNoKeys = make(map[string][]byte)
-		)
 
+		})
+
+		data = make(map[string][]byte)
+		dataNoKeys = make(map[string][]byte)
 		data["keys"] = secretData
 		// When resources are registered in the shoot spec,
 		// they get copied by Gardener to the shoot namespace but
@@ -227,14 +236,14 @@ var _ = Describe("Actuator", func() {
 		// v1beta1constants.ReferencedResourcePrefix is the aforementioned prefix.
 		//
 		// More info can be found here: https://github.com/gardener/gardener/blob/master/docs/extensions/referenced-resources.md
-		secret := &corev1.Secret{
+		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      prefixedSecretName,
 				Namespace: namespace,
 			},
 			Data: data,
 		}
-		secretNoKeys := &corev1.Secret{
+		secretNoKeys = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      prefixedSecretNoKeysName,
 				Namespace: namespace,
