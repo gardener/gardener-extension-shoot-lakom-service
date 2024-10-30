@@ -93,7 +93,7 @@ func (c *Config) Complete() (*CompletedConfig, error) {
 	return &res, nil
 }
 
-// uniquekeys returns the unique set of [VerifierKey] items.
+// uniqueKeys returns the unique set of [VerifierKey] items.
 func uniqueKeys(keys []VerifierKey) []VerifierKey {
 	result := make([]VerifierKey, 0)
 

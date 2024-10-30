@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestCMD(t *testing.T) {
+func TestConfig(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "LakomConfig Suite")
 }

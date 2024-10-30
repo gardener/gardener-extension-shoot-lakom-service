@@ -259,7 +259,7 @@ var _ = Describe("Actuator", func() {
 
 		It("Should return an err if the reference is found but the resource with the given name is not found", func() {
 			resourcesWrongName := resources
-			wrongName := "non-existant"
+			wrongName := "non-existent"
 			prefixedWrongName := v1beta1constants.ReferencedResourcesPrefix + wrongName
 			resourcesWrongName[0].ResourceRef.Name = "non-existant"
 

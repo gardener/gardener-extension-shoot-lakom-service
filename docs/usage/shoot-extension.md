@@ -42,7 +42,7 @@ Lakom will validate all pods in all namespaces.
 
 Lakom, by default, tries to verify only workloads that belong to Gardener. Because of this, the only public keys that it uses to do its job are the ones for the Gardener workload.
 
-If you'd like to use Lakom as a tool for verifying your own workload, you'll need to add your own public keys to the ones that Lakom is already using. This can be achieved using Gardener [referenced resources](https://github.com/gardener/gardener/blob/master/docs/extensions/referenced-resources.md). More information about the keys and their format can be found [here](https://github.com/gardener/gardener-extension-shoot-lakom-service/blob/main/docs/usage/lakom.md#lakom-cosign-public-keys-configuration-file).
+If you'd like to use Lakom as a tool for verifying your own workload, you'll need to add your own public keys to the ones that Lakom is already using. This can be achieved using Gardener [referenced resources](https://github.com/gardener/gardener/blob/master/docs/extensions/referenced-resources.md). More information about the keys and their format can be found [here](lakom.md#lakom-cosign-public-keys-configuration-file).
 
 Simply:
 1. Create a secret in your project namespace that contains a field `keys` with your keys as a value. Example keys:
