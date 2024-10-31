@@ -367,8 +367,7 @@ var _ = Describe("Actuator", func() {
 					expectedSeedServiceMonitor(namespace),
 				))
 			},
-			Entry("Kubernetes version < 1.26", semver.MustParse("1.25.0"), false, false, false, false),
-			Entry("Kubernetes version >= 1.26", semver.MustParse("1.26.0"), true, false, false, false),
+			Entry("Kubernetes version >= 1.27", semver.MustParse("1.27.0"), true, false, false, false),
 			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false),
 			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false),
 			Entry("Allow insecure registries", semver.MustParse("1.29.0"), true, false, false, true),
