@@ -57,7 +57,6 @@ func (s *shoot) validateScopeType(fldPath *field.Path, scopeType lakom.ScopeType
 	return errList
 }
 
-// TODO: This check exists in the validation of the lakom config as well. It can be extracted as a util function
 func (s *shoot) validateCosignPublicKeys(fldPath *field.Path, cosignPublicKeys []config.Key) field.ErrorList {
 	errList := field.ErrorList{}
 
