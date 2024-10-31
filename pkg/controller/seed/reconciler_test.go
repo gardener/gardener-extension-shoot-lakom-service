@@ -111,8 +111,7 @@ var _ = Describe("Reconciler", func() {
 					expectedVPA(namespace),
 				))
 			},
-			Entry("Kubernetes version < 1.26", "1.25.0", false, false, false, false),
-			Entry("Kubernetes version >= 1.26", "1.26.0", true, false, false, false),
+			Entry("Kubernetes version >= 1.27", "1.27.0", true, false, false, false),
 			Entry("Use only image pull secrets", "1.27.0", true, true, false, false),
 			Entry("Allow untrusted images", "1.28.0", true, false, true, false),
 			Entry("Allow insecure registries", "1.29.0", true, false, true, true),
