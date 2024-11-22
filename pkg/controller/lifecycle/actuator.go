@@ -20,7 +20,9 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
+	corev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
+	v1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
@@ -153,10 +155,22 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		image.Tag = ptr.To[string](version.Get().GitVersion)
 	}
 
-	lakomConfig, err := yaml.JSONToYAML(a.serviceConfig.CosignPublicKeys.Raw)
+	gardenerPublicKeys, err := yaml.JSONToYAML(a.serviceConfig.CosignPublicKeys.Raw)
 	if err != nil {
 		return fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
 	}
+
+	var clientPublicKeys []byte
+	if lakomProviderConfig.TrustedKeysResourceName != nil {
+		var err error
+		clientPublicKeys, err = getClientKeys(ctx, a.client, cluster.Shoot.Spec.Resources, *lakomProviderConfig.TrustedKeysResourceName, namespace)
+		if err != nil {
+			return fmt.Errorf("failed to get the additional keys: %w", err)
+		}
+	}
+
+	lakomPublicKeys := gardenerPublicKeys
+	lakomPublicKeys = append(lakomPublicKeys, clientPublicKeys...)
 
 	seedResources, err := getSeedResources(
 		getLakomReplicas(controller.IsHibernationEnabled(cluster)),
@@ -164,7 +178,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		extensions.GenericTokenKubeconfigSecretNameFromCluster(cluster),
 		lakomShootAccessSecret.Secret.Name,
 		generatedSecrets[constants.WebhookTLSSecretName].Name,
-		string(lakomConfig),
+		string(lakomPublicKeys),
 		image.String(),
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
@@ -693,6 +707,34 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 	}
 
 	return shootResources, nil
+}
+
+func getClientKeys(ctx context.Context, client client.Client, resources []corev1beta1.NamedResourceReference, resourceName, namespace string) ([]byte, error) {
+	ref := v1beta1helper.GetResourceByName(resources, resourceName)
+	if ref == nil {
+		return nil, fmt.Errorf("failed to find referenced resource with name %s", resourceName)
+	}
+	if ref.ResourceRef.Kind != "Secret" {
+		return nil, fmt.Errorf("references resource with name %s is not of kind 'Secret'", resourceName)
+	}
+
+	refSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ref.ResourceRef.Name,
+			Namespace: namespace,
+		},
+	}
+
+	if err := controller.GetObjectByReference(ctx, client, &ref.ResourceRef, namespace, refSecret); err != nil {
+		return nil, fmt.Errorf("failed to read referenced secret %s%s for reference %s: %w", v1beta1constants.ReferencedResourcesPrefix, ref.ResourceRef.Name, resourceName, err)
+	}
+
+	clientKeys, ok := refSecret.Data["keys"]
+	if !ok {
+		return nil, fmt.Errorf("secret %s/%s is missing data key 'keys'", refSecret.Namespace, refSecret.Name)
+	}
+
+	return clientKeys, nil
 }
 
 func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string) client.Object {

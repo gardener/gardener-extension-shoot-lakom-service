@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
@@ -87,7 +88,34 @@ func (c *Config) Complete() (*CompletedConfig, error) {
 		res.Keys = append(res.Keys, config)
 	}
 
+	res.Keys = uniqueKeys(res.Keys)
+
 	return &res, nil
+}
+
+// uniqueKeys returns the unique set of [VerifierKey] items.
+func uniqueKeys(keys []VerifierKey) []VerifierKey {
+	result := make([]VerifierKey, 0)
+
+	for _, item := range keys {
+		// Equality check between the keys is achieved via the 'Equal'
+		// function that we know is implemented for every public key type.
+		// Ref: https://pkg.go.dev/crypto#PublicKey
+		// We cast to the interface to inform the compiler of the func.
+		key, ok := item.Key.(interface{ Equal(x crypto.PublicKey) bool })
+		if !ok {
+			continue
+		}
+
+		predicate := func(other VerifierKey) bool {
+			return key.Equal(other.Key)
+		}
+		if !slices.ContainsFunc(result, predicate) {
+			result = append(result, item)
+		}
+	}
+
+	return result
 }
 
 func parseAlgorithm(key crypto.PublicKey, algorithm AlgorithmKey) (*crypto.Hash, *RSASchemeKey, error) {

@@ -51,6 +51,11 @@ publicKeys:
     -----END PUBLIC KEY-----
 ```
 
+Here:
+- `name` is logical human friendly name of the key.
+- `algorithm` is the algorithm that has to be used to verify the signature, see [Supported RSA Signature Verification Algorithms](#supported-rsa-signature-verification-algorithms) for the list of supported algorithms.
+- `key` is the cryptographic public key that will be used for image signature validation.
+
 ### Supported RSA Signature Verification Algorithms
 
 - `RSASSA-PKCS1-v1_5-SHA256`: uses `RSASSA-PKCS1-v1_5` scheme with `SHA256` hash func
