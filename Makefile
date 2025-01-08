@@ -93,7 +93,6 @@ tidy:
 	@cp $(GARDENER_HACK_DIR)/.ci/* $(REPO_ROOT)/.ci/hack/
 	@chmod +xw $(REPO_ROOT)/.ci/hack/*
 	@cp $(GARDENER_HACK_DIR)/cherry-pick-pull.sh $(HACK_DIR)/cherry-pick-pull.sh && chmod +xw $(HACK_DIR)/cherry-pick-pull.sh
-	@cp $(GARDENER_HACK_DIR)/sast.sh $(HACK_DIR)/sast.sh && chmod +xw $(HACK_DIR)/sast.sh
 #	@$(HACK_DIR)/update-github-templates.sh
 
 .PHONY: clean
@@ -123,12 +122,12 @@ format: $(GOIMPORTSREVISER)
 		bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test
 
 .PHONY: sast
-sast: tidy $(GOSEC)
-	@$(HACK_DIR)/sast.sh
+sast: $(GOSEC)
+	@bash $(GARDENER_HACK_DIR)/sast.sh
 
 .PHONY: sast-report
-sast-report: tidy $(GOSEC)
-	@$(HACK_DIR)/sast.sh --gosec-report true
+sast-report: $(GOSEC)
+	@bash $(GARDENER_HACK_DIR)/sast.sh --gosec-report true
 
 .PHONY: test
 test: $(REPORT_COLLECTOR)
