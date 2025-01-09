@@ -164,7 +164,11 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logger) error {
 	logger.Info("Handling new pod request")
 
-	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, p, h.useOnlyImagePullSecrets)
+	var secretNames []string
+	for _, ips := range p.Spec.ImagePullSecrets {
+		secretNames = append(secretNames, ips.Name)
+	}
+	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, p.Namespace, secretNames, h.useOnlyImagePullSecrets)
 
 	for idx, ic := range p.Spec.InitContainers {
 		image, err := h.handleContainer(ctx, ic.Image, kcr, logger.WithValues("initContainer", ic.Name))

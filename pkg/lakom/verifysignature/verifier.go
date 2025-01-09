@@ -39,13 +39,13 @@ func NewDirectVerifier(keys lakomconfig.CompletedConfig, allowInsecureRegistries
 	return dv
 }
 
-// Verify check if image is signed by at least one of the configured cosign public keys.
-func (r *directVerifier) Verify(ctx context.Context, image string, kcr utils.KeyChainReader) (bool, error) {
+// Verify check if artifact is signed by at least one of the configured cosign public keys.
+func (r *directVerifier) Verify(ctx context.Context, artifact string, kcr utils.KeyChainReader) (bool, error) {
 	opts := []name.Option{}
 	if r.insecure {
 		opts = append(opts, name.Insecure)
 	}
-	imageRef, err := name.ParseReference(image, opts...)
+	artifactRef, err := name.ParseReference(artifact, opts...)
 	if err != nil {
 		return false, err
 	}
@@ -61,12 +61,12 @@ func (r *directVerifier) Verify(ctx context.Context, image string, kcr utils.Key
 		remote.WithAuthFromKeychain(keyChain),
 	)
 
-	return verify(ctx, imageRef, r.publicKeys, remoteOpts)
+	return verify(ctx, artifactRef, r.publicKeys, remoteOpts)
 }
 
-func verify(ctx context.Context, imageRef name.Reference, keys lakomconfig.CompletedConfig, opts ...ociremote.Option) (bool, error) {
-	if _, ok := imageRef.(name.Digest); !ok {
-		return false, fmt.Errorf("image reference is not a digest, reference: %q", imageRef.Name())
+func verify(ctx context.Context, artifactRef name.Reference, keys lakomconfig.CompletedConfig, opts ...ociremote.Option) (bool, error) {
+	if _, ok := artifactRef.(name.Digest); !ok {
+		return false, fmt.Errorf("artifact reference is not a digest, reference: %q", artifactRef.Name())
 	}
 
 	logger := logf.FromContext(ctx)
@@ -95,7 +95,7 @@ func verify(ctx context.Context, imageRef name.Reference, keys lakomconfig.Compl
 			continue
 		}
 
-		checkedSignatures, _, err := cosign.VerifyImageSignatures(ctx, imageRef, &cosign.CheckOpts{
+		checkedSignatures, _, err := cosign.VerifyImageSignatures(ctx, artifactRef, &cosign.CheckOpts{
 			RegistryClientOpts: opts,
 			SigVerifier:        verifier,
 			ClaimVerifier:      cosign.SimpleClaimVerifier,
@@ -104,7 +104,7 @@ func verify(ctx context.Context, imageRef name.Reference, keys lakomconfig.Compl
 		})
 		if err != nil {
 			if IsNoSignaturesFound(err) {
-				log.Info("No signatures found for the image", "error", err.Error())
+				log.Info("No signatures found for the artifact", "error", err.Error())
 				return false, nil
 			}
 
@@ -153,19 +153,19 @@ func NewCacheVerifier(cache SignatureVerificationResultCache, verifier Verifier)
 	return cv
 }
 
-// Verify check cosign signature of an image. Firstly it checks if the cache have an entry
-// for the verification state of the image and returns it. If the cache have no entry,
+// Verify check cosign signature of an artifact. Firstly it checks if the cache have an entry
+// for the verification state of the artifact and returns it. If the cache have no entry,
 // it uses the verifier to do the real verification, persists the result in the cache and return it.
-func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyChainReader) (bool, error) {
-	verified, found := r.cache.GetSignatureVerificationResult(image)
+func (r *cacheVerifier) Verify(ctx context.Context, artifact string, kcr utils.KeyChainReader) (bool, error) {
+	verified, found := r.cache.GetSignatureVerificationResult(artifact)
 	if found {
 		metrics.ImageSignatureCache.WithLabelValues(metrics.CacheHit).Inc()
 		return verified, nil
 	}
 
-	defer r.requestGroup.Forget(image)
-	v, err, _ := r.requestGroup.Do(image, func() (any, error) {
-		verified, err := r.actualVerifier.Verify(ctx, image, kcr)
+	defer r.requestGroup.Forget(artifact)
+	v, err, _ := r.requestGroup.Do(artifact, func() (any, error) {
+		verified, err := r.actualVerifier.Verify(ctx, artifact, kcr)
 		if err != nil {
 			return false, err
 		}
@@ -178,7 +178,7 @@ func (r *cacheVerifier) Verify(ctx context.Context, image string, kcr utils.KeyC
 	// Casting is safe here
 	verified = v.(bool)
 	metrics.ImageSignatureCache.WithLabelValues(metrics.CacheMiss).Inc()
-	r.cache.StoreSignatureVerificationResult(image, verified)
+	r.cache.StoreSignatureVerificationResult(artifact, verified)
 	return verified, nil
 }
 
