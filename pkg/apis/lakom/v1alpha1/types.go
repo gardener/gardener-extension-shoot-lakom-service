@@ -19,4 +19,7 @@ type LakomConfig struct {
 	// The scope in which lakom will verify pods
 	// +optional
 	Scope *lakom.ScopeType `json:"scope"`
+	// TrustedKeysResourceName is the name of the shoot resource providing additional cosign public keys for image signature validation.
+	// +optional
+	TrustedKeysResourceName *string `json:"trustedKeysResourceName,omitempty"`
 }

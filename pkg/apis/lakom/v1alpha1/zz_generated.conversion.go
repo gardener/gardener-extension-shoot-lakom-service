@@ -39,6 +39,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1alpha1_LakomConfig_To_lakom_LakomConfig(in *LakomConfig, out *lakom.LakomConfig, s conversion.Scope) error {
 	out.Scope = (*lakom.ScopeType)(unsafe.Pointer(in.Scope))
+	out.TrustedKeysResourceName = (*string)(unsafe.Pointer(in.TrustedKeysResourceName))
 	return nil
 }
 
@@ -49,6 +50,7 @@ func Convert_v1alpha1_LakomConfig_To_lakom_LakomConfig(in *LakomConfig, out *lak
 
 func autoConvert_lakom_LakomConfig_To_v1alpha1_LakomConfig(in *lakom.LakomConfig, out *LakomConfig, s conversion.Scope) error {
 	out.Scope = (*lakom.ScopeType)(unsafe.Pointer(in.Scope))
+	out.TrustedKeysResourceName = (*string)(unsafe.Pointer(in.TrustedKeysResourceName))
 	return nil
 }
 

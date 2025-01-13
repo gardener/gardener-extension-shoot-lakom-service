@@ -35,6 +35,18 @@ github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom.ScopeT
 <p>The scope in which lakom will verify pods</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>trustedKeysResourceName</code></br>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TrustedKeysResourceName is the name of the shoot resource providing additional cosign public keys for image signature validation.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <hr/>
