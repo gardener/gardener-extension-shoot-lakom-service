@@ -46,6 +46,8 @@ webhooks:
     resources:
     - pods
     - pods/ephemeralcontainers
+    - controllerdeployments
+    - gardenlets
     scope: '*'
   sideEffects: None
   timeoutSeconds: 25
