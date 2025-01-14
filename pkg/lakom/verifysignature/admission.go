@@ -180,7 +180,7 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 	}
 
 	verificationTargets := h.extractVerificationTargets(ctx, request)
-	logger := h.logger.WithValues(request.Kind, client.ObjectKey{Namespace: request.Namespace, Name: request.Name})
+	logger := h.logger.WithValues(request.Kind.Kind, client.ObjectKey{Namespace: request.Namespace, Name: request.Name})
 
 	if err := h.validateResource(ctx, logger, verificationTargets); err != nil {
 		if h.allowUntrustedImages {
