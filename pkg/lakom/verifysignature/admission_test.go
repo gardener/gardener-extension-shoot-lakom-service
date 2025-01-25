@@ -30,7 +30,6 @@ import (
 var (
 	deploymentGVK = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
 	podGVK        = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
-	imageDigest   = "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429"
 
 	ctrl      *gomock.Controller
 	mgr       *mockmanager.MockManager
