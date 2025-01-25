@@ -31,7 +31,6 @@ import (
 	"github.com/sigstore/cosign/v2/pkg/oci/signed"
 	"github.com/sigstore/cosign/v2/pkg/oci/static"
 	"github.com/sigstore/sigstore/pkg/signature"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
