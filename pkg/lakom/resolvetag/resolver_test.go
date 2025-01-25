@@ -10,6 +10,7 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -50,8 +51,8 @@ var _ = Describe("Resolver", func() {
 
 	Describe("Direct Resolver", func() {
 		DescribeTable("Directly resolve images",
-			func(image, expectedImage string, expectTagParsingError, expectResolvingError bool, errorMessage string) {
-				tagRef, err := name.NewTag(image)
+			func(image, expectedImage *string, expectTagParsingError, expectResolvingError bool, errorMessage string) {
+				tagRef, err := name.NewTag(*image)
 				if expectTagParsingError {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring(errorMessage))
@@ -67,21 +68,20 @@ var _ = Describe("Resolver", func() {
 				}
 
 				Expect(err).ToNot(HaveOccurred())
-				Expect(resolvedImage).To(Equal(expectedImage))
+				Expect(resolvedImage).To(Equal(*expectedImage))
 			},
-			Entry("[GCR] Resolve tag to digest", "registry.k8s.io/pause:3.7", "registry.k8s.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c", false, false, ""),
-			Entry("[Docker Hub] Resolve tag to digest", "index.docker.io/library/alpine:3.10.0", "index.docker.io/library/alpine@sha256:ca1c944a4f8486a153024d9965aafbe24f5723c1d5c02f4964c045a16d19dc54", false, false, ""),
-			Entry("Do not run actual resolving of image with digest", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", true, false, ""),
-			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", "", true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
-			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", "", true, false, "tag can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-.ABCDEFGHIJKLMNOPQRSTUVWXYZ`"),
-			Entry("Fail to get non-existing image", "europe-docker.pkg.dev/gardener-project/releases/non-existing-image:123", "", false, true, "unexpected status code 404 Not Found"),
+			Entry("Resolve tag to digest", &signedImageTagRef, &signedImageFullRef, false, false, ""),
+			Entry("Do not run actual resolving of image with digest", &signedImageFullRef, &signedImageFullRef, true, false, ""),
+			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), ptr.To(""), true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
+			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), ptr.To(""), true, false, "tag can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-.ABCDEFGHIJKLMNOPQRSTUVWXYZ`"),
+			Entry("Fail to get non-existing image", &nonExistantImageTagRef, ptr.To(""), false, true, "unexpected status code 404 Not Found"),
 		)
 	})
 
 	Describe("Cache Resolver", func() {
 		DescribeTable("Directly resolve images and ensure result is cached",
-			func(image, expectedImage string, expectTagParsingError, expectResolvingError bool, errorMessage string) {
-				tagRef, err := name.NewTag(image)
+			func(image, expectedImage *string, expectTagParsingError, expectResolvingError bool, errorMessage string) {
+				tagRef, err := name.NewTag(*image)
 				if expectTagParsingError {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring(errorMessage))
@@ -97,17 +97,16 @@ var _ = Describe("Resolver", func() {
 				}
 
 				Expect(err).ToNot(HaveOccurred())
-				Expect(resolvedImage).To(Equal(expectedImage))
-				cachedImage, got := cache.GetDigest(image)
+				Expect(resolvedImage).To(Equal(*expectedImage))
+				cachedImage, got := cache.GetDigest(*image)
 				Expect(got).To(BeTrue())
-				Expect(cachedImage).To(Equal(expectedImage))
+				Expect(cachedImage).To(Equal(*expectedImage))
 			},
-			Entry("[GCR] Resolve tag to digest", "registry.k8s.io/pause:3.7", "registry.k8s.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c", false, false, ""),
-			Entry("[Docker Hub] Resolve tag to digest", "index.docker.io/library/alpine:3.10.0", "index.docker.io/library/alpine@sha256:ca1c944a4f8486a153024d9965aafbe24f5723c1d5c02f4964c045a16d19dc54", false, false, ""),
-			Entry("Do not run actual resolving of image with digest", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", true, false, ""),
-			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", "", true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
-			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", "", true, false, "tag can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-.ABCDEFGHIJKLMNOPQRSTUVWXYZ`"),
-			Entry("Fail to get non-existing image", "europe-docker.pkg.dev/gardener-project/releases/non-existing-image:123", "", false, true, "unexpected status code 404 Not Found"),
+			Entry("Resolve tag to digest", &signedImageTagRef, &signedImageFullRef, false, false, ""),
+			Entry("Do not run actual resolving of image with digest", &signedImageFullRef, &signedImageFullRef, true, false, ""),
+			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), ptr.To(""), true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
+			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), ptr.To(""), true, false, "tag can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-.ABCDEFGHIJKLMNOPQRSTUVWXYZ`"),
+			Entry("Fail to get non-existing image", &nonExistantImageTagRef, ptr.To(""), false, true, "unexpected status code 404 Not Found"),
 		)
 
 		It("Should uses the cache to resolve the image", func() {
