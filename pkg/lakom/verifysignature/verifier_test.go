@@ -7,14 +7,17 @@ package verifysignature_test
 import (
 	"context"
 	"fmt"
+
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
+	"k8s.io/utils/ptr"
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/authn"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
@@ -39,13 +42,6 @@ var _ = Describe("Verifier", func() {
 	const (
 		refresh = time.Millisecond * 100
 		ttl     = time.Second
-
-		// source: https://github.com/sigstore/cosign/releases/download/v1.11.1/release-cosign.pub
-		cosignPublicKey = `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhyQCx0E9wQWSFI9ULGwy3BuRklnt
-IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
------END PUBLIC KEY-----
-`
 	)
 
 	var (
@@ -64,8 +60,8 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			PublicKeys: []config.Key{
 				{
 					Name:      "test",
-					Key:       cosignPublicKey,
-					Algorithm: config.RSAPKCS1v15SHA256,
+					Key:       publicKey,
+					Algorithm: "",
 				},
 			},
 		}
@@ -85,12 +81,28 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			Expect(err).ToNot(HaveOccurred())
 			Expect(keys).ToNot(BeZero())
 
+			// Interesting detail. Altough we've created the verifier to not allow insecure registries,
+			// (the `false` that is passed as a second argument), go-containerregistry still allows insecure
+			// connections if the registry is specifically `localhost`. Don't remember where the code for
+			// this logic was but I remember seeing it.
+			//
+			// Thus when testing the fake registry on localhost, the `false` here does not matter.
 			directVerifier = verifysignature.NewDirectVerifier(*lakomConfig, false)
 		})
 
 		DescribeTable("Verify images",
-			func(image string, expectedVerificationResult, expectErr bool, errorMessage string) {
-				verified, err := directVerifier.Verify(ctx, image, kcr)
+			// The image variable is a pointer to a string because for some unknown reason
+			// when a string variable is passed to the `Entry` function, a copy of the string object gets used
+			// rather than the original object.
+			//
+			// This means that if a string variable (maybe any type of variable?) is passed to the `Entry` function, it will be copied and
+			// subsequent changes to it will not be reflected in the test.
+			// Since `signedImageTag` gets declared first but initialized after Ginkgo builds the spec tree,
+			// it will be nil when the `Entry` function is called.
+			//
+			// This might also be some sort of golang quirk? But I highly doubt it.
+			func(image *string, expectedVerificationResult, expectErr bool, errorMessage string) {
+				verified, err := directVerifier.Verify(ctx, *image, kcr)
 				if expectErr {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring(errorMessage))
@@ -99,18 +111,18 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 					Expect(verified).To(Equal(expectedVerificationResult))
 				}
 			},
-			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", false, true, "could not parse reference"),
-			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", false, true, "could not parse reference"),
-			Entry("Refuse to verify image not using digest", "registry.k8s.io/pause:3.7", false, true, "image reference is not a digest"),
-			Entry("Successfully verify signed image", "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429", true, false, ""),
-			Entry("Successfully verify unsigned image", "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", false, false, ""),
+			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), false, true, "could not parse reference"),
+			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), false, true, "could not parse reference"),
+			Entry("Refuse to verify image not using digest", ptr.To("registry.k8s.io/pause:3.7"), false, true, "image reference is not a digest"),
+			Entry("Successfully verify signed image", &signedImageTag, true, false, ""),
+			Entry("Fail signature check when image exists but it has not been signed", &nonSignedImageTag, false, false, ""),
 		)
 
 		It("Should fail image verification when context is canceled", func() {
 			canceledCtx, cancel := context.WithCancel(ctx)
 			cancel()
 
-			verified, err := directVerifier.Verify(canceledCtx, "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", kcr)
+			verified, err := directVerifier.Verify(canceledCtx, signedImageTag, kcr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("context canceled"))
 			Expect(verified).To(BeFalse())
@@ -135,31 +147,31 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 		})
 
 		DescribeTable("Verify images",
-			func(image string, expectedVerificationResult, expectErr bool, errorMessage string) {
-				_, got := cache.GetSignatureVerificationResult(image)
+			func(image *string, expectedVerificationResult, expectErr bool, errorMessage string) {
+				_, got := cache.GetSignatureVerificationResult(*image)
 				Expect(got).To(BeFalse())
 
-				verified, err := cachedVerifier.Verify(ctx, image, kcr)
+				verified, err := cachedVerifier.Verify(ctx, *image, kcr)
 				if expectErr {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring(errorMessage))
 
-					_, got := cache.GetSignatureVerificationResult(image)
+					_, got := cache.GetSignatureVerificationResult(*image)
 					Expect(got).To(BeFalse())
 				} else {
 					Expect(err).ToNot(HaveOccurred())
 					Expect(verified).To(Equal(expectedVerificationResult))
 
-					cachedResult, got := cache.GetSignatureVerificationResult(image)
+					cachedResult, got := cache.GetSignatureVerificationResult(*image)
 					Expect(got).To(BeTrue())
 					Expect(cachedResult).To(Equal(verified))
 				}
 			},
-			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", false, true, "could not parse reference"),
-			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", false, true, "could not parse reference"),
-			Entry("Refuse to verify image not using digest", "registry.k8s.io/pause:3.7", false, true, "image reference is not a digest"),
-			Entry("Successfully verify signed image", "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429", true, false, ""),
-			Entry("Successfully verify unsigned image", "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", false, false, ""),
+			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), false, true, "could not parse reference"),
+			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), false, true, "could not parse reference"),
+			Entry("Refuse to verify image not using digest", ptr.To("registry.k8s.io/pause:3.7"), false, true, "image reference is not a digest"),
+			Entry("Successfully verify signed image", &signedImageTag, true, false, ""),
+			Entry("Fail signature check when image exists but it has not been signed", &nonSignedImageTag, false, false, ""),
 		)
 
 		It("Should not run real validation for cached result", func() {
@@ -179,7 +191,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			canceledCtx, cancel := context.WithCancel(ctx)
 			cancel()
 
-			image := "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e" // #nosec G101
+			image := nonSignedImageTag
 			verified, err := cachedVerifier.Verify(canceledCtx, image, kcr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("context canceled"))

@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"time"
 
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
@@ -48,24 +47,10 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 		},
 	}
 
-	scheme    *runtime.Scheme
 	ctrl      *gomock.Controller
 	mgr       *mockmanager.MockManager
 	apiReader *mockclient.MockReader
 )
-
-var _ = BeforeSuite(func() {
-	scheme = runtime.NewScheme()
-	err := corev1.AddToScheme(scheme)
-	Expect(err).ToNot(HaveOccurred())
-
-	dirPath, err := os.MkdirTemp("", "verifysignature_test")
-	Expect(err).ToNot(HaveOccurred())
-	DeferCleanup(func() {
-		err := os.RemoveAll(dirPath)
-		Expect(err).ToNot(HaveOccurred())
-	})
-})
 
 var _ = Describe("Admission Handler", func() {
 	var (
