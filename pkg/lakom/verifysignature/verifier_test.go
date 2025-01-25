@@ -77,10 +77,6 @@ var _ = Describe("Verifier", func() {
 			directVerifier verifysignature.Verifier
 		)
 		BeforeEach(func() {
-			keys, err := utils.GetCosignPublicKeys([]byte(cosignPublicKey))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(keys).ToNot(BeZero())
-
 			// Interesting detail. Altough we've created the verifier to not allow insecure registries,
 			// (the `false` that is passed as a second argument), go-containerregistry still allows insecure
 			// connections if the registry is specifically `localhost`. Don't remember where the code for
@@ -133,12 +129,9 @@ var _ = Describe("Verifier", func() {
 		var (
 			cache          verifysignature.SignatureVerificationResultCache
 			cachedVerifier verifysignature.Verifier
+			err            error
 		)
 		BeforeEach(func() {
-			keys, err := utils.GetCosignPublicKeys([]byte(cosignPublicKey))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(keys).ToNot(BeZero())
-
 			cache, err = verifysignature.NewSignatureVerificationResultCache(refresh, ttl)
 			Expect(err).ToNot(HaveOccurred())
 
