@@ -28,24 +28,9 @@ import (
 )
 
 var (
-	deploymentGVK   = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
-	podGVK          = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
-	imageDigest     = "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429"
-	cosignPublicKey = `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhyQCx0E9wQWSFI9ULGwy3BuRklnt
-IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
------END PUBLIC KEY-----
-`
-
-	cosignConfig = lakomconfig.Config{
-		PublicKeys: []lakomconfig.Key{
-			{
-				Name:      "test",
-				Key:       cosignPublicKey,
-				Algorithm: lakomconfig.RSAPKCS1v15SHA256,
-			},
-		},
-	}
+	deploymentGVK = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
+	podGVK        = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
+	imageDigest   = "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429"
 
 	ctrl      *gomock.Controller
 	mgr       *mockmanager.MockManager
@@ -54,10 +39,11 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 
 var _ = Describe("Admission Handler", func() {
 	var (
-		ctx     = context.Background()
-		logger  logr.Logger
-		handler admission.Handler
-		pod     = &corev1.Pod{
+		ctx          = context.Background()
+		logger       logr.Logger
+		handler      admission.Handler
+		cosignConfig lakomconfig.Config
+		pod          = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "pod-namespace",
 				Name:      "pod-name",
@@ -65,7 +51,7 @@ var _ = Describe("Admission Handler", func() {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:  "container",
-					Image: imageDigest,
+					Image: signedImageTag,
 				}},
 			},
 		}
@@ -90,6 +76,15 @@ var _ = Describe("Admission Handler", func() {
 		mgr.EXPECT().GetScheme().Return(scheme)
 
 		logger = logzap.New(logzap.WriteTo(GinkgoWriter))
+		cosignConfig = lakomconfig.Config{
+			PublicKeys: []lakomconfig.Key{
+				{
+					Name:      "test",
+					Key:       publicKey,
+					Algorithm: "",
+				},
+			},
+		}
 		h, err := verifysignature.
 			NewHandleBuilder().
 			WithManager(mgr).
@@ -101,6 +96,23 @@ var _ = Describe("Admission Handler", func() {
 			Build()
 		Expect(err).ToNot(HaveOccurred())
 		handler = h
+
+		// TODO(rado): This reinialization is very annoying. Find a way to avoid it.
+		// It's currently needed since the `signedImageTag` is initialized after
+		// sped Ginkgo spec tree is built. While the `BeforeSuite` function is called
+		// after the spec tree is built buf before the spec is ran.
+		pod = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "pod-namespace",
+				Name:      "pod-name",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:  "container",
+					Image: signedImageTag,
+				}},
+			},
+		}
 	})
 
 	DescribeTable(
