@@ -14,10 +14,10 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
-	"github.com/gardener/gardener/pkg/apis/core"
-	"github.com/gardener/gardener/pkg/apis/seedmanagement"
 
+	"github.com/gardener/gardener/pkg/apis/core"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
+	"github.com/gardener/gardener/pkg/apis/seedmanagement"
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/name"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -229,7 +229,6 @@ func (h *handler) handleObject(ctx context.Context, request admission.Request, l
 				return nil, err
 			}
 			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &resolved
-
 		}
 
 		if extension.Spec.Deployment != nil &&
