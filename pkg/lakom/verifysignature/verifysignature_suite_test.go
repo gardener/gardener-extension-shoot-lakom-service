@@ -119,8 +119,7 @@ func publicKeyToPEM(pub crypto.PublicKey) (string, error) {
 	}
 
 	// Encode the PEM block to a string
-	var pemBytes []byte
-	pemBytes = pem.EncodeToMemory(pemBlock)
+	pemBytes := pem.EncodeToMemory(pemBlock)
 
 	return string(pemBytes), nil
 }
@@ -147,8 +146,10 @@ func writeRandomImage() (registryv1.Image, string, error) {
 
 	// Get digest
 	headResponse, err := remote.Head(tag)
+	if err != nil {
+		return nil, "", err
+	}
 
-	// TODO(rado): There should be an easier way than this
 	fullRef := tag.Context().Name() + "@" + headResponse.Digest.String()
 
 	return i, fullRef, nil
