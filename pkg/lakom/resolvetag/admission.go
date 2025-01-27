@@ -9,11 +9,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
+	"github.com/gardener/gardener/pkg/apis/core"
+	"github.com/gardener/gardener/pkg/apis/seedmanagement"
 
+	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/name"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -114,8 +118,12 @@ type handler struct {
 }
 
 var (
-	podGVK               = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
-	controlledOperations = sets.NewString(string(admissionv1.Create), string(admissionv1.Update))
+	podGVK                  = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
+	controllerDeploymentGVK = metav1.GroupVersionKind{Group: "core.gardener.cloud", Kind: "ControllerDeployment", Version: "v1"}
+	gardenletGVK            = metav1.GroupVersionKind{Group: "seedmanagement.gardener.cloud", Kind: "Gardenlet", Version: "v1alpha1"}
+	extensionGVK            = metav1.GroupVersionKind{Group: "extensions.operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
+	allowedResources        = sets.New(podGVK, controllerDeploymentGVK, gardenletGVK, extensionGVK)
+	controlledOperations    = sets.NewString(string(admissionv1.Create), string(admissionv1.Update))
 )
 
 func (h *handler) GetLogger() logr.Logger {
@@ -128,8 +136,8 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 	ctx, cancel := context.WithTimeout(ctx, time.Second*25)
 	defer cancel()
 
-	if request.Kind != podGVK {
-		return admission.Allowed("resource is not v1.Pod")
+	if !allowedResources.Has(request.Kind) {
+		return admission.Allowed(fmt.Sprintf("resource is not one of %v", allowedResources.UnsortedList()))
 	}
 
 	if request.SubResource != "" && request.SubResource != "ephemeralcontainers" {
@@ -140,67 +148,175 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		return admission.Allowed(fmt.Sprintf("operation is not any of %v", controlledOperations.List()))
 	}
 
-	pod := &corev1.Pod{}
-	if err := h.decoder.Decode(request, pod); err != nil {
-		h.logger.Error(err, "failed to decode request to pod")
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
+	logger := h.logger.WithValues(request.Kind, client.ObjectKey{Namespace: request.Namespace, Name: request.Name})
 
-	logger := h.logger.WithValues("pod", client.ObjectKeyFromObject(pod))
-
-	if err := h.handlePod(ctx, pod, logger); err != nil {
-		logger.Error(err, "failed to handle pod")
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-
-	marshaled, err := json.Marshal(pod)
+	newRawObject, err := h.handleObject(ctx, request, logger)
 	if err != nil {
-		logger.Error(err, "failed to marshal pod mutation")
+		logger.Error(err, "failed to handle object")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	return admission.PatchResponseFromRaw(request.Object.Raw, marshaled)
+
+	return admission.PatchResponseFromRaw(request.Object.Raw, newRawObject)
 }
 
-func (h *handler) handlePod(ctx context.Context, p *corev1.Pod, logger logr.Logger) error {
-	logger.Info("Handling new pod request")
+func (h *handler) handleObject(ctx context.Context, request admission.Request, logger logr.Logger) ([]byte, error) {
+	// Support for using pull secrets for helm charts has not been implemented yet.
+	// Thus the keychain reader is created without any image pull secrets.
+	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, request.Namespace, []string{}, h.useOnlyImagePullSecrets)
 
-	var secretNames []string
-	for _, ips := range p.Spec.ImagePullSecrets {
-		secretNames = append(secretNames, ips.Name)
-	}
-	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, p.Namespace, secretNames, h.useOnlyImagePullSecrets)
+	var bytes []byte
 
-	for idx, ic := range p.Spec.InitContainers {
-		image, err := h.handleContainer(ctx, ic.Image, kcr, logger.WithValues("initContainer", ic.Name))
+	switch request.Kind {
+	case controllerDeploymentGVK:
+		controllerDeployment := core.ControllerDeployment{}
+		err := h.decoder.Decode(request, &controllerDeployment)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if image != "" {
-			p.Spec.InitContainers[idx].Image = image
-		}
-	}
 
-	for idx, c := range p.Spec.Containers {
-		image, err := h.handleContainer(ctx, c.Image, kcr, logger.WithValues("container", c.Name))
+		if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
+			resolved, err := h.handleContainer(ctx, controllerDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
+			if err != nil {
+				return nil, err
+			}
+
+			controllerDeployment.Helm.OCIRepository.Ref = &resolved
+		}
+
+		bytes, err = json.Marshal(controllerDeployment)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if image != "" {
-			p.Spec.Containers[idx].Image = image
+	case gardenletGVK:
+		gardenlet := seedmanagement.Gardenlet{}
+		if err := h.decoder.Decode(request, &gardenlet); err != nil {
+			return nil, err
 		}
-	}
 
-	for idx, ec := range p.Spec.EphemeralContainers {
-		image, err := h.handleContainer(ctx, ec.Image, kcr, logger.WithValues("ephemeralContainer", ec.Name))
+		resolved, err := h.handleContainer(ctx, gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(), kcr, logger)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if image != "" {
-			p.Spec.EphemeralContainers[idx].Image = image
+		gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &resolved
+
+		if gardenlet.Spec.Deployment.Image != nil {
+			resolved, err = h.handleContainer(ctx, getURL(gardenlet.Spec.Deployment.Image), kcr, logger)
+			if err != nil {
+				return nil, err
+			}
+			// TODO(rado): Hmmm, I'm not sure this should be the change.
+			gardenlet.Spec.Deployment.Image.Tag = &resolved
 		}
+
+		bytes, err = json.Marshal(gardenlet)
+		if err != nil {
+			return nil, err
+		}
+	case extensionGVK:
+		extension := operatorv1alpha1.Extension{}
+		err := h.decoder.Decode(request, &extension)
+		if err != nil {
+			return nil, err
+		}
+
+		if extension.Spec.Deployment != nil &&
+			extension.Spec.Deployment.AdmissionDeployment != nil &&
+			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster != nil &&
+			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm != nil &&
+			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository != nil {
+			resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.GetURL(), kcr, logger)
+			if err != nil {
+				return nil, err
+			}
+			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &resolved
+
+		}
+
+		if extension.Spec.Deployment != nil &&
+			extension.Spec.Deployment.AdmissionDeployment != nil &&
+			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster != nil &&
+			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm != nil &&
+			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository != nil {
+			resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.GetURL(), kcr, logger)
+			if err != nil {
+				return nil, err
+			}
+			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &resolved
+		}
+
+		if extension.Spec.Deployment != nil &&
+			extension.Spec.Deployment.ExtensionDeployment != nil &&
+			extension.Spec.Deployment.ExtensionDeployment.Helm != nil &&
+			extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository != nil {
+			resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
+			if err != nil {
+				return nil, err
+			}
+			extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.Ref = &resolved
+		}
+
+		bytes, err = json.Marshal(extension)
+		if err != nil {
+			return nil, err
+		}
+	case podGVK:
+		pod := corev1.Pod{}
+		err := h.decoder.Decode(request, &pod)
+		if err != nil {
+			return nil, err
+		}
+
+		var secretNames []string
+		for _, ips := range pod.Spec.ImagePullSecrets {
+			secretNames = append(secretNames, ips.Name)
+		}
+
+		kcr = utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, pod.Namespace, secretNames, h.useOnlyImagePullSecrets)
+
+		for idx, ic := range pod.Spec.InitContainers {
+			resolved, err := h.handleContainer(ctx, ic.Image, kcr, logger)
+			if err != nil {
+				return nil, err
+			}
+
+			pod.Spec.InitContainers[idx].Image = resolved
+		}
+		for idx, c := range pod.Spec.Containers {
+			resolved, err := h.handleContainer(ctx, c.Image, kcr, logger)
+			if err != nil {
+				return nil, err
+			}
+
+			pod.Spec.Containers[idx].Image = resolved
+		}
+		for idx, ec := range pod.Spec.EphemeralContainers {
+			resolved, err := h.handleContainer(ctx, ec.Image, kcr, logger)
+			if err != nil {
+				return nil, err
+			}
+
+			pod.Spec.EphemeralContainers[idx].Image = resolved
+		}
+		bytes, err = json.Marshal(pod)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unknown kind %v", request.Kind.Kind)
 	}
 
-	return nil
+	return bytes, nil
+}
+
+// getURL returns the fully-qualified OCIRepository URL of the image.
+func getURL(img *seedmanagement.Image) string {
+	ref := *img.Repository
+
+	if img.Tag != nil {
+		ref = ref + ":" + *img.Tag
+	}
+
+	return strings.TrimPrefix(ref, "oci://")
 }
 
 func (h *handler) handleContainer(ctx context.Context, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
