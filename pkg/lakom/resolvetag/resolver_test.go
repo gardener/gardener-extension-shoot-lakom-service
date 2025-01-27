@@ -10,12 +10,12 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
-	"k8s.io/utils/ptr"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
 )
 
 type anonymousKeyChain struct{}
