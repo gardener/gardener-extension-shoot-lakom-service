@@ -162,7 +162,7 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 func (h *handler) handleObject(ctx context.Context, request admission.Request, logger logr.Logger) ([]byte, error) {
 	// Support for using pull secrets for helm charts has not been implemented yet.
 	// Thus the keychain reader is created without any image pull secrets.
-	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, request.Namespace, []string{}, h.useOnlyImagePullSecrets)
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, request.Namespace, []string{}, h.useOnlyImagePullSecrets)
 
 	var bytes []byte
 
@@ -265,12 +265,7 @@ func (h *handler) handleObject(ctx context.Context, request admission.Request, l
 			return nil, err
 		}
 
-		var secretNames []string
-		for _, ips := range pod.Spec.ImagePullSecrets {
-			secretNames = append(secretNames, ips.Name)
-		}
-
-		kcr = utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, pod.Namespace, secretNames, h.useOnlyImagePullSecrets)
+		kcr = utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, &pod, h.useOnlyImagePullSecrets)
 
 		for idx, ic := range pod.Spec.InitContainers {
 			resolved, err := h.handleContainer(ctx, ic.Image, kcr, logger)
