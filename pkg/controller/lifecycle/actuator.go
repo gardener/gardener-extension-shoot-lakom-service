@@ -379,6 +379,9 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 						Name:            constants.ApplicationName,
 						Image:           image,
 						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: &corev1.SecurityContext{
+							AllowPrivilegeEscalation: ptr.To(false),
+						},
 						Args: []string{
 							"--cache-ttl=" + cacheTTL.String(),
 							"--cache-refresh-interval=" + cacheRefreshInterval.String(),
