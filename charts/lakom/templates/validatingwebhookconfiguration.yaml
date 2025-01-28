@@ -48,6 +48,7 @@ webhooks:
     - pods/ephemeralcontainers
     - controllerdeployments
     - gardenlets
+    - operator.extensions
     scope: '*'
   sideEffects: None
   timeoutSeconds: 25
