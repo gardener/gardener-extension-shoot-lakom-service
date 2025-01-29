@@ -17,8 +17,10 @@ Files:
   VERSION
   charts/gardener-extension-shoot-lakom-service/.helmignore
   charts/gardener-extension-shoot-lakom-service/templates/_helpers.tpl
-  charts/gardener-extension-shoot-lakom-admission/.helmignore
-  charts/gardener-extension-shoot-lakom-admission/templates/_helpers.tpl
+  charts/gardener-extension-shoot-lakom-admission/charts/application/.helmignore
+  charts/gardener-extension-shoot-lakom-admission/charts/application/templates/_helpers.tpl
+  charts/gardener-extension-shoot-lakom-admission/charts/runtime/.helmignore
+  charts/gardener-extension-shoot-lakom-admission/charts/runtime/templates/_helpers.tpl
   charts/lakom/.helmignore
   charts/lakom/templates/_helpers.tpl
   charts/lakom/templates/_versions.tpl

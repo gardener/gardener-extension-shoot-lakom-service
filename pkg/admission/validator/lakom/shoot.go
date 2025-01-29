@@ -121,10 +121,10 @@ func (s *shoot) validateTrustedKeys(ctx context.Context, fldPath *field.Path, re
 }
 
 // Validate validates the given shoot object
-func (s *shoot) Validate(ctx context.Context, new, _ client.Object) error {
-	shoot, ok := new.(*core.Shoot)
+func (s *shoot) Validate(ctx context.Context, newObject, _ client.Object) error {
+	shoot, ok := newObject.(*core.Shoot)
 	if !ok {
-		return fmt.Errorf("wrong object type %T, expected core.Shoot", new)
+		return fmt.Errorf("wrong object type %T, expected core.Shoot", newObject)
 	}
 
 	i, lakomExt := findExtension(shoot.Spec.Extensions, constants.ExtensionType)
