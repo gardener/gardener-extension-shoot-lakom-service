@@ -121,7 +121,7 @@ func (s *shoot) validateTrustedKeys(ctx context.Context, fldPath *field.Path, re
 }
 
 // Validate validates the given shoot object
-func (s *shoot) Validate(_ context.Context, newObj, _ client.Object) error {
+func (s *shoot) Validate(ctx context.Context, newObj, _ client.Object) error {
 	shoot, ok := newObj.(*core.Shoot)
 	if !ok {
 		return fmt.Errorf("wrong object type %T, expected core.Shoot", newObj)
