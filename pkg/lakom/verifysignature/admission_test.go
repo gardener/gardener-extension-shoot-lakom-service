@@ -145,7 +145,7 @@ var _ = Describe("Admission Handler", func() {
 		Expect(response.Result.Code).To(BeEquivalentTo(http.StatusOK))
 	})
 
-	It("Should allow untrusted images", func() {
+	It("Should allow untrusted artifacts", func() {
 		mgr.EXPECT().GetAPIReader().Return(apiReader)
 		mgr.EXPECT().GetScheme().Return(scheme)
 
@@ -168,14 +168,14 @@ var _ = Describe("Admission Handler", func() {
 		ar := allowUntrustedHandler.Handle(ctx, req)
 		Expect(ar.Allowed).To(BeTrue())
 		Expect(ar.Result.Code).To(BeEquivalentTo(http.StatusOK))
-		Expect(ar.Warnings).To(ContainElement(ContainSubstring("Failed to admit pod with error")))
-		Expect(ar.Warnings).To(ContainElement(ContainSubstring("Forbidden: no valid signature found for image")))
-		Expect(ar.Result.Message).To(ContainSubstring("untrusted images are allowed"))
+		Expect(ar.Warnings).To(ContainElement(ContainSubstring("Failed to admit resource with error")))
+		Expect(ar.Warnings).To(ContainElement(ContainSubstring("Forbidden: no valid signature found for artifact")))
+		Expect(ar.Result.Message).To(ContainSubstring("untrusted artifacts are allowed"))
 
 		ar = handler.Handle(ctx, req)
 		Expect(ar.Allowed).To(BeFalse())
 		Expect(ar.Result.Code).To(Satisfy(isHTTPError))
-		Expect(ar.Result.Message).To(ContainSubstring("Forbidden: no valid signature found for image"))
+		Expect(ar.Result.Message).To(ContainSubstring("Forbidden: no valid signature found for artifact"))
 	})
 })
 

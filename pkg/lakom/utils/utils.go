@@ -67,3 +67,30 @@ func NewLazyKeyChainReaderFromPod(ctx context.Context, c client.Reader, pod *cor
 		},
 	)
 }
+
+// NewLazyKeyChainReaderFromSecrets creates lazyKeyChainReader for the given secrets.
+func NewLazyKeyChainReaderFromSecrets(ctx context.Context, c client.Reader, namespace string, secretNames []string, useOnlyImagePullSecrets bool) *lazyKeyChainReader {
+	return NewLazyKeyChainReader(
+		func() (authn.Keychain, error) {
+			var imagePullSecrets = make([]corev1.Secret, len(secretNames))
+			for _, sn := range secretNames {
+				secret := &corev1.Secret{}
+				secretKey := client.ObjectKey{Namespace: namespace, Name: sn}
+
+				if err := c.Get(ctx, secretKey, secret); err != nil {
+					if apierrors.IsNotFound(err) {
+						continue
+					}
+					return nil, err
+				}
+				imagePullSecrets = append(imagePullSecrets, *secret)
+			}
+
+			if useOnlyImagePullSecrets {
+				return kauth.NewFromPullSecrets(ctx, imagePullSecrets)
+			}
+
+			return k8schain.NewFromPullSecrets(ctx, imagePullSecrets)
+		},
+	)
+}

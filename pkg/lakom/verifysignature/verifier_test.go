@@ -101,7 +101,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			},
 			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", false, true, "could not parse reference"),
 			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", false, true, "could not parse reference"),
-			Entry("Refuse to verify image not using digest", "registry.k8s.io/pause:3.7", false, true, "image reference is not a digest"),
+			Entry("Refuse to verify image not using digest", "registry.k8s.io/pause:3.7", false, true, "artifact reference is not a digest, reference: \"registry.k8s.io/pause:3.7\""),
 			Entry("Successfully verify signed image", "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429", true, false, ""),
 			Entry("Successfully verify unsigned image", "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", false, false, ""),
 		)
@@ -157,7 +157,7 @@ IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
 			},
 			Entry("Fail to parse bad image digest", "gardener/non-existing-image@sha256:123", false, true, "could not parse reference"),
 			Entry("Fail to parse bad image tag", "gardener/non-existing-image:123!", false, true, "could not parse reference"),
-			Entry("Refuse to verify image not using digest", "registry.k8s.io/pause:3.7", false, true, "image reference is not a digest"),
+			Entry("Refuse to verify image not using digest", "registry.k8s.io/pause:3.7", false, true, "artifact reference is not a digest, reference: \"registry.k8s.io/pause:3.7\""),
 			Entry("Successfully verify signed image", "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429", true, false, ""),
 			Entry("Successfully verify unsigned image", "europe-docker.pkg.dev/gardener-project/releases/gardener/apiserver@sha256:249ea7f1d0439a94893b486e7820f6f0ab52522c5f22e1bad21782d6381e739e", false, false, ""),
 		)
