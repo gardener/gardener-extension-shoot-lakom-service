@@ -38,12 +38,6 @@ var (
 	apiReader *mockclient.MockReader
 )
 
-var _ = BeforeSuite(func() {
-	scheme = runtime.NewScheme()
-	err := corev1.AddToScheme(scheme)
-	Expect(err).ToNot(HaveOccurred())
-})
-
 var _ = Describe("Admission Handler", func() {
 	var (
 		ctx     = context.Background()
@@ -92,6 +86,20 @@ var _ = Describe("Admission Handler", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		handler = h
+
+		pod = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "pod-namespace",
+				Name:      "pod-name",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:  "container",
+					Image: signedImageTagRef,
+				}},
+			},
+		}
+		imageDigest = signedImageFullRef
 	})
 
 	DescribeTable(
