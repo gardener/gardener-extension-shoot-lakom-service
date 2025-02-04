@@ -23,9 +23,18 @@ gardener-extension-shoot-lakom-service:
         attribute: image.repository
       - ref: ocm-resource:lakom.tag
         attribute: image.tag
-    - &shoot-lakom-admission
-      name: shoot-lakom-admission
-      dir: charts/gardener-extension-shoot-lakom-admission
+    - &shoot-lakom-admission-application
+      name: shoot-lakom-admission-application
+      dir: charts/gardener-extension-shoot-lakom-admission/charts/application
+      registry: europe-docker.pkg.dev/gardener-project/snapshots/charts/gardener/extensions
+      mappings:
+      - ref: ocm-resource:gardener-extension-shoot-lakom-admission.repository
+        attribute: image.repository
+      - ref: ocm-resource:gardener-extension-shoot-lakom-admission.tag
+        attribute: image.tag
+    - &shoot-lakom-admission-runtime
+      name: shoot-lakom-admission-runtime
+      dir: charts/gardener-extension-shoot-lakom-admission/charts/runtime
       registry: europe-docker.pkg.dev/gardener-project/snapshots/charts/gardener/extensions
       mappings:
       - ref: ocm-resource:gardener-extension-shoot-lakom-admission.repository
@@ -77,7 +86,8 @@ gardener-extension-shoot-lakom-service:
           helmcharts:
           - *shoot-lakom-service
           - *lakom
-          - *shoot-lakom-admission
+          - *shoot-lakom-admission-application
+          - *shoot-lakom-admission-runtime
     pull-request:
       traits:
         pull-request: ~
@@ -90,7 +100,8 @@ gardener-extension-shoot-lakom-service:
           helmcharts:
           - *shoot-lakom-service
           - *lakom
-          - *shoot-lakom-admission
+          - *shoot-lakom-admission-application
+          - *shoot-lakom-admission-runtime
     release:
       traits:
         version:
@@ -113,7 +124,9 @@ gardener-extension-shoot-lakom-service:
             registry: europe-docker.pkg.dev/gardener-project/releases/charts/gardener/extensions
           - <<: *lakom
             registry: europe-docker.pkg.dev/gardener-project/releases/charts/gardener/extensions
-          - <<: *shoot-lakom-admission
+          - <<: *shoot-lakom-admission-application
+            registry: europe-docker.pkg.dev/gardener-project/releases/charts/gardener/extensions
+          - <<: *shoot-lakom-admission-runtime
             registry: europe-docker.pkg.dev/gardener-project/releases/charts/gardener/extensions
         release:
           nextversion: 'bump_minor'
