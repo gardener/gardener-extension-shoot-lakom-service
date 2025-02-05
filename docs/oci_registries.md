@@ -1,4 +1,4 @@
-# Crash Course on OCI Registries
+# OCI Registries
 
 This document aims to introduce the reader to the general architecture of OCI
 Registries, their history and jargon that might be encountered.
