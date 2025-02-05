@@ -45,7 +45,7 @@ var (
 	// TagRef use the tag instead of the digest for referencing the artifact.
 	signedImageTagRef      string
 	unsignedImageTagRef    string
-	nonExistantImageTagRef string
+	nonExistentImageTagRef string
 
 	// Public key in PEM format for verifying signatures in the fake registry
 	publicKey string
@@ -95,7 +95,7 @@ var _ = BeforeSuite(func() {
 	signedImageTagRef = signedImageRef.Context().Tag(signedImageTag).String()
 	unsignedImageTagRef = unsignedImageRef.Context().Tag(unsignedImageTag).String()
 
-	nonExistantImageTagRef = fmt.Sprintf("%s:nonexistant", signedImageRef.Context().Name())
+	nonExistentImageTagRef = fmt.Sprintf("%s:nonexistant", signedImageRef.Context().Name())
 
 	privateKey, err := cosign.GeneratePrivateKey()
 	Expect(err).ToNot(HaveOccurred())
