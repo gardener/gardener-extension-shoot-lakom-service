@@ -55,15 +55,15 @@ it can be stored only once and referenced by multiple images.
 
 ### Manifests
 
-A manifest is just a JSON document. It is stored seperately from the blobs.
+A manifest is just a JSON document. It is stored separately from the blobs.
 But similarly to the blobs, it is also content addressable. The manifest gets
-formated to a canonical form and then hashed. The hash becomes the address of
+formatted to a canonical form and then hashed. The hash becomes the address of
 the manifest.
 
 Where manifests become powerful is when they are used to reference to other
 manifests or blobs. These references are called [OCI Content Descriptors](https://github.com/opencontainers/image-spec/blob/v1.0.1/descriptor.md).
-For example, the Image Manifest that most readers would be familiar with containes
-a lisf of layers that are used to build the image. Each layer is a reference to
+For example, the Image Manifest that most readers would be familiar with contains
+a list of layers that are used to build the image. Each layer is a reference to
 a blob.
 
 An additional reference outside the layer references is used for storing 
@@ -71,7 +71,7 @@ additional configuration. More info can be found in the official [OCI Image Mani
 
 The term _artifact_ is just a generalization over the Image Manifest idea.
 The Image Manifest has a specific format that can be found in the aforementioned [OCI Image Manifest spec](https://github.com/opencontainers/image-spec/blob/v1.0.1/manifest.md).
-The important field is the .config.mediaType field. Based on the official guidelines,
+The important field is the `.config.mediaType` field. Based on the official guidelines,
 it can be used for defining types other than an image. More info can be found [here](https://github.com/opencontainers/image-spec/blob/main/manifest.md#guidelines-for-artifact-usage).
 
 Combining all of these ideas, we can see that artifacts can be represented by 1 
@@ -93,7 +93,7 @@ to address them in a human-readable format. Tags allow us to add a reference
 to a given manifest that differs from the digest of the object.
 
 Normally, whenever we push an image to a registry, if we don't give it an
-explicit tag, the registry would most likey give it the tag `latest`. This,
+explicit tag, the registry would most likely give it the tag `latest`. This,
 actually is not mandatory based on the distribution spec. Manifests don't 
 require that they have a tag.
 
