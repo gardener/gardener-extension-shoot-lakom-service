@@ -113,3 +113,46 @@ then verifying them. In theory, we wouldn't need to use Cosign for this, but
 it uses a popular format for the signatures and the libraries help us 
 save work.
 
+In the context of Lakom, what interests us is how Cosign signs OCI artifacts
+and how it stores them.
+The signing process in a nutshell is the following -- `Sign(sha256(SimpleSigningPayload(sha256(Image Manifest))))`, where:
+- Image Manifest is what it says. Just the manifest of the image (artifact).
+- sha256 is the hashing algorithm used.
+- SimpleSigningPayload is the interesting part here. Instead of just signing the
+hash of the manifest itself, the hash itself is packed into a JSON doc that
+is called the `SimpleSigningPayload`. Example payload:
+```json
+{
+    "critical": {
+           "identity": {
+               "docker-reference": "testing/manifest"
+           },
+           "image": {
+               "Docker-manifest-digest": "sha256:20be...fe55"
+           },
+           "type": "cosign container image signature"
+    },
+    "optional": {
+           "creator": "atomic",
+           "timestamp": 1458239713
+    }
+}
+```
+
+We can see that the hash of the manifest is stored in the `Docker-manifest-digest`.
+Now this object is the one that gets signed using our private key. The signed
+version of this objest is the one that gets stored and gets used for
+verification. 
+
+Storage of the signature is done via an image manifest that gets uploaded
+in the same repo as the image, but tagged with `<image-digest>.sig`.
+Thus, the signature discovery mechanism is to just fetch the image digest 
+that is tagged with the aforementioned tag.
+
+More info on this whole process can be found [here](https://github.com/sigstore/cosign/blob/main/specs/SIGNATURE_SPEC.md).
+
+Lakom relies on the cosign libraries to automate this whole process. When
+validating an artifact, if we know its digest, we can fetch the signature and
+verify it. If the signature is valid, we can be sure that the artifact has not
+been tampered with.
+
