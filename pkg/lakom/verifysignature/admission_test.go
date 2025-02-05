@@ -92,22 +92,7 @@ var _ = Describe("Admission Handler", func() {
 		Expect(err).ToNot(HaveOccurred())
 		handler = h
 
-		// TODO(rado): This reinialization is very annoying. Find a way to avoid it.
-		// It's currently needed since the `signedImageTag` is initialized after
-		// sped Ginkgo spec tree is built. While the `BeforeSuite` function is called
-		// after the spec tree is built buf before the spec is ran.
-		pod = &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "pod-namespace",
-				Name:      "pod-name",
-			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{
-					Name:  "container",
-					Image: signedImageFullRef,
-				}},
-			},
-		}
+		pod.Spec.Containers[0].Image = signedImageFullRef
 	})
 
 	DescribeTable(
