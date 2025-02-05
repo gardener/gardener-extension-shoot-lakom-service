@@ -7,11 +7,8 @@ package resolvetag_test
 import (
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"fmt"
-	"io"
 	"log"
 	"net/http/httptest"
 	"net/url"
@@ -39,22 +36,12 @@ import (
 )
 
 var (
-	// Fake registry properties
-	registryURL *url.URL
-	server      *httptest.Server
-
 	signedImageFullRef   string
 	unsignedImageFullRef string
 
 	signedImageTagRef      string
 	unsignedImageTagRef    string
 	nonExistantImageTagRef string
-
-	// Key for signing images in fake registry
-	privateKey *ecdsa.PrivateKey
-
-	// Public key in PEM format for verifying signatures in the fake registry
-	publicKey string
 
 	scheme    *runtime.Scheme
 	ctrl      *gomock.Controller
@@ -85,14 +72,14 @@ var _ = BeforeSuite(func() {
 	})
 
 	// Tests rely on a fake registry
-	registryURL, server = startFakeRegistry()
+	registryURL, server := startRegistry()
 	DeferCleanup(func() {
 		server.Close()
 	})
 
-	signedImage, signedImageRef, err := writeRandomImage(signedImageTag)
+	signedImage, signedImageRef, err := createTestImage(registryURL, signedImageTag)
 	Expect(err).ToNot(HaveOccurred())
-	_, unsignedImageRef, err := writeRandomImage(unsignedImageTag)
+	_, unsignedImageRef, err := createTestImage(registryURL, unsignedImageTag)
 	Expect(err).ToNot(HaveOccurred())
 
 	signedImageFullRef = signedImageRef.Name()
@@ -103,22 +90,16 @@ var _ = BeforeSuite(func() {
 
 	nonExistantImageTagRef = fmt.Sprintf("%s:nonexistant", signedImageRef.Context().Name())
 
-	privateKey, err = cosign.GeneratePrivateKey()
-	Expect(err).ToNot(HaveOccurred())
-	publicKey, err = publicKeyToPEM(privateKey.Public())
+	privateKey, err := cosign.GeneratePrivateKey()
 	Expect(err).ToNot(HaveOccurred())
 
-	err = signImage(signedImage, signedImageFullRef)
+	err = signImage(signedImage, signedImageFullRef, privateKey)
 	Expect(err).ToNot(HaveOccurred())
 })
 
-var _ = AfterSuite(func() {
-	server.Close()
-})
-
-func startFakeRegistry() (*url.URL, *httptest.Server) {
-	nopLog := log.New(io.Discard, "", 0)
-	s := httptest.NewServer(registry.New(registry.Logger(nopLog)))
+func startRegistry() (*url.URL, *httptest.Server) {
+	ginkgoLogger := log.New(GinkgoWriter, "", 0)
+	s := httptest.NewServer(registry.New(registry.Logger(ginkgoLogger)))
 	u, err := url.Parse(s.URL)
 	if err != nil {
 		log.Fatal("Error parsing")
@@ -127,26 +108,7 @@ func startFakeRegistry() (*url.URL, *httptest.Server) {
 	return u, s
 }
 
-func publicKeyToPEM(pub crypto.PublicKey) (string, error) {
-	// Marshal the public key to DER format
-	derBytes, err := x509.MarshalPKIXPublicKey(pub)
-	if err != nil {
-		return "", err
-	}
-
-	// Create a PEM block
-	pemBlock := &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: derBytes,
-	}
-
-	// Encode the PEM block to a string
-	pemBytes := pem.EncodeToMemory(pemBlock)
-
-	return string(pemBytes), nil
-}
-
-func writeRandomImage(tag string) (registryv1.Image, name.Reference, error) {
+func createTestImage(registryURL *url.URL, tag string) (registryv1.Image, name.Reference, error) {
 	// Create image
 	i, err := random.Image(512, 1)
 	if err != nil {
@@ -172,7 +134,6 @@ func writeRandomImage(tag string) (registryv1.Image, name.Reference, error) {
 		return nil, nil, err
 	}
 
-	// TODO(rado): There should be an easier way than this
 	fullRef := tagRef.Context().Name() + "@" + headResponse.Digest.String()
 
 	reference, err := name.ParseReference(fullRef)
@@ -183,7 +144,7 @@ func writeRandomImage(tag string) (registryv1.Image, name.Reference, error) {
 	return i, reference, nil
 }
 
-func signImage(image registryv1.Image, imageFullRef string) error {
+func signImage(image registryv1.Image, imageFullRef string, privateKey *ecdsa.PrivateKey) error {
 	digest, err := name.NewDigest(imageFullRef)
 	if err != nil {
 		return err
@@ -210,10 +171,5 @@ func signImage(image registryv1.Image, imageFullRef string) error {
 		return err
 	}
 
-	err = ociRemote.WriteSignatures(digest.Context(), si)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ociRemote.WriteSignatures(digest.Context(), si)
 }

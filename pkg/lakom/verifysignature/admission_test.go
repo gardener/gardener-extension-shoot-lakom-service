@@ -30,10 +30,6 @@ import (
 var (
 	deploymentGVK = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
 	podGVK        = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
-
-	ctrl      *gomock.Controller
-	mgr       *mockmanager.MockManager
-	apiReader *mockclient.MockReader
 )
 
 var _ = Describe("Admission Handler", func() {
@@ -50,7 +46,7 @@ var _ = Describe("Admission Handler", func() {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:  "container",
-					Image: signedImageTag,
+					Image: signedImageFullRef,
 				}},
 			},
 		}
@@ -108,7 +104,7 @@ var _ = Describe("Admission Handler", func() {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:  "container",
-					Image: signedImageTag,
+					Image: signedImageFullRef,
 				}},
 			},
 		}

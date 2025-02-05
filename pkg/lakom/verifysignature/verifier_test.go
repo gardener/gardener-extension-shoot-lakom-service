@@ -108,15 +108,15 @@ var _ = Describe("Verifier", func() {
 			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), false, true, "could not parse reference"),
 			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), false, true, "could not parse reference"),
 			Entry("Refuse to verify image not using digest", ptr.To("registry.k8s.io/pause:3.7"), false, true, "image reference is not a digest"),
-			Entry("Successfully verify signed image", &signedImageTag, true, false, ""),
-			Entry("Fail signature check when image exists but it has not been signed", &nonSignedImageTag, false, false, ""),
+			Entry("Successfully verify signed image", &signedImageFullRef, true, false, ""),
+			Entry("Fail signature check when image exists but it has not been signed", &unsignedImageFullRef, false, false, ""),
 		)
 
 		It("Should fail image verification when context is canceled", func() {
 			canceledCtx, cancel := context.WithCancel(ctx)
 			cancel()
 
-			verified, err := directVerifier.Verify(canceledCtx, signedImageTag, kcr)
+			verified, err := directVerifier.Verify(canceledCtx, signedImageFullRef, kcr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("context canceled"))
 			Expect(verified).To(BeFalse())
@@ -161,8 +161,8 @@ var _ = Describe("Verifier", func() {
 			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), false, true, "could not parse reference"),
 			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), false, true, "could not parse reference"),
 			Entry("Refuse to verify image not using digest", ptr.To("registry.k8s.io/pause:3.7"), false, true, "image reference is not a digest"),
-			Entry("Successfully verify signed image", &signedImageTag, true, false, ""),
-			Entry("Fail signature check when image exists but it has not been signed", &nonSignedImageTag, false, false, ""),
+			Entry("Successfully verify signed image", &signedImageFullRef, true, false, ""),
+			Entry("Fail signature check when image exists but it has not been signed", &unsignedImageFullRef, false, false, ""),
 		)
 
 		It("Should not run real validation for cached result", func() {
@@ -182,7 +182,7 @@ var _ = Describe("Verifier", func() {
 			canceledCtx, cancel := context.WithCancel(ctx)
 			cancel()
 
-			image := nonSignedImageTag
+			image := unsignedImageFullRef
 			verified, err := cachedVerifier.Verify(canceledCtx, image, kcr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("context canceled"))

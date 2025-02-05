@@ -11,13 +11,14 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"log"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"testing"
 
+	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
+	mockmanager "github.com/gardener/gardener/third_party/mock/controller-runtime/manager"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 	registryv1 "github.com/google/go-containerregistry/pkg/v1"
@@ -31,25 +32,33 @@ import (
 	"github.com/sigstore/cosign/v2/pkg/oci/signed"
 	"github.com/sigstore/cosign/v2/pkg/oci/static"
 	"github.com/sigstore/sigstore/pkg/signature"
+	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
-	scheme *runtime.Scheme
+	// FullRef use the digest instead of the tag.
+	signedImageFullRef   string
+	unsignedImageFullRef string
 
-	// Fake registry properties
-	registryURL *url.URL
-	server      *httptest.Server
-
-	signedImageTag    string
-	nonSignedImageTag string
-
-	// Key for signing images in fake registry
-	privateKey *ecdsa.PrivateKey
+	// TagRef use the tag instead of the digest for referencing the artifact.
+	signedImageTagRef      string
+	unsignedImageTagRef    string
+	nonExistantImageTagRef string
 
 	// Public key in PEM format for verifying signatures in the fake registry
 	publicKey string
+
+	scheme    *runtime.Scheme
+	ctrl      *gomock.Controller
+	mgr       *mockmanager.MockManager
+	apiReader *mockclient.MockReader
+)
+
+const (
+	signedImageTag   = "signed"
+	unsignedImageTag = "unsigned"
 )
 
 func TestCMD(t *testing.T) {
@@ -70,33 +79,36 @@ var _ = BeforeSuite(func() {
 	})
 
 	// Tests rely on a fake registry
-	registryURL, server = startFakeRegistry()
+	registryURL, server := startRegistry()
 	DeferCleanup(func() {
 		server.Close()
 	})
 
-	var signedImage registryv1.Image
-	signedImage, signedImageTag, err = writeRandomImage()
+	signedImage, signedImageRef, err := createTestImage(registryURL, signedImageTag)
 	Expect(err).ToNot(HaveOccurred())
-	_, nonSignedImageTag, err = writeRandomImage()
+	_, unsignedImageRef, err := createTestImage(registryURL, unsignedImageTag)
 	Expect(err).ToNot(HaveOccurred())
 
-	privateKey, err = cosign.GeneratePrivateKey()
+	signedImageFullRef = signedImageRef.Name()
+	unsignedImageFullRef = unsignedImageRef.Name()
+
+	signedImageTagRef = signedImageRef.Context().Tag(signedImageTag).String()
+	unsignedImageTagRef = unsignedImageRef.Context().Tag(unsignedImageTag).String()
+
+	nonExistantImageTagRef = fmt.Sprintf("%s:nonexistant", signedImageRef.Context().Name())
+
+	privateKey, err := cosign.GeneratePrivateKey()
 	Expect(err).ToNot(HaveOccurred())
 	publicKey, err = publicKeyToPEM(privateKey.Public())
 	Expect(err).ToNot(HaveOccurred())
 
-	err = signImage(signedImage, signedImageTag)
+	err = signImage(signedImage, signedImageFullRef, privateKey)
 	Expect(err).ToNot(HaveOccurred())
 })
 
-var _ = AfterSuite(func() {
-	server.Close()
-})
-
-func startFakeRegistry() (*url.URL, *httptest.Server) {
-	nopLog := log.New(io.Discard, "", 0)
-	s := httptest.NewServer(registry.New(registry.Logger(nopLog)))
+func startRegistry() (*url.URL, *httptest.Server) {
+	ginkgoLogger := log.New(GinkgoWriter, "", 0)
+	s := httptest.NewServer(registry.New(registry.Logger(ginkgoLogger)))
 	u, err := url.Parse(s.URL)
 	if err != nil {
 		log.Fatal("Error parsing")
@@ -124,38 +136,43 @@ func publicKeyToPEM(pub crypto.PublicKey) (string, error) {
 	return string(pemBytes), nil
 }
 
-func writeRandomImage() (registryv1.Image, string, error) {
+func createTestImage(registryURL *url.URL, tag string) (registryv1.Image, name.Reference, error) {
 	// Create image
 	i, err := random.Image(512, 1)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	// Create tag
-	tagName := fmt.Sprintf("%s/%s:v0.1", registryURL.Host, "test")
-	tag, err := name.NewTag(tagName)
+	tagName := fmt.Sprintf("%s/%s:%s", registryURL.Host, "test", tag)
+	tagRef, err := name.NewTag(tagName)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	// Write image to registry
-	err = remote.Write(tag, i)
+	err = remote.Write(tagRef, i)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	// Get digest
-	headResponse, err := remote.Head(tag)
+	headResponse, err := remote.Head(tagRef)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
-	fullRef := tag.Context().Name() + "@" + headResponse.Digest.String()
+	fullRef := tagRef.Context().Name() + "@" + headResponse.Digest.String()
 
-	return i, fullRef, nil
+	reference, err := name.ParseReference(fullRef)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return i, reference, nil
 }
 
-func signImage(image registryv1.Image, imageFullRef string) error {
+func signImage(image registryv1.Image, imageFullRef string, privateKey *ecdsa.PrivateKey) error {
 	digest, err := name.NewDigest(imageFullRef)
 	if err != nil {
 		return err
@@ -182,10 +199,5 @@ func signImage(image registryv1.Image, imageFullRef string) error {
 		return err
 	}
 
-	err = ociRemote.WriteSignatures(digest.Context(), si)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ociRemote.WriteSignatures(digest.Context(), si)
 }
