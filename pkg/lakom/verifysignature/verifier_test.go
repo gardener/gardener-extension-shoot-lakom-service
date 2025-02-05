@@ -57,9 +57,8 @@ var _ = Describe("Verifier", func() {
 		c := config.Config{
 			PublicKeys: []config.Key{
 				{
-					Name:      "test",
-					Key:       publicKey,
-					Algorithm: "",
+					Name: "test",
+					Key:  publicKey,
 				},
 			},
 		}

@@ -74,9 +74,8 @@ var _ = Describe("Admission Handler", func() {
 		cosignConfig = lakomconfig.Config{
 			PublicKeys: []lakomconfig.Key{
 				{
-					Name:      "test",
-					Key:       publicKey,
-					Algorithm: "",
+					Name: "test",
+					Key:  publicKey,
 				},
 			},
 		}
