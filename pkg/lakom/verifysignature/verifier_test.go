@@ -127,9 +127,9 @@ var _ = Describe("Verifier", func() {
 		var (
 			cache          verifysignature.SignatureVerificationResultCache
 			cachedVerifier verifysignature.Verifier
-			err            error
 		)
 		BeforeEach(func() {
+			var err error
 			cache, err = verifysignature.NewSignatureVerificationResultCache(refresh, ttl)
 			Expect(err).ToNot(HaveOccurred())
 
