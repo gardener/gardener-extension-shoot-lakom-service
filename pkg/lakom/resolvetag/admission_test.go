@@ -31,11 +31,6 @@ var (
 	podGVK        = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
 	imageTag      = "registry.k8s.io/pause:3.7"
 	imageDigest   = "registry.k8s.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c" // #nosec G101
-
-	scheme    *runtime.Scheme
-	ctrl      *gomock.Controller
-	mgr       *mockmanager.MockManager
-	apiReader *mockclient.MockReader
 )
 
 var _ = Describe("Admission Handler", func() {
@@ -51,7 +46,7 @@ var _ = Describe("Admission Handler", func() {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:  "container",
-					Image: imageTag,
+					Image: signedImageTagRef,
 				}},
 			},
 		}
