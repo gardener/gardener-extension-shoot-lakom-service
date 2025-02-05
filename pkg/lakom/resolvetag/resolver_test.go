@@ -74,7 +74,7 @@ var _ = Describe("Resolver", func() {
 			Entry("Do not run actual resolving of image with digest", &signedImageFullRef, &signedImageFullRef, true, false, ""),
 			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), ptr.To(""), true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
 			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), ptr.To(""), true, false, "tag can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-.ABCDEFGHIJKLMNOPQRSTUVWXYZ`"),
-			Entry("Fail to get non-existing image", &nonExistantImageTagRef, ptr.To(""), false, true, "unexpected status code 404 Not Found"),
+			Entry("Fail to get non-existing image", &nonExistentImageTagRef, ptr.To(""), false, true, "unexpected status code 404 Not Found"),
 		)
 	})
 
@@ -106,7 +106,7 @@ var _ = Describe("Resolver", func() {
 			Entry("Do not run actual resolving of image with digest", &signedImageFullRef, &signedImageFullRef, true, false, ""),
 			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), ptr.To(""), true, false, "repository can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-./`"),
 			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), ptr.To(""), true, false, "tag can only contain the characters `abcdefghijklmnopqrstuvwxyz0123456789_-.ABCDEFGHIJKLMNOPQRSTUVWXYZ`"),
-			Entry("Fail to get non-existing image", &nonExistantImageTagRef, ptr.To(""), false, true, "unexpected status code 404 Not Found"),
+			Entry("Fail to get non-existing image", &nonExistentImageTagRef, ptr.To(""), false, true, "unexpected status code 404 Not Found"),
 		)
 
 		It("Should uses the cache to resolve the image", func() {
