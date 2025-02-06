@@ -102,17 +102,14 @@ var _ = BeforeSuite(func() {
 	publicKey, err = publicKeyToPEM(privateKey.Public())
 	Expect(err).ToNot(HaveOccurred())
 
-	err = signImage(signedImage, signedImageFullRef, privateKey)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(signImage(signedImage, signedImageFullRef, privateKey)).ToNot(HaveOccurred())
 })
 
 func startRegistry() (*url.URL, *httptest.Server) {
 	ginkgoLogger := log.New(GinkgoWriter, "", 0)
 	s := httptest.NewServer(registry.New(registry.Logger(ginkgoLogger)))
 	u, err := url.Parse(s.URL)
-	if err != nil {
-		log.Fatal("Error parsing")
-	}
+	Expect(err).ToNot(HaveOccurred())
 
 	return u, s
 }
@@ -151,8 +148,7 @@ func createTestImage(registryURL *url.URL, tag string) (registryv1.Image, name.R
 	}
 
 	// Write image to registry
-	err = remote.Write(tagRef, i)
-	if err != nil {
+	if err = remote.Write(tagRef, i); err != nil {
 		return nil, nil, err
 	}
 
