@@ -196,14 +196,14 @@ func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagement.
 		kcr    = utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, gardenlet.Namespace, []string{}, h.useOnlyImagePullSecrets)
 	)
 
-	resolved, err := h.handleContainer(ctx, gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(), kcr, logger)
+	resolved, err := h.resolveArtifact(ctx, gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(), kcr, logger)
 	if err != nil {
 		return nil, err
 	}
 	gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &resolved
 
 	if gardenlet.Spec.Deployment.Image != nil {
-		resolved, err = h.handleContainer(ctx, getURL(gardenlet.Spec.Deployment.Image), kcr, logger)
+		resolved, err = h.resolveArtifact(ctx, getURL(gardenlet.Spec.Deployment.Image), kcr, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -221,7 +221,7 @@ func (h *handler) handleControllerDeployment(ctx context.Context, controllerDepl
 	)
 
 	if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
-		resolved, err := h.handleContainer(ctx, controllerDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
+		resolved, err := h.resolveArtifact(ctx, controllerDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -243,7 +243,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster != nil &&
 		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm != nil &&
 		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository != nil {
-		resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.GetURL(), kcr, logger)
+		resolved, err := h.resolveArtifact(ctx, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.GetURL(), kcr, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -255,7 +255,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster != nil &&
 		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm != nil &&
 		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository != nil {
-		resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.GetURL(), kcr, logger)
+		resolved, err := h.resolveArtifact(ctx, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.GetURL(), kcr, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -266,7 +266,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 		extension.Spec.Deployment.ExtensionDeployment != nil &&
 		extension.Spec.Deployment.ExtensionDeployment.Helm != nil &&
 		extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository != nil {
-		resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
+		resolved, err := h.resolveArtifact(ctx, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -283,7 +283,7 @@ func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error)
 	)
 
 	for idx, ic := range pod.Spec.InitContainers {
-		resolved, err := h.handleContainer(ctx, ic.Image, kcr, logger)
+		resolved, err := h.resolveArtifact(ctx, ic.Image, kcr, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -291,7 +291,7 @@ func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error)
 		pod.Spec.InitContainers[idx].Image = resolved
 	}
 	for idx, c := range pod.Spec.Containers {
-		resolved, err := h.handleContainer(ctx, c.Image, kcr, logger)
+		resolved, err := h.resolveArtifact(ctx, c.Image, kcr, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -299,7 +299,7 @@ func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error)
 		pod.Spec.Containers[idx].Image = resolved
 	}
 	for idx, ec := range pod.Spec.EphemeralContainers {
-		resolved, err := h.handleContainer(ctx, ec.Image, kcr, logger)
+		resolved, err := h.resolveArtifact(ctx, ec.Image, kcr, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -321,7 +321,7 @@ func getURL(img *seedmanagement.Image) string {
 	return strings.TrimPrefix(ref, "oci://")
 }
 
-func (h *handler) handleContainer(ctx context.Context, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
+func (h *handler) resolveArtifact(ctx context.Context, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
 	logger = logger.WithValues("originalImage", image)
 
 	opts := []name.Option{}
