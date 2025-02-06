@@ -145,7 +145,7 @@ version of this objest is the one that gets stored and gets used for
 verification. 
 
 Storage of the signature is done via an image manifest that gets uploaded
-in the same repo as the image, but tagged with `<image-digest>.sig`.
+in the same repo as the image, but tagged with `sha256-<container-image-digest>.sig`.
 Thus, the signature discovery mechanism is to just fetch the image digest 
 that is tagged with the aforementioned tag.
 
