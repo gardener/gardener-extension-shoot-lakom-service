@@ -7,6 +7,8 @@ package verifysignature_test
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -26,7 +28,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sigstore/cosign/v2/pkg/cosign"
 	"github.com/sigstore/cosign/v2/pkg/oci/mutate"
 	ociRemote "github.com/sigstore/cosign/v2/pkg/oci/remote"
 	"github.com/sigstore/cosign/v2/pkg/oci/signed"
@@ -97,7 +98,7 @@ var _ = BeforeSuite(func() {
 
 	nonExistentImageTagRef = fmt.Sprintf("%s:nonexistant", signedImageRef.Context().Name())
 
-	privateKey, err := cosign.GeneratePrivateKey()
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	Expect(err).ToNot(HaveOccurred())
 	publicKey, err = publicKeyToPEM(privateKey.Public())
 	Expect(err).ToNot(HaveOccurred())
