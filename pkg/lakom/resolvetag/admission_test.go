@@ -29,20 +29,7 @@ import (
 var (
 	deploymentGVK = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
 	podGVK        = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
-	imageTag      = "registry.k8s.io/pause:3.7"
-	imageDigest   = "registry.k8s.io/pause@sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c" // #nosec G101
-
-	scheme    *runtime.Scheme
-	ctrl      *gomock.Controller
-	mgr       *mockmanager.MockManager
-	apiReader *mockclient.MockReader
 )
-
-var _ = BeforeSuite(func() {
-	scheme = runtime.NewScheme()
-	err := corev1.AddToScheme(scheme)
-	Expect(err).ToNot(HaveOccurred())
-})
 
 var _ = Describe("Admission Handler", func() {
 	var (
@@ -57,7 +44,7 @@ var _ = Describe("Admission Handler", func() {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:  "container",
-					Image: imageTag,
+					Image: signedImageTagRef,
 				}},
 			},
 		}
@@ -92,6 +79,7 @@ var _ = Describe("Admission Handler", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		handler = h
+		pod.Spec.Containers[0].Image = signedImageTagRef
 	})
 
 	DescribeTable(
@@ -122,7 +110,7 @@ var _ = Describe("Admission Handler", func() {
 		patch := response.Patches[0]
 		Expect(patch.Operation).To(Equal("replace"))
 		Expect(patch.Path).To(Equal("/spec/containers/0/image"))
-		Expect(patch.Value).To(Equal(imageDigest))
+		Expect(patch.Value).To(Equal(signedImageFullRef))
 	})
 
 })
