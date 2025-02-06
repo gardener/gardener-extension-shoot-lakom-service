@@ -133,173 +133,181 @@ func (h *handler) GetLogger() logr.Logger {
 // Handle handles admission requests. It works only on create/update v1.Pods and ignores anything else.
 // Ensures that each initContainer, container and ephemeral container is using digest instead of tag.
 func (h *handler) Handle(ctx context.Context, request admission.Request) admission.Response {
+	var (
+		patch []byte
+		err   error
+		// logger = h.logger.WithValues(request.Kind, client.ObjectKey{Namespace: request.Namespace, Name: request.Name})
+	)
+
 	ctx, cancel := context.WithTimeout(ctx, time.Second*25)
 	defer cancel()
 
-	if !allowedResources.Has(request.Kind) {
-		return admission.Allowed(fmt.Sprintf("resource is not one of %v", allowedResources.UnsortedList()))
+	if !controlledOperations.Has(string(request.Operation)) {
+		return admission.Allowed(fmt.Sprintf("operation is not any of %v", controlledOperations.List()))
 	}
 
 	if request.SubResource != "" && request.SubResource != "ephemeralcontainers" {
 		return admission.Allowed("subresources on pods other than 'ephemeralcontainers' are not handled")
 	}
 
-	if !controlledOperations.Has(string(request.Operation)) {
-		return admission.Allowed(fmt.Sprintf("operation is not any of %v", controlledOperations.List()))
+	switch request.Kind {
+	case podGVK:
+		pod := corev1.Pod{}
+		err = h.decoder.Decode(request, &pod)
+		if err != nil {
+			break
+		}
+		patch, err = h.handlePod(ctx, pod)
+	case controllerDeploymentGVK:
+		controllerDeployment := core.ControllerDeployment{}
+		err = h.decoder.Decode(request, &controllerDeployment)
+		if err != nil {
+			break
+		}
+		patch, err = h.handleControllerDeployment(ctx, controllerDeployment)
+	case gardenletGVK:
+		gardenlet := seedmanagement.Gardenlet{}
+		err = h.decoder.Decode(request, &gardenlet)
+		if err != nil {
+			break
+		}
+		patch, err = h.handleGardenlet(ctx, gardenlet)
+	case extensionGVK:
+		extension := operatorv1alpha1.Extension{}
+		err = h.decoder.Decode(request, &extension)
+		if err != nil {
+			break
+		}
+		patch, err = h.handleExtension(ctx, extension)
+	default:
+		return admission.Allowed(fmt.Sprintf("resource is not one of %v", allowedResources.UnsortedList()))
 	}
 
-	logger := h.logger.WithValues(request.Kind, client.ObjectKey{Namespace: request.Namespace, Name: request.Name})
-
-	newRawObject, err := h.handleObject(ctx, request, logger)
 	if err != nil {
-		logger.Error(err, "failed to handle object")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	return admission.PatchResponseFromRaw(request.Object.Raw, newRawObject)
+	return admission.PatchResponseFromRaw(request.Object.Raw, patch)
 }
 
-func (h *handler) handleObject(ctx context.Context, request admission.Request, logger logr.Logger) ([]byte, error) {
-	// Support for using pull secrets for helm charts has not been implemented yet.
-	// Thus the keychain reader is created without any image pull secrets.
-	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, request.Namespace, []string{}, h.useOnlyImagePullSecrets)
+func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagement.Gardenlet) ([]byte, error) {
+	var (
+		logger = h.logger.WithValues("gardenlet", client.ObjectKey{Name: gardenlet.Name})
+		kcr    = utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, gardenlet.Namespace, []string{}, h.useOnlyImagePullSecrets)
+	)
 
-	var bytes []byte
+	resolved, err := h.handleContainer(ctx, gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(), kcr, logger)
+	if err != nil {
+		return nil, err
+	}
+	gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &resolved
 
-	switch request.Kind {
-	case controllerDeploymentGVK:
-		controllerDeployment := core.ControllerDeployment{}
-		err := h.decoder.Decode(request, &controllerDeployment)
+	if gardenlet.Spec.Deployment.Image != nil {
+		resolved, err = h.handleContainer(ctx, getURL(gardenlet.Spec.Deployment.Image), kcr, logger)
 		if err != nil {
 			return nil, err
 		}
-
-		if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
-			resolved, err := h.handleContainer(ctx, controllerDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
-			if err != nil {
-				return nil, err
-			}
-
-			controllerDeployment.Helm.OCIRepository.Ref = &resolved
-		}
-
-		bytes, err = json.Marshal(controllerDeployment)
-		if err != nil {
-			return nil, err
-		}
-	case gardenletGVK:
-		gardenlet := seedmanagement.Gardenlet{}
-		if err := h.decoder.Decode(request, &gardenlet); err != nil {
-			return nil, err
-		}
-
-		resolved, err := h.handleContainer(ctx, gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(), kcr, logger)
-		if err != nil {
-			return nil, err
-		}
-		gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &resolved
-
-		if gardenlet.Spec.Deployment.Image != nil {
-			resolved, err = h.handleContainer(ctx, getURL(gardenlet.Spec.Deployment.Image), kcr, logger)
-			if err != nil {
-				return nil, err
-			}
-			// TODO(rado): Hmmm, I'm not sure this should be the change.
-			gardenlet.Spec.Deployment.Image.Tag = &resolved
-		}
-
-		bytes, err = json.Marshal(gardenlet)
-		if err != nil {
-			return nil, err
-		}
-	case extensionGVK:
-		extension := operatorv1alpha1.Extension{}
-		err := h.decoder.Decode(request, &extension)
-		if err != nil {
-			return nil, err
-		}
-
-		if extension.Spec.Deployment != nil &&
-			extension.Spec.Deployment.AdmissionDeployment != nil &&
-			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster != nil &&
-			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm != nil &&
-			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository != nil {
-			resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.GetURL(), kcr, logger)
-			if err != nil {
-				return nil, err
-			}
-			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &resolved
-		}
-
-		if extension.Spec.Deployment != nil &&
-			extension.Spec.Deployment.AdmissionDeployment != nil &&
-			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster != nil &&
-			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm != nil &&
-			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository != nil {
-			resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.GetURL(), kcr, logger)
-			if err != nil {
-				return nil, err
-			}
-			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &resolved
-		}
-
-		if extension.Spec.Deployment != nil &&
-			extension.Spec.Deployment.ExtensionDeployment != nil &&
-			extension.Spec.Deployment.ExtensionDeployment.Helm != nil &&
-			extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository != nil {
-			resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
-			if err != nil {
-				return nil, err
-			}
-			extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.Ref = &resolved
-		}
-
-		bytes, err = json.Marshal(extension)
-		if err != nil {
-			return nil, err
-		}
-	case podGVK:
-		pod := corev1.Pod{}
-		err := h.decoder.Decode(request, &pod)
-		if err != nil {
-			return nil, err
-		}
-
-		kcr = utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, &pod, h.useOnlyImagePullSecrets)
-
-		for idx, ic := range pod.Spec.InitContainers {
-			resolved, err := h.handleContainer(ctx, ic.Image, kcr, logger)
-			if err != nil {
-				return nil, err
-			}
-
-			pod.Spec.InitContainers[idx].Image = resolved
-		}
-		for idx, c := range pod.Spec.Containers {
-			resolved, err := h.handleContainer(ctx, c.Image, kcr, logger)
-			if err != nil {
-				return nil, err
-			}
-
-			pod.Spec.Containers[idx].Image = resolved
-		}
-		for idx, ec := range pod.Spec.EphemeralContainers {
-			resolved, err := h.handleContainer(ctx, ec.Image, kcr, logger)
-			if err != nil {
-				return nil, err
-			}
-
-			pod.Spec.EphemeralContainers[idx].Image = resolved
-		}
-		bytes, err = json.Marshal(pod)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("unknown kind %v", request.Kind.Kind)
+		// TODO(rado): Hmmm, I'm not sure this should be the change.
+		gardenlet.Spec.Deployment.Image.Tag = &resolved
 	}
 
-	return bytes, nil
+	return json.Marshal(gardenlet)
+}
+
+func (h *handler) handleControllerDeployment(ctx context.Context, controllerDeployment core.ControllerDeployment) ([]byte, error) {
+	var (
+		logger = h.logger.WithValues("controllerDeployment", client.ObjectKey{Name: controllerDeployment.Name})
+		kcr    = utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, controllerDeployment.Namespace, []string{}, h.useOnlyImagePullSecrets)
+	)
+
+	if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
+		resolved, err := h.handleContainer(ctx, controllerDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		controllerDeployment.Helm.OCIRepository.Ref = &resolved
+	}
+
+	return json.Marshal(controllerDeployment)
+}
+
+func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha1.Extension) ([]byte, error) {
+	var (
+		logger = h.logger.WithValues("extension", client.ObjectKey{Name: extension.Name})
+		kcr    = utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, extension.Namespace, []string{}, h.useOnlyImagePullSecrets)
+	)
+
+	if extension.Spec.Deployment != nil &&
+		extension.Spec.Deployment.AdmissionDeployment != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository != nil {
+		resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.GetURL(), kcr, logger)
+		if err != nil {
+			return nil, err
+		}
+		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &resolved
+	}
+
+	if extension.Spec.Deployment != nil &&
+		extension.Spec.Deployment.AdmissionDeployment != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository != nil {
+		resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.GetURL(), kcr, logger)
+		if err != nil {
+			return nil, err
+		}
+		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &resolved
+	}
+
+	if extension.Spec.Deployment != nil &&
+		extension.Spec.Deployment.ExtensionDeployment != nil &&
+		extension.Spec.Deployment.ExtensionDeployment.Helm != nil &&
+		extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository != nil {
+		resolved, err := h.handleContainer(ctx, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
+		if err != nil {
+			return nil, err
+		}
+		extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.Ref = &resolved
+	}
+
+	return json.Marshal(extension)
+}
+
+func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error) {
+	var (
+		logger = h.logger.WithValues("pod", client.ObjectKey{Name: pod.Name})
+		kcr    = utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, &pod, h.useOnlyImagePullSecrets)
+	)
+
+	for idx, ic := range pod.Spec.InitContainers {
+		resolved, err := h.handleContainer(ctx, ic.Image, kcr, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		pod.Spec.InitContainers[idx].Image = resolved
+	}
+	for idx, c := range pod.Spec.Containers {
+		resolved, err := h.handleContainer(ctx, c.Image, kcr, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		pod.Spec.Containers[idx].Image = resolved
+	}
+	for idx, ec := range pod.Spec.EphemeralContainers {
+		resolved, err := h.handleContainer(ctx, ec.Image, kcr, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		pod.Spec.EphemeralContainers[idx].Image = resolved
+	}
+
+	return json.Marshal(pod)
 }
 
 // getURL returns the fully-qualified OCIRepository URL of the image.
