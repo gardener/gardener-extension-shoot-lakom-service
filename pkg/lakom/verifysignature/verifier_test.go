@@ -84,16 +84,8 @@ var _ = Describe("Verifier", func() {
 		})
 
 		DescribeTable("Verify images",
-			// The image variable is a pointer to a string because for some unknown reason
-			// when a string variable is passed to the `Entry` function, a copy of the string object gets used
-			// rather than the original object.
-			//
-			// This means that if a string variable (maybe any type of variable?) is passed to the `Entry` function, it will be copied and
-			// subsequent changes to it will not be reflected in the test.
-			// Since `signedImageTag` gets declared first but initialized after Ginkgo builds the spec tree,
-			// it will be nil when the `Entry` function is called.
-			//
-			// This might also be some sort of golang quirk? But I highly doubt it.
+			// image is a pointer due to a workaround needed because of the way ginkgo works
+			// Ref: https://github.com/onsi/ginkgo/issues/378
 			func(image *string, expectedVerificationResult, expectErr bool, errorMessage string) {
 				verified, err := directVerifier.Verify(ctx, *image, kcr)
 				if expectErr {
