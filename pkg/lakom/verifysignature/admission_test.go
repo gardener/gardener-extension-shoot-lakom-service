@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"time"
 
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
@@ -29,50 +28,17 @@ import (
 )
 
 var (
-	deploymentGVK   = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
-	podGVK          = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
-	imageDigest     = "gcr.io/projectsigstore/cosign@sha256:f9fd5a287a67f4b955d08062a966df10f9a600b6b8583fd367bce3f1f000a429"
-	cosignPublicKey = `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhyQCx0E9wQWSFI9ULGwy3BuRklnt
-IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
------END PUBLIC KEY-----
-`
-
-	cosignConfig = lakomconfig.Config{
-		PublicKeys: []lakomconfig.Key{
-			{
-				Name:      "test",
-				Key:       cosignPublicKey,
-				Algorithm: lakomconfig.RSAPKCS1v15SHA256,
-			},
-		},
-	}
-
-	scheme    *runtime.Scheme
-	ctrl      *gomock.Controller
-	mgr       *mockmanager.MockManager
-	apiReader *mockclient.MockReader
+	deploymentGVK = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
+	podGVK        = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
 )
-
-var _ = BeforeSuite(func() {
-	scheme = runtime.NewScheme()
-	err := corev1.AddToScheme(scheme)
-	Expect(err).ToNot(HaveOccurred())
-
-	dirPath, err := os.MkdirTemp("", "verifysignature_test")
-	Expect(err).ToNot(HaveOccurred())
-	DeferCleanup(func() {
-		err := os.RemoveAll(dirPath)
-		Expect(err).ToNot(HaveOccurred())
-	})
-})
 
 var _ = Describe("Admission Handler", func() {
 	var (
-		ctx     = context.Background()
-		logger  logr.Logger
-		handler admission.Handler
-		pod     = &corev1.Pod{
+		ctx          = context.Background()
+		logger       logr.Logger
+		handler      admission.Handler
+		cosignConfig lakomconfig.Config
+		pod          = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "pod-namespace",
 				Name:      "pod-name",
@@ -80,7 +46,7 @@ var _ = Describe("Admission Handler", func() {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:  "container",
-					Image: imageDigest,
+					Image: signedImageFullRef,
 				}},
 			},
 		}
@@ -105,6 +71,14 @@ var _ = Describe("Admission Handler", func() {
 		mgr.EXPECT().GetScheme().Return(scheme)
 
 		logger = logzap.New(logzap.WriteTo(GinkgoWriter))
+		cosignConfig = lakomconfig.Config{
+			PublicKeys: []lakomconfig.Key{
+				{
+					Name: "test",
+					Key:  publicKey,
+				},
+			},
+		}
 		h, err := verifysignature.
 			NewHandleBuilder().
 			WithManager(mgr).
@@ -116,6 +90,8 @@ var _ = Describe("Admission Handler", func() {
 			Build()
 		Expect(err).ToNot(HaveOccurred())
 		handler = h
+
+		pod.Spec.Containers[0].Image = signedImageFullRef
 	})
 
 	DescribeTable(

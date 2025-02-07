@@ -412,6 +412,8 @@ spec:
         resources:
           requests:
             memory: 25M
+        securityContext:
+          allowPrivilegeEscalation: false
         volumeMounts:
         - mountPath: /etc/lakom/config
           name: lakom-config

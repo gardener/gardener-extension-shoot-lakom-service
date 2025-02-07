@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,6 +39,8 @@ spec:
       - name: {{ include "name" . }}
         image: {{ include "image" .Values.global.image }}
         imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
         args:
         - --webhook-config-server-port={{ .Values.global.webhookConfig.serverPort }}
         {{- if .Values.global.virtualGarden.enabled }}

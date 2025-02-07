@@ -69,6 +69,8 @@ spec:
       - name: {{ .Values.name }}
         image: {{ include "image" . }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
         command:
         - /lakom
         - --cache-ttl={{ .Values.cache.ttl }}

@@ -23,3 +23,6 @@ dive.log
 /example/lakom
 /.vscode
 /vendor
+
+# gosec
+gosec-report.sarif

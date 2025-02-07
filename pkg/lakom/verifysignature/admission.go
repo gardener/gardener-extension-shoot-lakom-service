@@ -130,7 +130,7 @@ func (hb HandleBuilder) Build() (*handler, error) {
 
 type handler struct {
 	reader  client.Reader
-	decoder *admission.Decoder
+	decoder admission.Decoder
 	logger  logr.Logger
 
 	verifier                Verifier

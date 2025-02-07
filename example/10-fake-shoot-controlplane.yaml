@@ -39,6 +39,8 @@ spec:
         volumeMounts:
         - mountPath: /etcd-data
           name: data
+        securityContext:
+          allowPrivilegeEscalation: false
       volumes:
       - name: data
         emptyDir: {}
@@ -156,6 +158,8 @@ spec:
         - --v=2
         image: k8s.gcr.io/hyperkube:v1.15.1
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
         name: kube-apiserver
         ports:
         - containerPort: 443
