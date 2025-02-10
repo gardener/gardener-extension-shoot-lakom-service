@@ -12,6 +12,9 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
 
+	gcorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
+	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
+	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
 	mockmanager "github.com/gardener/gardener/third_party/mock/controller-runtime/manager"
 	"github.com/go-logr/logr"
@@ -27,8 +30,11 @@ import (
 )
 
 var (
-	deploymentGVK = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
-	podGVK        = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
+	deploymentGVK           = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
+	podGVK                  = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
+	controllerDeploymentGVK = metav1.GroupVersionKind{Group: "core.gardener.cloud", Kind: "ControllerDeployment", Version: "v1"}
+	gardenletGVK            = metav1.GroupVersionKind{Group: "seedmanagement.gardener.cloud", Kind: "Gardenlet", Version: "v1alpha1"}
+	extensionGVK            = metav1.GroupVersionKind{Group: "extensions.operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
 )
 
 var _ = Describe("Admission Handler", func() {
@@ -48,7 +54,76 @@ var _ = Describe("Admission Handler", func() {
 				}},
 			},
 		}
-		invalidPod = &corev1.ConfigMap{
+		podPaths                = []string{"/spec/containers/0/image"}
+		podExpectedPatchesCount = 1
+		cd                      = &gcorev1.ControllerDeployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "cd-namespace",
+				Name:      "cd-name",
+			},
+			Helm: &gcorev1.HelmControllerDeployment{
+				OCIRepository: &gcorev1.OCIRepository{
+					Ref: &signedImageTagRef,
+				},
+			},
+		}
+		cdPaths                = []string{"/helm/ociRepository/ref"}
+		cdExpectedPatchesCount = 1
+		gardenlet              = &seedmanagementv1alpha1.Gardenlet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "gardenlet-namespace",
+				Name:      "gardenlet-name",
+			},
+			Spec: seedmanagementv1alpha1.GardenletSpec{
+				Deployment: seedmanagementv1alpha1.GardenletSelfDeployment{
+					Helm: seedmanagementv1alpha1.GardenletHelm{
+						OCIRepository: gcorev1.OCIRepository{
+							Ref: &signedImageTagRef,
+						},
+					},
+				},
+			},
+		}
+		gardenletPaths                = []string{"/spec/deployment/helm/ociRepository/ref"}
+		gardenletExpectedPatchesCount = 1
+		extension                     = &operatorv1alpha1.Extension{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "extension-namespace",
+				Name:      "extension-name",
+			},
+			Spec: operatorv1alpha1.ExtensionSpec{
+				Deployment: &operatorv1alpha1.Deployment{
+					ExtensionDeployment: &operatorv1alpha1.ExtensionDeploymentSpec{
+						DeploymentSpec: operatorv1alpha1.DeploymentSpec{
+							Helm: &operatorv1alpha1.ExtensionHelm{
+								OCIRepository: &gcorev1.OCIRepository{
+									Ref: &signedImageTagRef,
+								},
+							},
+						},
+					},
+					AdmissionDeployment: &operatorv1alpha1.AdmissionDeploymentSpec{
+						RuntimeCluster: &operatorv1alpha1.DeploymentSpec{
+							Helm: &operatorv1alpha1.ExtensionHelm{
+								OCIRepository: &gcorev1.OCIRepository{
+									Ref: &signedImageTagRef,
+								},
+							},
+						},
+						VirtualCluster: &operatorv1alpha1.DeploymentSpec{
+							Helm: &operatorv1alpha1.ExtensionHelm{
+								OCIRepository: &gcorev1.OCIRepository{
+									Ref: &signedImageTagRef,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		extensionPaths                = []string{"/spec/deployment/extension/helm/ociRepository/ref", "/spec/deployment/admission/runtimeCluster/helm/ociRepository/ref", "/spec/deployment/admission/virtualCluster/helm/ociRepository/ref"}
+		extensionExpectedPatchesCount = 3
+		invalidPod                    = &corev1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "invalida.api/v1",
 				Kind:       "InvalidKind",
@@ -102,17 +177,35 @@ var _ = Describe("Admission Handler", func() {
 		Entry("Disallow pod with invalid image via ephemeralcontainers subResource request", arb{}.withKind(podGVK).withSubResource("ephemeralcontainers").withOperation(admissionv1.Update).withObject(podWithImage(pod, "invalid-image@sha256:123")).Build(), false, "could not parse reference"),
 	)
 
-	It("Should properly resolve tag to digest", func() {
-		request := arb{}.withKind(podGVK).withOperation(admissionv1.Create).withObject(pod).Build()
-		response := handler.Handle(ctx, request)
-		Expect(response.Allowed).To(BeTrue())
-		Expect(response.Patches).To(HaveLen(1))
-		patch := response.Patches[0]
-		Expect(patch.Operation).To(Equal("replace"))
-		Expect(patch.Path).To(Equal("/spec/containers/0/image"))
-		Expect(patch.Value).To(Equal(signedImageFullRef))
-	})
-
+	// Use a closure for building the request to capture a ref of the
+	// the object (pod, controllerdeployment, ...) instead of the value.
+	// Ref: https://github.com/onsi/ginkgo/issues/378
+	DescribeTable(
+		"Resolve tags to digests",
+		func(requestBuilder func() admission.Request, expectedImage *string, expectedPatchesCount int, expectedPaths []string) {
+			request := requestBuilder()
+			response := handler.Handle(ctx, request)
+			Expect(response.Allowed).To(BeTrue())
+			Expect(response.Patches).To(HaveLen(expectedPatchesCount))
+			for _, patch := range response.Patches {
+				Expect(patch.Operation).To(Equal("replace"))
+				Expect(patch.Value).To(Equal(*expectedImage))
+				Expect(expectedPaths).To(ContainElement(patch.Path))
+			}
+		},
+		Entry("Resolve tag to digest for pod", func() admission.Request {
+			return arb{}.withKind(podGVK).withOperation(admissionv1.Create).withObject(pod).Build()
+		}, &signedImageFullRef, podExpectedPatchesCount, podPaths),
+		Entry("Resolve tag to digest for controllerdeployment", func() admission.Request {
+			return arb{}.withKind(controllerDeploymentGVK).withOperation(admissionv1.Create).withObject(cd).Build()
+		}, &signedImageFullRef, cdExpectedPatchesCount, cdPaths),
+		Entry("Resolve tag to digest for gardenlet", func() admission.Request {
+			return arb{}.withKind(gardenletGVK).withOperation(admissionv1.Create).withObject(gardenlet).Build()
+		}, &signedImageFullRef, gardenletExpectedPatchesCount, gardenletPaths),
+		Entry("Resolve tag to digest for extension", func() admission.Request {
+			return arb{}.withKind(extensionGVK).withOperation(admissionv1.Create).withObject(extension).Build()
+		}, &signedImageFullRef, extensionExpectedPatchesCount, extensionPaths),
+	)
 })
 
 func podWithImage(pod *corev1.Pod, image string) *corev1.Pod {

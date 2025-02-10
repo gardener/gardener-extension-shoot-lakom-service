@@ -13,6 +13,9 @@ import (
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
 
+	gcorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
+	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
+	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
 	mockmanager "github.com/gardener/gardener/third_party/mock/controller-runtime/manager"
 	"github.com/go-logr/logr"
@@ -28,8 +31,11 @@ import (
 )
 
 var (
-	deploymentGVK = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
-	podGVK        = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
+	deploymentGVK           = metav1.GroupVersionKind{Group: "apps", Kind: "Deployment", Version: "v1"}
+	podGVK                  = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
+	controllerDeploymentGVK = metav1.GroupVersionKind{Group: "core.gardener.cloud", Kind: "ControllerDeployment", Version: "v1"}
+	gardenletGVK            = metav1.GroupVersionKind{Group: "seedmanagement.gardener.cloud", Kind: "Gardenlet", Version: "v1alpha1"}
+	extensionGVK            = metav1.GroupVersionKind{Group: "extensions.operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
 )
 
 var _ = Describe("Admission Handler", func() {
@@ -50,6 +56,68 @@ var _ = Describe("Admission Handler", func() {
 				}},
 			},
 		}
+		cd = &gcorev1.ControllerDeployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "cd-namespace",
+				Name:      "cd-name",
+			},
+			Helm: &gcorev1.HelmControllerDeployment{
+				OCIRepository: &gcorev1.OCIRepository{
+					Ref: &signedImageFullRef,
+				},
+			},
+		}
+		gardenlet = &seedmanagementv1alpha1.Gardenlet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "gardenlet-namespace",
+				Name:      "gardenlet-name",
+			},
+			Spec: seedmanagementv1alpha1.GardenletSpec{
+				Deployment: seedmanagementv1alpha1.GardenletSelfDeployment{
+					Helm: seedmanagementv1alpha1.GardenletHelm{
+						OCIRepository: gcorev1.OCIRepository{
+							Ref: &signedImageFullRef,
+						},
+					},
+				},
+			},
+		}
+		extension = &operatorv1alpha1.Extension{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "extension-namespace",
+				Name:      "extension-name",
+			},
+			Spec: operatorv1alpha1.ExtensionSpec{
+				Deployment: &operatorv1alpha1.Deployment{
+					ExtensionDeployment: &operatorv1alpha1.ExtensionDeploymentSpec{
+						DeploymentSpec: operatorv1alpha1.DeploymentSpec{
+							Helm: &operatorv1alpha1.ExtensionHelm{
+								OCIRepository: &gcorev1.OCIRepository{
+									Ref: &signedImageFullRef,
+								},
+							},
+						},
+					},
+					AdmissionDeployment: &operatorv1alpha1.AdmissionDeploymentSpec{
+						RuntimeCluster: &operatorv1alpha1.DeploymentSpec{
+							Helm: &operatorv1alpha1.ExtensionHelm{
+								OCIRepository: &gcorev1.OCIRepository{
+									Ref: &signedImageFullRef,
+								},
+							},
+						},
+						VirtualCluster: &operatorv1alpha1.DeploymentSpec{
+							Helm: &operatorv1alpha1.ExtensionHelm{
+								OCIRepository: &gcorev1.OCIRepository{
+									Ref: &signedImageFullRef,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
 		invalidPod = &corev1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "invalida.api/v1",
@@ -92,6 +160,11 @@ var _ = Describe("Admission Handler", func() {
 		handler = h
 
 		pod.Spec.Containers[0].Image = signedImageFullRef
+		cd.Helm.OCIRepository.Ref = &signedImageFullRef
+		gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &signedImageFullRef
+		extension.Spec.Deployment.ExtensionDeployment.DeploymentSpec.Helm.OCIRepository.Ref = &signedImageFullRef
+		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &signedImageFullRef
+		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &signedImageFullRef
 	})
 
 	DescribeTable(
@@ -112,14 +185,35 @@ var _ = Describe("Admission Handler", func() {
 		Entry("Disallow undecodable pod", admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: invalidPod}.Build(), false, `no kind "InvalidKind" is registered for version`),
 		Entry("Disallow pod with invalid image", admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, "invalid-image@sha256:123")}.Build(), false, "could not parse reference"),
 		Entry("Disallow pod with invalid image via ephemeralcontainers subResource request", admissionRequestBuilder{gvk: podGVK, subResource: "ephemeralcontainers", operation: admissionv1.Update, object: podWithImage(pod, "invalid-image@sha256:123")}.Build(), false, "could not parse reference"),
+		Entry("Disallow controller deployment with invalid artifact", admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Create, object: controllerDeploymentWithChart(cd, "invalid-artifact@sha256:123")}.Build(), false, "could not parse reference"),
+		Entry("Disallow gardenlet with invalid artifact", admissionRequestBuilder{gvk: gardenletGVK, operation: admissionv1.Create, object: gardenletWithChart(gardenlet, "invalid-artifact@sha256:123")}.Build(), false, "could not parse reference"),
+		Entry("Disallow extension with invalid artifact", admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extensionWithChart(extension, "invalid-artifact@sha256:123")}.Build(), false, "could not parse reference"),
 	)
 
-	It("Should properly verify image signature", func() {
-		request := admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: pod}.Build()
-		response := handler.Handle(ctx, request)
-		Expect(response.Allowed).To(BeTrue())
-		Expect(response.Result.Code).To(BeEquivalentTo(http.StatusOK))
-	})
+	// Use a closure for building the request to capture a ref of the
+	// the object (pod, controllerdeployment, ...) instead of the value.
+	// Ref: https://github.com/onsi/ginkgo/issues/378
+	DescribeTable(
+		"Proper verification of artifacts",
+		func(requestBuilder func() admission.Request, allowed bool) {
+			request := requestBuilder()
+			response := handler.Handle(ctx, request)
+			Expect(response.Allowed).To(Equal(allowed))
+			Expect(response.Result.Code).To(BeEquivalentTo(http.StatusOK))
+		},
+		Entry("Should properly verify pod image signature", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: pod}.Build()
+		}, true),
+		Entry("Should properly verify controllerdeployment artifact signature", func() admission.Request {
+			return admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Create, object: cd}.Build()
+		}, true),
+		Entry("Should properly verify gardenlet artifact signature", func() admission.Request {
+			return admissionRequestBuilder{gvk: gardenletGVK, operation: admissionv1.Create, object: gardenlet}.Build()
+		}, true),
+		Entry("Should properly verify extension artifact signature", func() admission.Request {
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}, true),
+	)
 
 	It("Should allow untrusted artifacts", func() {
 		mgr.EXPECT().GetAPIReader().Return(apiReader)
@@ -174,6 +268,26 @@ func podWithImage(pod *corev1.Pod, image string) *corev1.Pod {
 	}
 
 	return p
+}
+
+func controllerDeploymentWithChart(controllerDeployment *gcorev1.ControllerDeployment, artifact string) *gcorev1.ControllerDeployment {
+	cd := controllerDeployment.DeepCopy()
+	cd.Helm.OCIRepository.Ref = &artifact
+	return cd
+}
+
+func gardenletWithChart(gardenlet *seedmanagementv1alpha1.Gardenlet, artifact string) *seedmanagementv1alpha1.Gardenlet {
+	g := gardenlet.DeepCopy()
+	g.Spec.Deployment.Helm.OCIRepository.Ref = &artifact
+	return g
+}
+
+func extensionWithChart(extension *operatorv1alpha1.Extension, artifact string) *operatorv1alpha1.Extension {
+	e := extension.DeepCopy()
+	e.Spec.Deployment.ExtensionDeployment.DeploymentSpec.Helm.OCIRepository.Ref = &artifact
+	e.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &artifact
+	e.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &artifact
+	return e
 }
 
 type admissionRequestBuilder struct {
