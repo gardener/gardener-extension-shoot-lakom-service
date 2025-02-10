@@ -15,9 +15,9 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
-	"github.com/gardener/gardener/pkg/apis/core"
+	gcorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
-	"github.com/gardener/gardener/pkg/apis/seedmanagement"
+	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/name"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -159,14 +159,14 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		}
 		patch, err = h.handlePod(ctx, pod)
 	case controllerDeploymentGVK:
-		controllerDeployment := core.ControllerDeployment{}
+		controllerDeployment := gcorev1.ControllerDeployment{}
 		err = h.decoder.Decode(request, &controllerDeployment)
 		if err != nil {
 			break
 		}
 		patch, err = h.handleControllerDeployment(ctx, controllerDeployment)
 	case gardenletGVK:
-		gardenlet := seedmanagement.Gardenlet{}
+		gardenlet := seedmanagementv1alpha1.Gardenlet{}
 		err = h.decoder.Decode(request, &gardenlet)
 		if err != nil {
 			break
@@ -190,7 +190,7 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 	return admission.PatchResponseFromRaw(request.Object.Raw, patch)
 }
 
-func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagement.Gardenlet) ([]byte, error) {
+func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagementv1alpha1.Gardenlet) ([]byte, error) {
 	var (
 		logger = h.logger.WithValues("gardenlet", client.ObjectKey{Name: gardenlet.Name})
 		kcr    = utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, gardenlet.Namespace, []string{}, h.useOnlyImagePullSecrets)
@@ -214,7 +214,7 @@ func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagement.
 	return json.Marshal(gardenlet)
 }
 
-func (h *handler) handleControllerDeployment(ctx context.Context, controllerDeployment core.ControllerDeployment) ([]byte, error) {
+func (h *handler) handleControllerDeployment(ctx context.Context, controllerDeployment gcorev1.ControllerDeployment) ([]byte, error) {
 	var (
 		logger = h.logger.WithValues("controllerDeployment", client.ObjectKey{Name: controllerDeployment.Name})
 		kcr    = utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, controllerDeployment.Namespace, []string{}, h.useOnlyImagePullSecrets)
@@ -311,7 +311,7 @@ func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error)
 }
 
 // getURL returns the fully-qualified OCIRepository URL of the image.
-func getURL(img *seedmanagement.Image) string {
+func getURL(img *seedmanagementv1alpha1.Image) string {
 	ref := *img.Repository
 
 	if img.Tag != nil {

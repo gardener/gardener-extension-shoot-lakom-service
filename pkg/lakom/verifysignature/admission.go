@@ -16,9 +16,9 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
-	"github.com/gardener/gardener/pkg/apis/core"
+	gcorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
-	"github.com/gardener/gardener/pkg/apis/seedmanagement"
+	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	"github.com/go-logr/logr"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -197,14 +197,14 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		}
 		verificationTargets, kcr, err = h.extractPodVerificationTargets(ctx, pod)
 	case controllerDeploymentGVK:
-		controllerDeployment := core.ControllerDeployment{}
+		controllerDeployment := gcorev1.ControllerDeployment{}
 		err = h.decoder.Decode(request, &controllerDeployment)
 		if err != nil {
 			break
 		}
 		verificationTargets, kcr, err = h.extractControllerDeploymentVerificationTargets(ctx, controllerDeployment)
 	case gardenletGVK:
-		gardenlet := seedmanagement.Gardenlet{}
+		gardenlet := seedmanagementv1alpha1.Gardenlet{}
 		err = h.decoder.Decode(request, &gardenlet)
 		if err != nil {
 			break
@@ -277,7 +277,7 @@ func (h *handler) extractPodVerificationTargets(ctx context.Context, pod corev1.
 // extractControllerDeploymentVerificationTargets returns an array of verification targets from the controller deployment.
 // The verification targets are extracted from the following fields:
 // - core.gardener.cloud/ControllerDeployment: helm.ociRepository
-func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Context, controllerDeployment core.ControllerDeployment) ([]verificationTarget, utils.KeyChainReader, error) {
+func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Context, controllerDeployment gcorev1.ControllerDeployment) ([]verificationTarget, utils.KeyChainReader, error) {
 	var verificationTargets []verificationTarget
 
 	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, controllerDeployment.Namespace, []string{}, h.useOnlyImagePullSecrets)
@@ -296,7 +296,7 @@ func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Con
 // The verification targets are extracted from the following fields:
 // - seedmanagement.gardener.cloud/Gardenlet: spec.deployment.helm.ociRepository
 // - seedmanagement.gardener.cloud/Gardenlet: spec.deployment.image
-func (h *handler) extractGardenletVerificationTargets(ctx context.Context, gardenlet seedmanagement.Gardenlet) ([]verificationTarget, utils.KeyChainReader, error) {
+func (h *handler) extractGardenletVerificationTargets(ctx context.Context, gardenlet seedmanagementv1alpha1.Gardenlet) ([]verificationTarget, utils.KeyChainReader, error) {
 	var verificationTargets []verificationTarget
 
 	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, gardenlet.Namespace, []string{}, h.useOnlyImagePullSecrets)
@@ -361,7 +361,7 @@ func (h *handler) extractExtensionVerificationTargets(ctx context.Context, exten
 }
 
 // getURL returns the fully-qualified OCIRepository URL of the image.
-func getURL(img *seedmanagement.Image) string {
+func getURL(img *seedmanagementv1alpha1.Image) string {
 	ref := *img.Repository
 
 	if img.Tag != nil {
