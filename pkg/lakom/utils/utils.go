@@ -43,7 +43,7 @@ func NewLazyKeyChainReader(reader func() (authn.Keychain, error)) *lazyKeyChainR
 
 // NewLazyKeyChainReaderFromPod creates lazyKeyChainReader for given pod.
 func NewLazyKeyChainReaderFromPod(ctx context.Context, c client.Reader, pod *corev1.Pod, useOnlyImagePullSecrets bool) *lazyKeyChainReader {
-	var secretNames []string
+	secretNames := make([]string, 0, len(pod.Spec.ImagePullSecrets))
 	for _, sn := range pod.Spec.ImagePullSecrets {
 		secretNames = append(secretNames, sn.Name)
 	}
