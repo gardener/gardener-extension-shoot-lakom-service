@@ -36,19 +36,6 @@ webhooks:
 {{ toYaml .Values.admissionConfig.objectSelector | indent 4 }}
 {{- end }}
   rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - pods
-    - pods/ephemeralcontainers
-    - controllerdeployments
-    - gardenlets
-    - operator.extensions
-    scope: '*'
+{{ toYaml .Values.rules | indent 2 }}
   sideEffects: None
   timeoutSeconds: 25
