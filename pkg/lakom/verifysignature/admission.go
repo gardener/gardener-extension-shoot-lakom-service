@@ -173,6 +173,7 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		err                 error
 		verificationTargets []verificationTarget
 		kcr                 utils.KeyChainReader
+		logger              = h.logger.WithValues(request.Kind.Kind, client.ObjectKey{Namespace: request.Namespace, Name: request.Name})
 	)
 	ctx, cancel := context.WithTimeout(ctx, time.Second*25)
 	defer cancel()
@@ -181,18 +182,16 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		return admission.Allowed(fmt.Sprintf("resource is not one of %v", allowedResources.UnsortedList()))
 	}
 
-	if request.SubResource != "" && request.SubResource != "ephemeralcontainers" {
-		return admission.Allowed("subresources on pods other than 'ephemeralcontainers' are not handled")
-	}
-
 	if !controlledOperations.Has(string(request.Operation)) {
 		return admission.Allowed(fmt.Sprintf("operation is not any of %v", controlledOperations.List()))
 	}
 
-	logger := h.logger.WithValues(request.Kind.Kind, client.ObjectKey{Namespace: request.Namespace, Name: request.Name})
-
 	switch request.Kind {
 	case podGVK:
+		if request.SubResource != "" && request.SubResource != "ephemeralcontainers" {
+			return admission.Allowed("subresources on pods other than 'ephemeralcontainers' are not handled")
+		}
+
 		pod := corev1.Pod{}
 		err = h.decoder.Decode(request, &pod)
 		if err != nil {
