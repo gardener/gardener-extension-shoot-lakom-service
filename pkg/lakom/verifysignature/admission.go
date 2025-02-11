@@ -158,8 +158,11 @@ type verificationTarget struct {
 	fldPath     *field.Path
 }
 
-// Handle handles admission requests. It works only on create/update on one of
-// (core.gardener.cloud/ControllerDeployment, seedmanagement.gardener.cloud/Gardenlet, extensions.operator.gardener.cloud/Extension, v1.Pod)
+// Handle handles admission requests. It works only on create/update on one of:
+// - v1.Pod
+// - core.gardener.cloud/ControllerDeployment/v1
+// - seedmanagement.gardener.cloud/Gardenlet/v1alpha1
+// - extensions.operator.gardener.cloud/Extension/v1alpha1
 // and ignores anything else. Ensures that each resource is using images or
 // helm charts signed by at least one of the provided public cosign keys.
 //
