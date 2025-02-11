@@ -130,13 +130,15 @@ func (h *handler) GetLogger() logr.Logger {
 	return h.logger
 }
 
-// Handle handles admission requests. It works only on create/update v1.Pods and ignores anything else.
-// Ensures that each initContainer, container and ephemeral container is using digest instead of tag.
+// Handle handles admission requests. It works on create/update on the following resources:
+// - v1/Pod
+// - core.gardener.cloud/v1/ControllerDeployment
+// - seedmanagement.gardener.cloud/v1alpha1/Gardenlet
+// - extensions.operator.gardener.cloud/v1alpha1/Extension
 func (h *handler) Handle(ctx context.Context, request admission.Request) admission.Response {
 	var (
 		patch []byte
 		err   error
-		// logger = h.logger.WithValues(request.Kind, client.ObjectKey{Namespace: request.Namespace, Name: request.Name})
 	)
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*25)
@@ -146,12 +148,11 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		return admission.Allowed(fmt.Sprintf("operation is not any of %v", controlledOperations.List()))
 	}
 
-	if request.SubResource != "" && request.SubResource != "ephemeralcontainers" {
-		return admission.Allowed("subresources on pods other than 'ephemeralcontainers' are not handled")
-	}
-
 	switch request.Kind {
 	case podGVK:
+		if request.SubResource != "" && request.SubResource != "ephemeralcontainers" {
+			return admission.Allowed("subresources on pods other than 'ephemeralcontainers' are not handled")
+		}
 		pod := corev1.Pod{}
 		err = h.decoder.Decode(request, &pod)
 		if err != nil {
@@ -190,6 +191,11 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 	return admission.PatchResponseFromRaw(request.Object.Raw, patch)
 }
 
+// Ensures that each OCIRepository URL in the gardenlet is referring
+// to an artifact using digest instead of tag.
+// The following fields are checked:
+// - gardenlet.Spec.Deployment.Helm.OCIRepository
+// - gardenlet.Spec.Deployment.Image
 func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagementv1alpha1.Gardenlet) ([]byte, error) {
 	var (
 		logger = h.logger.WithValues("gardenlet", client.ObjectKey{Name: gardenlet.Name})
@@ -207,13 +213,16 @@ func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagementv
 		if err != nil {
 			return nil, err
 		}
-		// TODO(rado): Hmmm, I'm not sure this should be the change.
 		gardenlet.Spec.Deployment.Image.Tag = &resolved
 	}
 
 	return json.Marshal(gardenlet)
 }
 
+// Ensures that each OCIRepository URL in the controller deployment is referring
+// to an artifact using digest instead of tag.
+// The following fields are checked:
+// - controllerDeployment.Spec.Helm.OCIRepository
 func (h *handler) handleControllerDeployment(ctx context.Context, controllerDeployment gcorev1.ControllerDeployment) ([]byte, error) {
 	var (
 		logger = h.logger.WithValues("controllerDeployment", client.ObjectKey{Name: controllerDeployment.Name})
@@ -232,6 +241,12 @@ func (h *handler) handleControllerDeployment(ctx context.Context, controllerDepl
 	return json.Marshal(controllerDeployment)
 }
 
+// Ensures that each OCIRepository URL in the extension resource is referring
+// to an artifact using digest instead of tag.
+// The following fields are checked:
+// - extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository
+// - extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository
+// - extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository
 func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha1.Extension) ([]byte, error) {
 	var (
 		logger = h.logger.WithValues("extension", client.ObjectKey{Name: extension.Name})
@@ -276,6 +291,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 	return json.Marshal(extension)
 }
 
+// Ensures that each initContainer, container and ephemeral container is using digest instead of tag.
 func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error) {
 	var (
 		logger = h.logger.WithValues("pod", client.ObjectKey{Name: pod.Name})
@@ -315,7 +331,11 @@ func getURL(img *seedmanagementv1alpha1.Image) string {
 	ref := *img.Repository
 
 	if img.Tag != nil {
-		ref = ref + ":" + *img.Tag
+		if strings.HasPrefix(*img.Tag, "sha256:") {
+			ref = ref + "@" + *img.Tag
+		} else {
+			ref = ref + ":" + *img.Tag
+		}
 	}
 
 	return strings.TrimPrefix(ref, "oci://")

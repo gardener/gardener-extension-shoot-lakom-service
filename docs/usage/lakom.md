@@ -77,5 +77,5 @@ However, it also has the capabilities to validate the following Gardener specifi
 > When deploying Lakom via the helm chart in `/charts/lakom`, the `rules` key
 > can be fully customized to include any of the listed resources above.
 > Make sure that they are registered with the same group & versions as the ones listed above.
-> Any difference will cause Lakom to fail the decoding of the resources and
-> automatically reject them.
+> Any difference will cause Lakom to skip validation and approve the request,
+> making it a security risk.
