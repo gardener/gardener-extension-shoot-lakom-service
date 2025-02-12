@@ -367,7 +367,11 @@ func getURL(img *seedmanagementv1alpha1.Image) string {
 	ref := *img.Repository
 
 	if img.Tag != nil {
-		ref = ref + ":" + *img.Tag
+		if strings.HasPrefix(*img.Tag, "sha256:") {
+			ref = ref + "@" + *img.Tag
+		} else {
+			ref = ref + ":" + *img.Tag
+		}
 	}
 
 	return strings.TrimPrefix(ref, "oci://")
