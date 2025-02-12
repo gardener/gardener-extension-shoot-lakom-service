@@ -98,7 +98,7 @@ var _ = Describe("Verifier", func() {
 			},
 			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), false, true, "could not parse reference"),
 			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), false, true, "could not parse reference"),
-			Entry("Refuse to verify image not using digest", ptr.To("registry.k8s.io/pause:3.7"), false, true, "image reference is not a digest"),
+			Entry("Refuse to verify image not using digest", ptr.To("registry.k8s.io/pause:3.7"), false, true, "artifact reference is not a digest, reference: \"registry.k8s.io/pause:3.7\""),
 			Entry("Successfully verify signed image", &signedImageFullRef, true, false, ""),
 			Entry("Fail signature check when image exists but it has not been signed", &unsignedImageFullRef, false, false, ""),
 		)
@@ -151,7 +151,7 @@ var _ = Describe("Verifier", func() {
 			},
 			Entry("Fail to parse bad image digest", ptr.To("gardener/non-existing-image@sha256:123"), false, true, "could not parse reference"),
 			Entry("Fail to parse bad image tag", ptr.To("gardener/non-existing-image:123!"), false, true, "could not parse reference"),
-			Entry("Refuse to verify image not using digest", ptr.To("registry.k8s.io/pause:3.7"), false, true, "image reference is not a digest"),
+			Entry("Refuse to verify image not using digest", ptr.To("registry.k8s.io/pause:3.7"), false, true, "artifact reference is not a digest, reference: \"registry.k8s.io/pause:3.7\""),
 			Entry("Successfully verify signed image", &signedImageFullRef, true, false, ""),
 			Entry("Fail signature check when image exists but it has not been signed", &unsignedImageFullRef, false, false, ""),
 		)

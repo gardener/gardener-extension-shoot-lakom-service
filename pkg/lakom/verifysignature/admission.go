@@ -9,12 +9,16 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
+	gcorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
+	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
+	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	"github.com/go-logr/logr"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,13 +55,13 @@ func (hb HandleBuilder) WithManager(mgr manager.Manager) HandleBuilder {
 	return hb
 }
 
-// WithUseOnlyImagePullSecrets sets only the image pull secrets to be used to access the OCI Registry.
+// WithUseOnlyImagePullSecrets sets only the artifact pull secrets to be used to access the OCI Registry.
 func (hb HandleBuilder) WithUseOnlyImagePullSecrets(useOnlyImagePullSecrets bool) HandleBuilder {
 	hb.useOnlyImagePullSecrets = useOnlyImagePullSecrets
 	return hb
 }
 
-// WithAllowUntrustedImages configures the webhook to allow images without trusted signature.
+// WithAllowUntrustedImages configures the webhook to allow artifacts without trusted signature.
 func (hb HandleBuilder) WithAllowUntrustedImages(allowUntrustedImages bool) HandleBuilder {
 	hb.allowUntrustedImages = allowUntrustedImages
 	return hb
@@ -135,106 +139,266 @@ type handler struct {
 }
 
 var (
-	podGVK               = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
-	controlledOperations = sets.NewString(string(admissionv1.Create), string(admissionv1.Update))
+	podGVK                  = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
+	controllerDeploymentGVK = metav1.GroupVersionKind{Group: "core.gardener.cloud", Kind: "ControllerDeployment", Version: "v1"}
+	gardenletGVK            = metav1.GroupVersionKind{Group: "seedmanagement.gardener.cloud", Kind: "Gardenlet", Version: "v1alpha1"}
+	extensionGVK            = metav1.GroupVersionKind{Group: "extensions.operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
+	allowedResources        = sets.New(podGVK, controllerDeploymentGVK, gardenletGVK, extensionGVK)
+	controlledOperations    = sets.NewString(string(admissionv1.Create), string(admissionv1.Update))
 )
 
 func (h *handler) GetLogger() logr.Logger {
 	return h.logger
 }
 
-// Handle handles admission requests. It works only on create/update v1.Pods and ignores anything else.
-// Ensures that each initContainer, container and ephemeral container is using images signed by
-// at least one of the provided public cosign keys.
+// a verification target represents an artifact that needs to be verified
+// along with the path from which it was extracted in the resource.
+type verificationTarget struct {
+	artifactRef string
+	fldPath     *field.Path
+}
+
+// Handle handles admission requests. It works only on create/update on one of:
+// - v1.Pod
+// - core.gardener.cloud/ControllerDeployment/v1
+// - seedmanagement.gardener.cloud/Gardenlet/v1alpha1
+// - extensions.operator.gardener.cloud/Extension/v1alpha1
+// and ignores anything else. Ensures that each resource is using images or
+// helm charts signed by at least one of the provided public cosign keys.
+//
+// The resource from the request is first transformed into a list of verification targets.
+// After that, each verification target is validated against the provided public keys.
 func (h *handler) Handle(ctx context.Context, request admission.Request) admission.Response {
+	var (
+		err                 error
+		verificationTargets []verificationTarget
+		kcr                 utils.KeyChainReader
+		logger              = h.logger.WithValues(request.Kind.Kind, client.ObjectKey{Namespace: request.Namespace, Name: request.Name})
+	)
 	ctx, cancel := context.WithTimeout(ctx, time.Second*25)
 	defer cancel()
 
-	if request.Kind != podGVK {
-		return admission.Allowed("resource is not v1.Pod")
-	}
-
-	if request.SubResource != "" && request.SubResource != "ephemeralcontainers" {
-		return admission.Allowed("subresources on pods other than 'ephemeralcontainers' are not handled")
+	if !allowedResources.Has(request.Kind) {
+		return admission.Allowed(fmt.Sprintf("resource is not one of %v", allowedResources.UnsortedList()))
 	}
 
 	if !controlledOperations.Has(string(request.Operation)) {
 		return admission.Allowed(fmt.Sprintf("operation is not any of %v", controlledOperations.List()))
 	}
 
-	pod := &corev1.Pod{}
-	if err := h.decoder.Decode(request, pod); err != nil {
-		h.logger.Error(err, "failed to decode request to pod")
+	switch request.Kind {
+	case podGVK:
+		if request.SubResource != "" && request.SubResource != "ephemeralcontainers" {
+			return admission.Allowed("subresources on pods other than 'ephemeralcontainers' are not handled")
+		}
+
+		pod := corev1.Pod{}
+		err = h.decoder.Decode(request, &pod)
+		if err != nil {
+			break
+		}
+		verificationTargets, kcr, err = h.extractPodVerificationTargets(ctx, pod)
+	case controllerDeploymentGVK:
+		controllerDeployment := gcorev1.ControllerDeployment{}
+		err = h.decoder.Decode(request, &controllerDeployment)
+		if err != nil {
+			break
+		}
+		verificationTargets, kcr, err = h.extractControllerDeploymentVerificationTargets(ctx, controllerDeployment)
+	case gardenletGVK:
+		gardenlet := seedmanagementv1alpha1.Gardenlet{}
+		err = h.decoder.Decode(request, &gardenlet)
+		if err != nil {
+			break
+		}
+		verificationTargets, kcr, err = h.extractGardenletVerificationTargets(ctx, gardenlet)
+	case extensionGVK:
+		extension := operatorv1alpha1.Extension{}
+		err = h.decoder.Decode(request, &extension)
+		if err != nil {
+			break
+		}
+		verificationTargets, kcr, err = h.extractExtensionVerificationTargets(ctx, extension)
+	default:
+		return admission.Allowed(fmt.Sprintf("resource is not one of %v", allowedResources.UnsortedList()))
+	}
+
+	if err != nil {
+		logger.Error(err, "failed to extract verification targets")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	logger := h.logger.WithValues("pod", client.ObjectKeyFromObject(pod))
-
-	if err := h.validatePod(ctx, logger, pod); err != nil {
+	if err := h.validateTargets(ctx, logger, verificationTargets, kcr); err != nil {
 		if h.allowUntrustedImages {
-			logger.Info("pod validation failed but untrusted images are allowed", "error", err.Error())
-			warningsResponse := admission.Allowed("untrusted images are allowed")
-			warningsResponse.Warnings = []string{
-				fmt.Sprintf("Failed to admit pod with error: %q", err.Error()),
+			logger.Info("resource validation failed but untrusted artifacts are allowed", "error", err.Error())
+			warningResponse := admission.Allowed("untrusted artifacts are allowed")
+			warningResponse.Warnings = []string{
+				fmt.Sprintf("Failed to admit resource with error: %q", err.Error()),
 			}
-			return warningsResponse
+			return warningResponse
 		}
-		logger.Error(err, "pod validation failed")
+		logger.Error(err, "resource validation failed")
 		return admission.Denied(err.Error())
 	}
 
-	return admission.Allowed("All images successfully validated with cosign public keys")
+	return admission.Allowed("All artifacts successfully validated with cosign public keys")
 }
 
-func (h *handler) validatePod(ctx context.Context, logger logr.Logger, p *corev1.Pod) error {
+// extractPodVerificationTargets returns an array of verification targets from the pod.
+// The verification targets are extracted from the following fields:
+// - v1.Pod: spec.initContainers[*].image
+// - v1.Pod: spec.containers[*].image
+// - v1.Pod: spec.ephemeralContainers[*].image
+func (h *handler) extractPodVerificationTargets(ctx context.Context, pod corev1.Pod) ([]verificationTarget, utils.KeyChainReader, error) {
+	var verificationTargets []verificationTarget
+	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, &pod, h.useOnlyImagePullSecrets)
+
+	specPath := field.NewPath("pod", "spec")
+	for idx, ic := range pod.Spec.InitContainers {
+		verificationTargets = append(verificationTargets, verificationTarget{
+			artifactRef: ic.Image,
+			fldPath:     specPath.Child("initContainers").Index(idx).Child("image"),
+		})
+	}
+	for idx, c := range pod.Spec.Containers {
+		verificationTargets = append(verificationTargets, verificationTarget{
+			artifactRef: c.Image,
+			fldPath:     specPath.Child("containers").Index(idx).Child("image"),
+		})
+	}
+	for idx, ec := range pod.Spec.EphemeralContainers {
+		verificationTargets = append(verificationTargets, verificationTarget{
+			artifactRef: ec.Image,
+			fldPath:     specPath.Child("ephemeralContainers").Index(idx).Child("image"),
+		})
+	}
+
+	return verificationTargets, kcr, nil
+}
+
+// extractControllerDeploymentVerificationTargets returns an array of verification targets from the controller deployment.
+// The verification targets are extracted from the following fields:
+// - core.gardener.cloud/ControllerDeployment: helm.ociRepository
+func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Context, controllerDeployment gcorev1.ControllerDeployment) ([]verificationTarget, utils.KeyChainReader, error) {
+	var verificationTargets []verificationTarget
+
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, controllerDeployment.Namespace, []string{}, h.useOnlyImagePullSecrets)
+
+	if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
+		verificationTargets = append(verificationTargets, verificationTarget{
+			artifactRef: controllerDeployment.Helm.OCIRepository.GetURL(),
+			fldPath:     field.NewPath("helm", "ociRepository"),
+		})
+	}
+
+	return verificationTargets, kcr, nil
+}
+
+// extractGardenletVerificationTargets returns an array of verification targets from the gardenlet.
+// The verification targets are extracted from the following fields:
+// - seedmanagement.gardener.cloud/Gardenlet: spec.deployment.helm.ociRepository
+// - seedmanagement.gardener.cloud/Gardenlet: spec.deployment.image
+func (h *handler) extractGardenletVerificationTargets(ctx context.Context, gardenlet seedmanagementv1alpha1.Gardenlet) ([]verificationTarget, utils.KeyChainReader, error) {
+	var verificationTargets []verificationTarget
+
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, gardenlet.Namespace, []string{}, h.useOnlyImagePullSecrets)
+
+	verificationTargets = append(verificationTargets, verificationTarget{
+		artifactRef: gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(),
+		fldPath:     field.NewPath("spec", "deployment", "helm", "ociRepository"),
+	})
+	if gardenlet.Spec.Deployment.Image != nil {
+		verificationTargets = append(verificationTargets, verificationTarget{
+			artifactRef: getURL(gardenlet.Spec.Deployment.Image),
+			fldPath:     field.NewPath("spec", "deployment", "image"),
+		})
+	}
+
+	return verificationTargets, kcr, nil
+}
+
+// extractExtensionVerificationTargets returns an array of verification targets from the extension.
+// The verification targets are extracted from the following fields:
+// - extensions.operator.gardener.cloud/Extension: spec.deployment.admission.runtimeCluster.helm.ociRepository
+// - extensions.operator.gardener.cloud/Extension: spec.deployment.admission.virtualCluster.helm.ociRepository
+// - extensions.operator.gardener.cloud/Extension: spec.deployment.extension.helm.ociRepository
+func (h *handler) extractExtensionVerificationTargets(ctx context.Context, extension operatorv1alpha1.Extension) ([]verificationTarget, utils.KeyChainReader, error) {
+	var verificationTargets []verificationTarget
+
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, extension.Namespace, []string{}, h.useOnlyImagePullSecrets)
+
+	if extension.Spec.Deployment != nil &&
+		extension.Spec.Deployment.AdmissionDeployment != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository != nil {
+		verificationTargets = append(verificationTargets, verificationTarget{
+			artifactRef: extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.GetURL(),
+			fldPath:     field.NewPath("spec", "deployment", "admissionDeployment", "runtimeCluster", "helm", "ociRepository"),
+		})
+	}
+
+	if extension.Spec.Deployment != nil &&
+		extension.Spec.Deployment.AdmissionDeployment != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm != nil &&
+		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository != nil {
+		verificationTargets = append(verificationTargets, verificationTarget{
+			artifactRef: extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.GetURL(),
+			fldPath:     field.NewPath("spec", "deployment", "admissionDeployment", "virtualCluster", "helm", "ociRepository"),
+		})
+	}
+
+	if extension.Spec.Deployment != nil &&
+		extension.Spec.Deployment.ExtensionDeployment != nil &&
+		extension.Spec.Deployment.ExtensionDeployment.Helm != nil &&
+		extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository != nil {
+		verificationTargets = append(verificationTargets, verificationTarget{
+			artifactRef: extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.GetURL(),
+			fldPath:     field.NewPath("spec", "deployment", "extensionDeployment", "helm", "ociRepository"),
+		})
+	}
+
+	return verificationTargets, kcr, nil
+}
+
+// getURL returns the fully-qualified OCIRepository URL of the image.
+func getURL(img *seedmanagementv1alpha1.Image) string {
+	ref := *img.Repository
+
+	if img.Tag != nil {
+		if strings.HasPrefix(*img.Tag, "sha256:") {
+			ref = ref + "@" + *img.Tag
+		} else {
+			ref = ref + ":" + *img.Tag
+		}
+	}
+
+	return strings.TrimPrefix(ref, "oci://")
+}
+
+func (h *handler) validateTargets(ctx context.Context, logger logr.Logger, verificationTargets []verificationTarget, kcr utils.KeyChainReader) error {
 	var (
-		specPath            = field.NewPath("pod", "spec")
 		errorList           = field.ErrorList{}
 		noSignatureFoundMsg = "no valid signature found"
 	)
 
-	logger.Info("Handling new pod request")
-
-	kcr := utils.NewLazyKeyChainReaderFromPod(ctx, h.reader, p, h.useOnlyImagePullSecrets)
-
-	for idx, ic := range p.Spec.InitContainers {
-		fldPath := specPath.Child("initContainers").Index(idx).Child("image")
-		verified, err := h.validateContainerImage(ctx, logger.WithValues("initContainers", ic.Name), ic.Name, ic.Image, kcr)
+	for _, verificationTarget := range verificationTargets {
+		verified, err := h.validateArtifact(ctx, logger, verificationTarget.artifactRef, kcr)
 		if err != nil {
-			errorList = append(errorList, field.InternalError(fldPath, err))
+			errorList = append(errorList, field.InternalError(verificationTarget.fldPath, err))
 		} else if !verified {
-			errorList = append(errorList, field.Forbidden(fldPath, fmt.Sprintf("%s for image %s", noSignatureFoundMsg, ic.Image)))
-		}
-	}
-
-	for idx, c := range p.Spec.Containers {
-		fldPath := specPath.Child("containers").Index(idx).Child("image")
-		verified, err := h.validateContainerImage(ctx, logger.WithValues("containers", c.Name), c.Name, c.Image, kcr)
-		if err != nil {
-			errorList = append(errorList, field.InternalError(fldPath, err))
-		} else if !verified {
-			errorList = append(errorList, field.Forbidden(fldPath, fmt.Sprintf("%s for image %s", noSignatureFoundMsg, c.Image)))
-		}
-	}
-
-	for idx, ec := range p.Spec.EphemeralContainers {
-		fldPath := specPath.Child("ephemeralContainers").Index(idx).Child("image")
-		verified, err := h.validateContainerImage(ctx, logger.WithValues("ephemeralContainers", ec.Name), ec.Name, ec.Image, kcr)
-		if err != nil {
-			errorList = append(errorList, field.InternalError(fldPath, err))
-		} else if !verified {
-			errorList = append(errorList, field.Forbidden(fldPath, fmt.Sprintf("%s for image %s", noSignatureFoundMsg, ec.Image)))
+			errorList = append(errorList, field.Forbidden(verificationTarget.fldPath, fmt.Sprintf("%s for artifact %s", noSignatureFoundMsg, verificationTarget.artifactRef)))
 		}
 	}
 
 	return errorList.ToAggregate()
 }
 
-func (h *handler) validateContainerImage(ctx context.Context, logger logr.Logger, containerName, image string, kcr utils.KeyChainReader) (bool, error) {
-	logger = logger.WithValues("image", image).WithValues("containerName", containerName)
+func (h *handler) validateArtifact(ctx context.Context, logger logr.Logger, artifact string, kcr utils.KeyChainReader) (bool, error) {
 	ctx = logf.IntoContext(ctx, logger)
 
-	verified, err := h.verifier.Verify(ctx, image, kcr)
+	verified, err := h.verifier.Verify(ctx, artifact, kcr)
 	if err != nil {
 		metrics.ImageSignatureErrors.WithLabelValues().Inc()
 	} else {

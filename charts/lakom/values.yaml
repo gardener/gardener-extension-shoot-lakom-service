@@ -64,3 +64,16 @@ additionalAnnotations:
   service: {}
 additionalLabels:
   deployment: {}
+
+rules:
+- apiGroups:
+  - ""
+  apiVersions:
+  - v1
+  operations:
+  - CREATE
+  - UPDATE
+  resources:
+  - pods
+  - pods/ephemeralcontainers
+  scope: '*'
