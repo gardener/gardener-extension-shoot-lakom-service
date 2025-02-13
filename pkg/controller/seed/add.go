@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 
-	controllerconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/config"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 
 	"github.com/Masterminds/semver/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -35,7 +35,7 @@ type AddOptions struct {
 	// ControllerOptions contains options for the controller.
 	ControllerOptions controller.Options
 	// ServiceConfig contains configuration for the shoot Lakom service.
-	ServiceConfig controllerconfig.Config
+	ServiceConfig config.Configuration
 }
 
 // AddToManager adds a Lakom Service seed bootstrap controller to the given Controller Manager.
@@ -58,7 +58,7 @@ func AddToManager(_ context.Context, mgr manager.Manager) error {
 	r := &kubeSystemReconciler{
 		client:         mgr.GetClient(),
 		seedK8sVersion: k8sVersion,
-		serviceConfig:  DefaultAddOptions.ServiceConfig.Configuration,
+		serviceConfig:  DefaultAddOptions.ServiceConfig,
 	}
 
 	DefaultAddOptions.ControllerOptions.Reconciler = r

@@ -8,8 +8,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
-	controllerconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/config"
 
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -33,7 +33,7 @@ type AddOptions struct {
 	// ControllerOptions contains options for the controller.
 	ControllerOptions controller.Options
 	// ServiceConfig contains configuration for the shoot Lakom service.
-	ServiceConfig controllerconfig.Config
+	ServiceConfig config.Configuration
 	// IgnoreOperationAnnotation specifies whether to ignore the operation annotation or not.
 	IgnoreOperationAnnotation bool
 }
@@ -44,7 +44,7 @@ func AddToManager(ctx context.Context, mgr manager.Manager) error {
 		ctx,
 		mgr,
 		extension.AddArgs{
-			Actuator:          NewActuator(mgr, DefaultAddOptions.ServiceConfig.Configuration),
+			Actuator:          NewActuator(mgr, DefaultAddOptions.ServiceConfig),
 			ControllerOptions: DefaultAddOptions.ControllerOptions,
 			Name:              Name,
 			FinalizerSuffix:   FinalizerSuffix,

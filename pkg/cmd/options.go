@@ -8,9 +8,9 @@ import (
 	"errors"
 	"os"
 
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	apisconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	v1alpha1apisconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1"
-	controllerconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/config"
 	healthcheckcontroller "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
@@ -83,8 +83,8 @@ type LakomServiceConfig struct {
 }
 
 // Apply applies the LakomServiceOptions to the passed ControllerOptions instance.
-func (c *LakomServiceConfig) Apply(config *controllerconfig.Config) {
-	config.Configuration = c.config
+func (c *LakomServiceConfig) Apply(config *config.Configuration) {
+	*config = c.config
 }
 
 // ApplyHealthCheckConfig applies the HealthCheckConfig to the config.
