@@ -49,6 +49,18 @@ admissionConfig:
   clientConfig:
     caBundle: foo
     urlHostname: ""
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+    - pods/ephemeralcontainers
+    scope: '*'
 tls:
   crt: aaaa
   key: bbbb
@@ -64,16 +76,3 @@ additionalAnnotations:
   service: {}
 additionalLabels:
   deployment: {}
-
-rules:
-- apiGroups:
-  - ""
-  apiVersions:
-  - v1
-  operations:
-  - CREATE
-  - UPDATE
-  resources:
-  - pods
-  - pods/ephemeralcontainers
-  scope: '*'

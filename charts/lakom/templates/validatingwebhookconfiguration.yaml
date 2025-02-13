@@ -36,6 +36,6 @@ webhooks:
 {{ toYaml .Values.admissionConfig.objectSelector | indent 4 }}
 {{- end }}
   rules:
-{{ toYaml .Values.rules | indent 2 }} 
+{{ toYaml .Values.admissionConfig.rules | indent 2 }}
   sideEffects: None
   timeoutSeconds: 25
