@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"runtime"
 
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	v1alpha1apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
@@ -84,7 +84,7 @@ func (o *Options) run(ctx context.Context) error {
 	var (
 		extraHandlers map[string]http.Handler
 		ctrlConfig    = o.lakomOptions.Completed()
-		debugConfig   = &config.Config{}
+		debugConfig   = &config.Configuration{}
 		mgrOpts       = o.managerOptions.Completed().Options()
 	)
 
