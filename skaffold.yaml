@@ -36,7 +36,6 @@ build:
             - pkg/apis/lakom/v1alpha1
             - pkg/cmd
             - pkg/constants
-            - pkg/controller/config
             - pkg/controller/healthcheck
             - pkg/controller/lifecycle
             - pkg/controller/seed
