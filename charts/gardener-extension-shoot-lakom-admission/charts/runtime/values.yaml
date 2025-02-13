@@ -35,8 +35,5 @@ service:
 gardener:
   virtualCluster:
     enabled: true
-    serviceAccount: {}
-#     name: gardener-extension-shoot-lakom-admission
-#     namespace: kube-system
   runtimeCluster: {}
 #   priorityClassName: gardener-garden-system-400
