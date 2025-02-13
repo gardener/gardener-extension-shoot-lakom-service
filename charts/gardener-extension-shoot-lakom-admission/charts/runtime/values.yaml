@@ -28,10 +28,6 @@ kubeconfig:
 #   baseMountPath: /var/run/secrets/gardener.cloud
 #   genericKubeconfigSecretName: generic-token-kubeconfig
 #   tokenSecretName: access-shoot-lakom-admission
-serviceAccountTokenVolumeProjection:
-  enabled: false
-  expirationSeconds: 43200
-  audience: ""
 service:
   topologyAwareRouting:
     enabled: false
