@@ -60,7 +60,7 @@ spec:
               topologyKey: "kubernetes.io/hostname"
       {{- end }}
       priorityClassName: {{ .Values.priorityClass.name }}
-      {{- if .Values.kubeconfig }}
+      {{- if or .Values.kubeconfig .Values.projectedKubeconfig }}
       automountServiceAccountToken: false
       {{- else }}
       serviceAccountName: {{ .Values.name }}
@@ -82,6 +82,8 @@ spec:
         - --port={{ .Values.serverPort }}
         {{- if .Values.kubeconfig }}
         - --kubeconfig=/etc/lakom/client/kubeconfig
+        {{- else if .Values.projectedKubeconfig }}
+        - --kubeconfig={{ required ".Values.projectedKubeconfig.baseMountPath is required" .Values.projectedKubeconfig.baseMountPath }}/kubeconfig
         {{- end }}
         - --use-only-image-pull-secrets={{ .Values.useOnlyImagePullSecrets }}
         - --insecure-allow-untrusted-images={{ .Values.allowUntrustedImages }}
@@ -113,6 +115,10 @@ spec:
         - name: kubeconfig
           mountPath: /etc/lakom/client
           readOnly: true
+        {{- else if .Values.projectedKubeconfig }}
+        - name: kubeconfig
+          mountPath: {{ required ".Values.projectedKubeconfig.baseMountPath is required" .Values.projectedKubeconfig.baseMountPath }}
+          readOnly: true
         {{- else }}
         - name: kube-api-access-lakom
           mountPath: /var/run/secrets/kubernetes.io/serviceaccount
@@ -129,6 +135,23 @@ spec:
       - name: kubeconfig
         secret:
           secretName: lakom-target-kubeconfig
+      {{- else if .Values.projectedKubeconfig }}
+      - name: kubeconfig
+        projected:
+          defaultMode: 420
+          sources:
+          - secret:
+              items:
+              - key: kubeconfig
+                path: kubeconfig
+              name: {{ required ".Values.projectedKubeconfig.genericKubeconfigSecretName is required" .Values.projectedKubeconfig.genericKubeconfigSecretName }}
+              optional: false
+          - secret:
+              items:
+              - key: token
+                path: token
+              name: {{ required ".Values.projectedKubeconfig.tokenSecretName is required" .Values.projectedKubeconfig.tokenSecretName }}
+              optional: false
       {{- else }}
       - name: kube-api-access-lakom
         projected:

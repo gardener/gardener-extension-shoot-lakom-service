@@ -35,7 +35,7 @@ spec:
       priorityClassName: {{ .Values.gardener.runtimeCluster.priorityClassName }}
       {{- end }}
       serviceAccountName: {{ include "name" . }}
-      {{- if .Values.kubeconfig }}
+      {{- if or .Values.kubeconfig .Values.projectedKubeconfig }}
       automountServiceAccountToken: false
       {{- end }}
       containers:
@@ -55,8 +55,7 @@ spec:
         - --webhook-config-namespace={{ .Release.Namespace }}
         {{- if .Values.kubeconfig }}
         - --kubeconfig=/etc/gardener-extension-shoot-lakom-admission/kubeconfig/kubeconfig
-        {{- end }}
-        {{- if .Values.projectedKubeconfig }}
+        {{- else if .Values.projectedKubeconfig }}
         - --kubeconfig={{ required ".Values.projectedKubeconfig.baseMountPath is required" .Values.projectedKubeconfig.baseMountPath }}/kubeconfig
         {{- end }}
         {{- if .Values.metricsPort }}
@@ -94,8 +93,7 @@ spec:
         - name: kubeconfig
           mountPath: /etc/gardener-extension-shoot-lakom-admission/kubeconfig
           readOnly: true
-        {{- end }}
-        {{- if .Values.projectedKubeconfig }}
+        {{- else if .Values.projectedKubeconfig }}
         - name: kubeconfig
           mountPath: {{ required ".Values.projectedKubeconfig.baseMountPath is required" .Values.projectedKubeconfig.baseMountPath }}
           readOnly: true
@@ -106,8 +104,7 @@ spec:
         secret:
           secretName: gardener-extension-shoot-lakom-admission-kubeconfig
           defaultMode: 420
-      {{- end }}
-      {{- if .Values.projectedKubeconfig }}
+      {{- else if .Values.projectedKubeconfig }}
       - name: kubeconfig
         projected:
           defaultMode: 420

@@ -17,7 +17,7 @@ webhooks:
   clientConfig:
     caBundle: {{ .Values.admissionConfig.clientConfig.caBundle | b64enc }}
 {{- if .Values.admissionConfig.clientConfig.urlHostname }}
-    url: {{ printf "https://%s:443/lakom/resolve-tag-to-digest" (.Values.admissionConfig.clientConfig.urlHostname) }}
+    url: {{ printf "https://%s:443/lakom/verify-cosign-signature" (.Values.admissionConfig.clientConfig.urlHostname) }}
 {{- else }}
     service:
       name: {{ .Values.name }}

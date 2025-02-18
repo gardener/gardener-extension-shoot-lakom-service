@@ -37,6 +37,10 @@ useOnlyImagePullSecrets: false
 allowUntrustedImages: false
 allowInsecureRegistries: false
 kubeconfig: {}
+projectedKubeconfig: {}
+  # baseMountPath: /var/run/secrets/gardener.cloud
+  # genericKubeconfigSecretName: generic-token-kubeconfig
+  # tokenSecretName: access-shoot-lakom-admission
 admissionConfig:
   objectSelector: {}
   namespaceSelector:
