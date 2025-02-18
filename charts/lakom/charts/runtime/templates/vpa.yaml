@@ -7,18 +7,18 @@
 apiVersion: "autoscaling.k8s.io/v1"
 kind: VerticalPodAutoscaler
 metadata:
-  name: {{ .Values.name }}
+  name: {{ .Values.global.name }}
   namespace: {{ .Release.Namespace }}
 spec:
   resourcePolicy:
     containerPolicies:
-    - containerName:  {{ .Values.name }}
+    - containerName:  {{ .Values.global.name }}
       controlledResources:
       - memory
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ .Values.name }}
+    name: {{ .Values.global.name }}
   updatePolicy:
     updateMode: {{ .Values.vpa.updatePolicy.updateMode }}
 {{- end }}

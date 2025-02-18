@@ -6,16 +6,16 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ .Values.name }}
+  name: {{ .Values.global.name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/name: {{ .Values.global.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ .Values.name }}
+      app.kubernetes.io/name: {{ .Values.global.name }}
       app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if semverCompare ">= 1.26-0" .Capabilities.KubeVersion.GitVersion }}
   unhealthyPodEvictionPolicy: AlwaysAllow

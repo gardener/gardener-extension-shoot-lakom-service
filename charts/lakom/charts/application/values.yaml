@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+global:
+  name: lakom-admission-controller
+  kubeconfig: {}
+
+admissionConfig:
+  objectSelector: {}
+  namespaceSelector:
+    matchExpressions:
+    - key: "kubernetes.io/metadata.name"
+      operator: "NotIn"
+      values:
+      - "kube-system"
+      - "lakom-system"
+  clientConfig:
+    caBundle: foo
+    urlHostname: ""
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+    - pods/ephemeralcontainers
+    scope: '*'
