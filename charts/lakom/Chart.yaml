@@ -8,3 +8,8 @@ appVersion: "0.1.0"
 description: A Helm chart for the Lakom admission controller.
 name: lakom
 version: 0.1.0
+dependencies:
+- name: application
+  condition: application.enabled
+- name: runtime
+  condition: runtime.enabled

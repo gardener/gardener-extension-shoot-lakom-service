@@ -1,14 +1,15 @@
 # SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
 #
 # SPDX-License-Identifier: Apache-2.0
-{{- if not .Values.kubeconfig }}
+
+{{- if not .Values.global.kubeconfig }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: extensions.gardener.cloud:{{ .Values.name }}
+  name: extensions.gardener.cloud:{{ .Values.global.name }}
   labels:
-    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/name: {{ .Values.global.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 rules:
 - apiGroups:
@@ -21,16 +22,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: extensions.gardener.cloud:{{ .Values.name }}
+  name: extensions.gardener.cloud:{{ .Values.global.name }}
   labels:
-    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/name: {{ .Values.global.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: extensions.gardener.cloud:{{ .Values.name }}
+  name: extensions.gardener.cloud:{{ .Values.global.name }}
 subjects:
 - kind: ServiceAccount
-  name: {{ .Values.name }}
+  name: {{ .Values.global.name }}
   namespace: {{ .Release.Namespace }}
 {{- end }}

@@ -22,8 +22,7 @@ Files:
   charts/gardener-extension-shoot-lakom-admission/charts/runtime/.helmignore
   charts/gardener-extension-shoot-lakom-admission/charts/runtime/templates/_helpers.tpl
   charts/lakom/.helmignore
-  charts/lakom/templates/_helpers.tpl
-  charts/lakom/templates/_versions.tpl
+  charts/lakom/charts/runtime/templates/_helpers.tpl
   config/lakom/cosign/password
   example/controller-registration.yaml
   local-setup/.gitignore

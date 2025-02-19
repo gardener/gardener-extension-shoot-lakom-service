@@ -6,9 +6,9 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ .Values.name }}
+  name: {{ .Values.global.name }}
   labels:
-    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/name: {{ .Values.global.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     remediation.webhook.shoot.gardener.cloud/exclude: "true"
 webhooks:
@@ -20,7 +20,7 @@ webhooks:
     url: {{ printf "https://%s:443/lakom/resolve-tag-to-digest" (.Values.admissionConfig.clientConfig.urlHostname) }}
 {{- else }}
     service:
-      name: {{ .Values.name }}
+      name: {{ .Values.global.name }}
       namespace: {{ .Release.Namespace }}
       path: /lakom/resolve-tag-to-digest
 {{- end }}

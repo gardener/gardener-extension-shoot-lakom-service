@@ -1,15 +1,16 @@
 # SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
 #
 # SPDX-License-Identifier: Apache-2.0
-{{- if not .Values.kubeconfig }}
+
 ---
 apiVersion: v1
-kind: ServiceAccount
+kind: ConfigMap
 metadata:
-  name: {{ .Values.name }}
+  name: {{ .Values.global.name }}-config
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/name: {{ .Values.global.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-automountServiceAccountToken: false
-{{- end }}
+data:
+  config.yaml: |
+  {{ toYaml .Values.cosign | nindent 4 }}

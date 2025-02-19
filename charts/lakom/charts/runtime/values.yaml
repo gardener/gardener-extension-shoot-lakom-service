@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+global:
+  name: lakom-admission-controller
+  kubeconfig: {}
+
+# DO NOT SET DEFAULT VALUES OUTSIDE THE `global` SECTION!
+# There are multiple issues in helm after several backward incompatible changes
+# regarding the values precedence and how nil/null values are treated.
+# As result subchart values cannot be deleted from the parent chart,
+# for example resources cannot be unset during installation
+# if it is set in this values.yaml file.
+# Refs:
+# - https://github.com/helm/helm/issues/12511
+# - https://github.com/helm/helm/issues/12460
+# - https://github.com/helm/helm/issues/12677
+
+# The behaviour seems to be fixed with https://github.com/helm/helm/pull/12879, released with v3.17.1,
+# however to avoid new backward incompatible changes in the future do not define default values here.

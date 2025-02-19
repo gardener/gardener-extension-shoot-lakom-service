@@ -6,11 +6,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.name }}
+  name: {{ .Values.global.name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ .Values.name }}
-    helm.sh/chart: {{ .Values.name }}
+    app.kubernetes.io/name: {{ .Values.global.name }}
+    helm.sh/chart: {{ .Values.global.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     high-availability-config.resources.gardener.cloud/type: server
     {{- if .Values.additionalLabels.deployment }}
@@ -21,21 +21,21 @@ spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ .Values.name }}
+      app.kubernetes.io/name: {{ .Values.global.name }}
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
       annotations:
         checksum/configmap-lakom-config: {{ include (print $.Template.BasePath "/configmap-lakom-config.yaml") . | sha256sum }}
         checksum/secret-lakom-server-tls: {{ include (print $.Template.BasePath "/secret-lakom-server-tls.yaml") . | sha256sum }}
-        {{- if .Values.kubeconfig }}
+        {{- if .Values.global.kubeconfig }}
         checksum/secret-lakom-target-kubeconfig: {{ include (print $.Template.BasePath "/secret-lakom-target-kubeconfig.yaml") . | sha256sum }}
         {{- end }}
         prometheus.io/name: {{ .Release.Name | quote }}
         prometheus.io/port: {{ .Values.metricsPort | quote }}
         prometheus.io/scrape: "true"
       labels:
-        app.kubernetes.io/name: {{ .Values.name }}
+        app.kubernetes.io/name: {{ .Values.global.name }}
         app.kubernetes.io/instance: {{ .Release.Name }}
         {{- if .Values.additionalLabels.deployment }}
         {{- toYaml .Values.additionalLabels.deployment | trim | nindent 8 }}
@@ -52,7 +52,7 @@ spec:
                 - key: app.kubernetes.io/name
                   operator: In
                   values:
-                  - {{ .Values.name }}
+                  - {{ .Values.global.name }}
                 - key: app.kubernetes.io/instance
                   operator: In
                   values:
@@ -60,13 +60,13 @@ spec:
               topologyKey: "kubernetes.io/hostname"
       {{- end }}
       priorityClassName: {{ .Values.priorityClass.name }}
-      {{- if or .Values.kubeconfig .Values.projectedKubeconfig }}
+      {{- if or .Values.global.kubeconfig .Values.projectedKubeconfig }}
       automountServiceAccountToken: false
       {{- else }}
-      serviceAccountName: {{ .Values.name }}
+      serviceAccountName: {{ .Values.global.name }}
       {{- end }}
       containers:
-      - name: {{ .Values.name }}
+      - name: lakom-admission-controller
         image: {{ include "image" . }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         securityContext:
@@ -80,7 +80,7 @@ spec:
         - --health-bind-address=:{{ .Values.healthPort }}
         - --metrics-bind-address=:{{ .Values.metricsPort }}
         - --port={{ .Values.serverPort }}
-        {{- if .Values.kubeconfig }}
+        {{- if .Values.global.kubeconfig }}
         - --kubeconfig=/etc/lakom/client/kubeconfig
         {{- else if .Values.projectedKubeconfig }}
         - --kubeconfig={{ required ".Values.projectedKubeconfig.baseMountPath is required" .Values.projectedKubeconfig.baseMountPath }}/kubeconfig
@@ -111,7 +111,7 @@ spec:
         - name: lakom-server-tls
           mountPath: /etc/lakom/tls
           readOnly: true
-        {{- if .Values.kubeconfig }}
+        {{- if .Values.global.kubeconfig }}
         - name: kubeconfig
           mountPath: /etc/lakom/client
           readOnly: true
@@ -127,14 +127,14 @@ spec:
       volumes:
       - name: lakom-config
         configMap:
-          name: lakom-config
+          name: {{ .Values.global.name }}-config
       - name: lakom-server-tls
         secret:
-          secretName: lakom-server-tls
-      {{- if .Values.kubeconfig }}
+          secretName: {{ .Values.global.name }}-tls
+      {{- if .Values.global.kubeconfig }}
       - name: kubeconfig
         secret:
-          secretName: lakom-target-kubeconfig
+          secretName: {{ .Values.global.name}}-target-kubeconfig
       {{- else if .Values.projectedKubeconfig }}
       - name: kubeconfig
         projected:

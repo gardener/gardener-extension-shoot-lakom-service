@@ -9,9 +9,9 @@ kind: PriorityClass
 metadata:
   name: {{ .Values.priorityClass.name }}
   labels:
-    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/name: {{ .Values.global.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 value: {{ required ".Values.priorityClass.value is required" .Values.priorityClass.value }}
 globalDefault: false
-description: "Priority class for the Gardener extension: {{ .Values.name }}."
+description: "Priority class for the Gardener extension: {{ .Values.global.name }}."
 {{- end }}
