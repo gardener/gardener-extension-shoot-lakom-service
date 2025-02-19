@@ -6,55 +6,16 @@ global:
   name: lakom-admission-controller
   kubeconfig: {}
 
-image:
-  pullPolicy: IfNotPresent
-  tag: latest
-  repository: europe-docker.pkg.dev/gardener-project/public/gardener/extensions/lakom
+# DO NOT SET DEFAULT VALUES OUTSIDE THE `global` SECTION!
+# There are multiple issues in helm after several backward incompatible changes
+# regarding the values precedence and how nil/null values are treated.
+# As result subchart values cannot be deleted from the parent chart,
+# for example resources cannot be unset during installation
+# if it is set in this values.yaml file.
+# Refs:
+# - https://github.com/helm/helm/issues/12511
+# - https://github.com/helm/helm/issues/12460
+# - https://github.com/helm/helm/issues/12677
 
-replicaCount: 3
-resources:
-  requests:
-    memory: 25M
-metricsPort: 8080
-healthPort: 8081
-serverPort: 10250
-cache:
-  ttl: 10m
-  refreshInterval: 30s
-cosign:
-  publicKeys: []
-  # - name: key1
-  #   algorithm: RSASSA-PKCS1-v1_5-SHA256
-  #   key: |-
-  #     -----BEGIN PUBLIC KEY-----
-  #     1234
-  #     -----END PUBLIC KEY-----
-  # - name: key2
-  #   algorithm: RSASSA-PKCS1-v1_5-SHA256
-  #   key: |-
-  #     -----BEGIN PUBLIC KEY-----
-  #     abcd
-  #     -----END PUBLIC KEY-----
-useOnlyImagePullSecrets: false
-allowUntrustedImages: false
-allowInsecureRegistries: false
-projectedKubeconfig: {}
-  # baseMountPath: /var/run/secrets/gardener.cloud
-  # genericKubeconfigSecretName: generic-token-kubeconfig
-  # tokenSecretName: access-shoot-lakom-admission
-
-tls:
-  crt: aaaa
-  key: bbbb
-priorityClass:
-  enabled: true
-  value: 100
-  name: lakom-system
-vpa:
-  enabled: true
-  updatePolicy:
-    updateMode: "Auto"
-additionalAnnotations:
-  service: {}
-additionalLabels:
-  deployment: {}
+# The behaviour seems to be fixed with https://github.com/helm/helm/pull/12879, released with v3.17.1,
+# however to avoid new backward incompatible changes in the future do not define default values here.
