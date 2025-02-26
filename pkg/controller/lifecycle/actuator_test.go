@@ -13,7 +13,6 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 
-	"github.com/Masterminds/semver/v3"
 	corev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
@@ -328,7 +327,7 @@ var _ = Describe("Actuator", func() {
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion *semver.Version, withUnhealthyPodEvictionPolicy, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
+			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
 				resources, err := getSeedResources(
 					&replicas,
 					namespace,
@@ -340,7 +339,6 @@ var _ = Describe("Actuator", func() {
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					allowInsecureRegistries,
-					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveKey("data.yaml.br"))
@@ -359,7 +357,7 @@ var _ = Describe("Actuator", func() {
 
 				Expect(manifests).To(ConsistOf(
 					expectedSeedDeployment(replicas, namespace, genericKubeconfigName, shootAccessServiceAccountName, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
-					expectedSeedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					expectedSeedPDB(namespace),
 					expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
 					expectedSeedService(namespace),
 					expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
@@ -367,10 +365,9 @@ var _ = Describe("Actuator", func() {
 					expectedSeedServiceMonitor(namespace),
 				))
 			},
-			Entry("Kubernetes version >= 1.27", semver.MustParse("1.27.0"), true, false, false, false),
-			Entry("Use only image pull secrets", semver.MustParse("1.27.0"), true, true, false, false),
-			Entry("Allow untrusted images", semver.MustParse("1.28.0"), true, false, true, false),
-			Entry("Allow insecure registries", semver.MustParse("1.29.0"), true, false, false, true),
+			Entry("Use only image pull secrets", true, false, false),
+			Entry("Allow untrusted images", false, true, false),
+			Entry("Allow insecure registries", false, false, true),
 		)
 	})
 })
@@ -685,12 +682,7 @@ status: {}
 `
 }
 
-func expectedSeedPDB(namespace string, withUnhealthyPodEvictionPolicy bool) string {
-	unhealthyPodEvictionPolicyStr := ""
-	if withUnhealthyPodEvictionPolicy {
-		unhealthyPodEvictionPolicyStr = `  unhealthyPodEvictionPolicy: AlwaysAllow
-`
-	}
+func expectedSeedPDB(namespace string) string {
 	return `apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -706,7 +698,8 @@ spec:
     matchLabels:
       app.kubernetes.io/name: lakom
       app.kubernetes.io/part-of: shoot-lakom-service
-` + unhealthyPodEvictionPolicyStr + `status:
+  unhealthyPodEvictionPolicy: AlwaysAllow
+status:
   currentHealthy: 0
   desiredHealthy: 0
   disruptionsAllowed: 0

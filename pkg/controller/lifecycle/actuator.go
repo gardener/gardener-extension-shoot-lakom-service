@@ -16,7 +16,6 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/secrets"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
@@ -141,11 +140,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return fmt.Errorf("missing or empty `cluster.seed.status.kubernetesVersion`")
 	}
 
-	seedK8sSemverVersion, err := semver.NewVersion(*cluster.Seed.Status.KubernetesVersion)
-	if err != nil {
-		return fmt.Errorf("failed to parse the seed kubernetes version: %v", err)
-	}
-
 	image, err := imagevector.ImageVector().FindImage(constants.ImageName)
 	if err != nil {
 		return fmt.Errorf("failed to find image version for %s: %v", constants.ImageName, err)
@@ -183,7 +177,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
 		a.serviceConfig.AllowInsecureRegistries,
-		seedK8sSemverVersion,
 	)
 	if err != nil {
 		return err
@@ -301,7 +294,7 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version) (map[string][]byte, error) {
+func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
 		serverPort               = intstr.FromInt32(10250)
@@ -517,12 +510,11 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 			Labels:    getLabels(),
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable: ptr.To(intstr.FromInt32(1)),
-			Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
+			MaxUnavailable:             ptr.To(intstr.FromInt32(1)),
+			Selector:                   &metav1.LabelSelector{MatchLabels: getLabels()},
+			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
 		},
 	}
-
-	kutil.SetAlwaysAllowEviction(pdb, k8sVersion)
 
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
