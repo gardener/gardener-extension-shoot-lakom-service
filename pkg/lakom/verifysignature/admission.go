@@ -115,6 +115,10 @@ func (hb HandleBuilder) Build() (*handler, error) {
 		return nil, err
 	}
 
+	for _, key := range lakomConfig.Keys {
+		hb.logger.Info("Verifier is configured with a key", "name", key.Name, "type", fmt.Sprintf("%T", key.Key), "rsaScheme", key.RSAScheme, "hash", key.Hash)
+	}
+
 	verifier = NewDirectVerifier(*lakomConfig, hb.allowInsecureRegistries)
 	if hb.cacheTTL != 0 {
 		cache, err := NewSignatureVerificationResultCache(hb.cacheRefreshInterval, hb.cacheTTL)
