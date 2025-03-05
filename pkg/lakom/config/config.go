@@ -108,7 +108,10 @@ func uniqueKeys(keys []VerifierKey) []VerifierKey {
 		}
 
 		predicate := func(other VerifierKey) bool {
-			return key.Equal(other.Key)
+			return key.Equal(other.Key) &&
+				*item.Hash == *other.Hash &&
+				((item.RSAScheme == nil && other.RSAScheme == nil) ||
+					(item.RSAScheme != nil && other.RSAScheme != nil && *item.RSAScheme == *other.RSAScheme))
 		}
 		if !slices.ContainsFunc(result, predicate) {
 			result = append(result, item)
