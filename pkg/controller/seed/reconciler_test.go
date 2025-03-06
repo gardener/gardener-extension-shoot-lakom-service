@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
@@ -46,7 +45,6 @@ var _ = Describe("Reconciler", func() {
 		var (
 			lakomConfig string
 			caBundle    = []byte("caBundle")
-			k8sVersion  *semver.Version
 		)
 
 		BeforeEach(func() {
@@ -67,11 +65,10 @@ var _ = Describe("Reconciler", func() {
     -----END PUBLIC KEY-----
 `
 
-			k8sVersion = semver.MustParse("1.27.0")
 		})
 
 		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
-			func(k8sVersion string, withUnhealthyPodEvictionPolicy, onlyImagePullSecrets, untrustedImages, insecureRegistries bool) {
+			func(onlyImagePullSecrets, untrustedImages, insecureRegistries bool) {
 				resources, err := getResources(
 					serverTLSSecretName,
 					image,
@@ -80,7 +77,6 @@ var _ = Describe("Reconciler", func() {
 					onlyImagePullSecrets,
 					untrustedImages,
 					insecureRegistries,
-					semver.MustParse(k8sVersion),
 				)
 
 				Expect(err).ToNot(HaveOccurred())
@@ -104,17 +100,17 @@ var _ = Describe("Reconciler", func() {
 					expectedClusterRole(),
 					expectedClusterRoleBinding(),
 					expectedDeployment(namespace, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(onlyImagePullSecrets), strconv.FormatBool(untrustedImages), strconv.FormatBool(insecureRegistries)),
-					expectedPDB(namespace, withUnhealthyPodEvictionPolicy),
+					expectedPDB(namespace),
 					expectedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
 					expectedService(namespace),
 					expectedServiceAccount(namespace),
 					expectedVPA(namespace),
 				))
 			},
-			Entry("Kubernetes version >= 1.27", "1.27.0", true, false, false, false),
-			Entry("Use only image pull secrets", "1.27.0", true, true, false, false),
-			Entry("Allow untrusted images", "1.28.0", true, false, true, false),
-			Entry("Allow insecure registries", "1.29.0", true, false, true, true),
+			Entry("Kubernetes version >= 1.27", false, false, false),
+			Entry("Use only image pull secrets", true, false, false),
+			Entry("Allow untrusted images", false, true, false),
+			Entry("Allow insecure registries", false, true, true),
 		)
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
@@ -127,7 +123,6 @@ var _ = Describe("Reconciler", func() {
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					insecureRegistries,
-					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -149,7 +144,6 @@ var _ = Describe("Reconciler", func() {
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					insecureRegistries,
-					k8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -170,7 +164,6 @@ var _ = Describe("Reconciler", func() {
 				useOnlyImagePullSecrets,
 				allowUntrustedImages,
 				insecureRegistries,
-				k8sVersion,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -433,7 +426,7 @@ status: {}
 `
 }
 
-func expectedPDB(namespace string, withUnhealthyPodEvictionPolicy bool) string {
+func expectedPDB(namespace string) string {
 	out := `apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -449,12 +442,8 @@ spec:
     matchLabels:
       app.kubernetes.io/name: lakom-seed
       app.kubernetes.io/part-of: shoot-lakom-service
-`
-	if withUnhealthyPodEvictionPolicy {
-		out += `  unhealthyPodEvictionPolicy: AlwaysAllow
-`
-	}
-	out += `status:
+  unhealthyPodEvictionPolicy: AlwaysAllow
+status:
   currentHealthy: 0
   desiredHealthy: 0
   disruptionsAllowed: 0

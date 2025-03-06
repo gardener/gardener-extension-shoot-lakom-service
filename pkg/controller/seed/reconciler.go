@@ -125,7 +125,6 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		kcr.serviceConfig.UseOnlyImagePullSecrets,
 		kcr.serviceConfig.AllowUntrustedImages,
 		kcr.serviceConfig.AllowInsecureRegistries,
-		kcr.seedK8sVersion,
 	)
 	if err != nil {
 		return err
@@ -185,7 +184,7 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	return nil
 }
 
-func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundle []byte, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version) (map[string][]byte, error) {
+func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundle []byte, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
 		serverPort               = intstr.FromInt32(10250)
@@ -410,6 +409,7 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 		},
 	}
 
+	unhealthyPodEvictionPolicyAlwaysAllow := policyv1.AlwaysAllow
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      constants.SeedExtensionServiceName,
@@ -417,12 +417,11 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 			Labels:    getLabels(),
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-			Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
+			MaxUnavailable:             &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			Selector:                   &metav1.LabelSelector{MatchLabels: getLabels()},
+			UnhealthyPodEvictionPolicy: &unhealthyPodEvictionPolicyAlwaysAllow,
 		},
 	}
-
-	kutil.SetAlwaysAllowEviction(pdb, k8sVersion)
 
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
