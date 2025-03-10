@@ -67,7 +67,7 @@ var _ = Describe("Reconciler", func() {
 
 		})
 
-		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
+		DescribeTable("Should ensure resources are correctly created",
 			func(onlyImagePullSecrets, untrustedImages, insecureRegistries bool) {
 				resources, err := getResources(
 					serverTLSSecretName,
@@ -107,7 +107,7 @@ var _ = Describe("Reconciler", func() {
 					expectedVPA(namespace),
 				))
 			},
-			Entry("Kubernetes version >= 1.27", false, false, false),
+			Entry("Default settings", false, false, false),
 			Entry("Use only image pull secrets", true, false, false),
 			Entry("Allow untrusted images", false, true, false),
 			Entry("Allow insecure registries", false, true, true),

@@ -326,7 +326,7 @@ var _ = Describe("Actuator", func() {
 `
 		})
 
-		DescribeTable("Should ensure resources are correctly created for different Kubernetes versions",
+		DescribeTable("Should ensure resources are correctly created",
 			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
 				resources, err := getSeedResources(
 					&replicas,
@@ -365,6 +365,7 @@ var _ = Describe("Actuator", func() {
 					expectedSeedServiceMonitor(namespace),
 				))
 			},
+			Entry("Default config", false, false, false),
 			Entry("Use only image pull secrets", true, false, false),
 			Entry("Allow untrusted images", false, true, false),
 			Entry("Allow insecure registries", false, false, true),

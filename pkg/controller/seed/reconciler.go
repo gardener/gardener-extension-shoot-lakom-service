@@ -14,7 +14,6 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 
-	"github.com/Masterminds/semver/v3"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
@@ -46,9 +45,8 @@ import (
 )
 
 type kubeSystemReconciler struct {
-	client         client.Client
-	seedK8sVersion *semver.Version
-	serviceConfig  config.Configuration
+	client        client.Client
+	serviceConfig config.Configuration
 }
 
 // Reconcile installs the lakom admission controller in the kube-system namespace.
@@ -409,7 +407,6 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 		},
 	}
 
-	unhealthyPodEvictionPolicyAlwaysAllow := policyv1.AlwaysAllow
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      constants.SeedExtensionServiceName,
@@ -419,7 +416,7 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			MaxUnavailable:             &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
 			Selector:                   &metav1.LabelSelector{MatchLabels: getLabels()},
-			UnhealthyPodEvictionPolicy: &unhealthyPodEvictionPolicyAlwaysAllow,
+			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
 		},
 	}
 
