@@ -14,7 +14,6 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 
-	"github.com/Masterminds/semver/v3"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
@@ -46,9 +45,8 @@ import (
 )
 
 type kubeSystemReconciler struct {
-	client         client.Client
-	seedK8sVersion *semver.Version
-	serviceConfig  config.Configuration
+	client        client.Client
+	serviceConfig config.Configuration
 }
 
 // Reconcile installs the lakom admission controller in the kube-system namespace.
@@ -125,7 +123,6 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		kcr.serviceConfig.UseOnlyImagePullSecrets,
 		kcr.serviceConfig.AllowUntrustedImages,
 		kcr.serviceConfig.AllowInsecureRegistries,
-		kcr.seedK8sVersion,
 	)
 	if err != nil {
 		return err
@@ -185,7 +182,7 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	return nil
 }
 
-func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundle []byte, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool, k8sVersion *semver.Version) (map[string][]byte, error) {
+func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundle []byte, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
 		serverPort               = intstr.FromInt32(10250)
@@ -417,12 +414,11 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 			Labels:    getLabels(),
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-			Selector:       &metav1.LabelSelector{MatchLabels: getLabels()},
+			MaxUnavailable:             &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			Selector:                   &metav1.LabelSelector{MatchLabels: getLabels()},
+			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
 		},
 	}
-
-	kutil.SetAlwaysAllowEviction(pdb, k8sVersion)
 
 	resources, err := registry.AddAllAndSerialize(
 		lakomDeployment,
