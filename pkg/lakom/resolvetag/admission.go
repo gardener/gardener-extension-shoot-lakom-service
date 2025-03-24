@@ -16,6 +16,7 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
 	gcorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
+	corev1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	"github.com/go-logr/logr"
@@ -198,9 +199,15 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 // - gardenlet.Spec.Deployment.Image
 func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagementv1alpha1.Gardenlet) ([]byte, error) {
 	var (
-		logger = h.logger.WithValues("gardenlet", client.ObjectKey{Name: gardenlet.Name})
-		kcr    = utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, gardenlet.Namespace, []string{}, h.useOnlyImagePullSecrets)
+		logger           = h.logger.WithValues("gardenlet", client.ObjectKey{Name: gardenlet.Name})
+		imagePullSecrets []string
 	)
+
+	if gardenlet.Spec.Deployment.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, gardenlet.Spec.Deployment.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, corev1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 
 	resolved, err := h.resolveArtifact(ctx, gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(), kcr, logger)
 	if err != nil {
@@ -225,9 +232,15 @@ func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagementv
 // - controllerDeployment.Spec.Helm.OCIRepository
 func (h *handler) handleControllerDeployment(ctx context.Context, controllerDeployment gcorev1.ControllerDeployment) ([]byte, error) {
 	var (
-		logger = h.logger.WithValues("controllerDeployment", client.ObjectKey{Name: controllerDeployment.Name})
-		kcr    = utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, controllerDeployment.Namespace, []string{}, h.useOnlyImagePullSecrets)
+		logger           = h.logger.WithValues("controllerDeployment", client.ObjectKey{Name: controllerDeployment.Name})
+		imagePullSecrets []string
 	)
+
+	if controllerDeployment.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, controllerDeployment.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, corev1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 
 	if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
 		resolved, err := h.resolveArtifact(ctx, controllerDeployment.Helm.OCIRepository.GetURL(), kcr, logger)
@@ -249,9 +262,23 @@ func (h *handler) handleControllerDeployment(ctx context.Context, controllerDepl
 // - extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository
 func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha1.Extension) ([]byte, error) {
 	var (
-		logger = h.logger.WithValues("extension", client.ObjectKey{Name: extension.Name})
-		kcr    = utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, extension.Namespace, []string{}, h.useOnlyImagePullSecrets)
+		logger           = h.logger.WithValues("extension", client.ObjectKey{Name: extension.Name})
+		imagePullSecrets []string
 	)
+
+	if extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	if extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	if extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, corev1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 
 	if extension.Spec.Deployment != nil &&
 		extension.Spec.Deployment.AdmissionDeployment != nil &&
