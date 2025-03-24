@@ -15,7 +15,7 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
 
-	healthcheckconfig "github.com/gardener/gardener/extensions/pkg/apis/config"
+	apisconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	"github.com/gardener/gardener/extensions/pkg/controller/cmd"
 	extensionshealthcheckcontroller "github.com/gardener/gardener/extensions/pkg/controller/healthcheck"
 	extensionsheartbeatcontroller "github.com/gardener/gardener/extensions/pkg/controller/heartbeat"
@@ -88,7 +88,7 @@ func (c *LakomServiceConfig) Apply(config *config.Configuration) {
 }
 
 // ApplyHealthCheckConfig applies the HealthCheckConfig to the config.
-func (c *LakomServiceConfig) ApplyHealthCheckConfig(config *healthcheckconfig.HealthCheckConfig) {
+func (c *LakomServiceConfig) ApplyHealthCheckConfig(config *apisconfigv1alpha1.HealthCheckConfig) {
 	if c.config.HealthCheckConfig != nil {
 		*config = *c.config.HealthCheckConfig
 	}
