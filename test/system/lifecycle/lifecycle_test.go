@@ -26,7 +26,7 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
-	gutil "github.com/gardener/gardener/pkg/utils/gardener"
+	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
 	. "github.com/gardener/gardener/pkg/utils/test/matchers"
 	"github.com/gardener/gardener/test/framework"
 	. "github.com/onsi/ginkgo/v2"
@@ -192,7 +192,7 @@ var _ = Describe("Shoot lakom service testing", func() {
 
 		// Ensure that manually deployed secrets are deleted
 		for _, name := range []string{
-			gutil.SecretNamePrefixShootAccess + constants.ApplicationName,
+			gardenerutils.SecretNamePrefixShootAccess + constants.ApplicationName,
 			constants.WebhookTLSSecretName,
 		} {
 			secret := &corev1.Secret{

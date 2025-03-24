@@ -8,8 +8,8 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
-	kutil "github.com/gardener/gardener/pkg/utils/kubernetes"
-	secretutils "github.com/gardener/gardener/pkg/utils/secrets"
+	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
+	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
 )
 
@@ -24,19 +24,19 @@ const (
 func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOptions {
 	return []extensionssecretsmanager.SecretConfigWithOptions{
 		{
-			Config: &secretutils.CertificateSecretConfig{
+			Config: &secretsutils.CertificateSecretConfig{
 				Name:       CAName,
 				CommonName: CAName,
-				CertType:   secretutils.CACert,
+				CertType:   secretsutils.CACert,
 			},
 			Options: []secretsmanager.GenerateOption{secretsmanager.Persist()},
 		},
 		{
-			Config: &secretutils.CertificateSecretConfig{
+			Config: &secretsutils.CertificateSecretConfig{
 				Name:                        constants.WebhookTLSSecretName,
 				CommonName:                  constants.ExtensionServiceName,
-				DNSNames:                    kutil.DNSNamesForService(constants.ExtensionServiceName, namespace),
-				CertType:                    secretutils.ServerCert,
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.ExtensionServiceName, namespace),
+				CertType:                    secretsutils.ServerCert,
 				SkipPublishingCACertificate: true,
 			},
 			// use current CA for signing server cert to prevent mismatches when dropping the old CA from the webhook

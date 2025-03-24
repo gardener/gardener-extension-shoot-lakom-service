@@ -5,7 +5,7 @@
 package config
 
 import (
-	apisconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
+	extensionsconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -17,7 +17,7 @@ type Configuration struct {
 	metav1.TypeMeta
 
 	// HealthCheckConfig is the config for the health check controller.
-	HealthCheckConfig *apisconfigv1alpha1.HealthCheckConfig
+	HealthCheckConfig *extensionsconfigv1alpha1.HealthCheckConfig
 	// CosignPublicKeys is the cosign public keys used to verify image signatures.
 	CosignPublicKeys *runtime.RawExtension
 	// DebugConfig contains debug configurations for the controller.

@@ -20,12 +20,12 @@ import (
 	"github.com/gardener/gardener/pkg/client/kubernetes"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils"
-	kutil "github.com/gardener/gardener/pkg/utils/kubernetes"
+	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
-	secretutils "github.com/gardener/gardener/pkg/utils/secrets"
+	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
 	"github.com/go-logr/logr"
-	admissionregistration "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -119,7 +119,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		generatedSecrets[constants.SeedWebhookTLSSecretName].Name,
 		image.String(),
 		string(lakomConfig),
-		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
+		caBundleSecret.Data[secretsutils.DataKeyCertificateBundle],
 		kcr.serviceConfig.UseOnlyImagePullSecrets,
 		kcr.serviceConfig.AllowUntrustedImages,
 		kcr.serviceConfig.AllowInsecureRegistries,
@@ -173,7 +173,7 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	for _, s := range secretList.Items {
 		secret := s.DeepCopy()
 		patch := client.StrategicMergeFrom(secret.DeepCopy(), client.MergeFromWithOptimisticLock{})
-		secret.SetOwnerReferences(kutil.MergeOwnerReferences(secret.GetOwnerReferences(), *ownerRef))
+		secret.SetOwnerReferences(kubernetesutils.MergeOwnerReferences(secret.GetOwnerReferences(), *ownerRef))
 		if err := kcr.client.Patch(ctx, secret, patch); err != nil {
 			return err
 		}
@@ -197,9 +197,9 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 		requestMemory            = resource.MustParse("25M")
 		vpaUpdateMode            = vpaautoscalingv1.UpdateModeAuto
 		kubeSystemNamespace      = metav1.NamespaceSystem
-		matchPolicy              = admissionregistration.Equivalent
-		sideEffectClass          = admissionregistration.SideEffectClassNone
-		failurePolicy            = admissionregistration.Fail
+		matchPolicy              = admissionregistrationv1.Equivalent
+		sideEffectClass          = admissionregistrationv1.SideEffectClassNone
+		failurePolicy            = admissionregistrationv1.Fail
 		timeOutSeconds           = ptr.To[int32](25)
 		namespaceSelector        = metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -210,9 +210,9 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 				},
 			},
 		}
-		rules = []admissionregistration.RuleWithOperations{{
-			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
-			Rule: admissionregistration.Rule{
+		rules = []admissionregistrationv1.RuleWithOperations{{
+			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
+			Rule: admissionregistrationv1.Rule{
 				APIGroups:   []string{""},
 				APIVersions: []string{"v1"},
 				Resources:   []string{"pods", "pods/ephemeralcontainers"},
@@ -232,7 +232,7 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 		},
 	}
 
-	if err := kutil.MakeUnique(&lakomConfigConfigMap); err != nil {
+	if err := kubernetesutils.MakeUnique(&lakomConfigConfigMap); err != nil {
 		return nil, err
 	}
 
@@ -461,12 +461,12 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 			},
 		},
 
-		&admissionregistration.MutatingWebhookConfiguration{
+		&admissionregistrationv1.MutatingWebhookConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   webhookName,
 				Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
 			},
-			Webhooks: []admissionregistration.MutatingWebhook{{
+			Webhooks: []admissionregistrationv1.MutatingWebhook{{
 				Name:                    "resolve-tag.seed.lakom.service.extensions.gardener.cloud",
 				Rules:                   rules,
 				FailurePolicy:           &failurePolicy,
@@ -474,8 +474,8 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 				SideEffects:             &sideEffectClass,
 				TimeoutSeconds:          timeOutSeconds,
 				AdmissionReviewVersions: []string{"v1"},
-				ClientConfig: admissionregistration.WebhookClientConfig{
-					Service: &admissionregistration.ServiceReference{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
+					Service: &admissionregistrationv1.ServiceReference{
 						Namespace: kubeSystemNamespace,
 						Name:      constants.SeedExtensionServiceName,
 						Path:      ptr.To[string](constants.LakomResolveTagPath),
@@ -485,12 +485,12 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 				NamespaceSelector: &namespaceSelector,
 			}},
 		},
-		&admissionregistration.ValidatingWebhookConfiguration{
+		&admissionregistrationv1.ValidatingWebhookConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   webhookName,
 				Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
 			},
-			Webhooks: []admissionregistration.ValidatingWebhook{{
+			Webhooks: []admissionregistrationv1.ValidatingWebhook{{
 				Name:                    "verify-signature.seed.lakom.service.extensions.gardener.cloud",
 				Rules:                   rules,
 				FailurePolicy:           &failurePolicy,
@@ -498,8 +498,8 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 				SideEffects:             &sideEffectClass,
 				TimeoutSeconds:          timeOutSeconds,
 				AdmissionReviewVersions: []string{"v1"},
-				ClientConfig: admissionregistration.WebhookClientConfig{
-					Service: &admissionregistration.ServiceReference{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
+					Service: &admissionregistrationv1.ServiceReference{
 						Namespace: kubeSystemNamespace,
 						Name:      constants.SeedExtensionServiceName,
 						Path:      ptr.To[string](constants.LakomVerifyCosignSignaturePath),

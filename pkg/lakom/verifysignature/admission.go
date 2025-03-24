@@ -16,8 +16,8 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
-	gcorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
-	corev1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
+	gardencorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
+	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	"github.com/go-logr/logr"
@@ -204,7 +204,7 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		}
 		verificationTargets, kcr, err = h.extractPodVerificationTargets(ctx, pod)
 	case controllerDeploymentGVK:
-		controllerDeployment := gcorev1.ControllerDeployment{}
+		controllerDeployment := gardencorev1.ControllerDeployment{}
 		err = h.decoder.Decode(request, &controllerDeployment)
 		if err != nil {
 			break
@@ -284,7 +284,7 @@ func (h *handler) extractPodVerificationTargets(ctx context.Context, pod corev1.
 // extractControllerDeploymentVerificationTargets returns an array of verification targets from the controller deployment.
 // The verification targets are extracted from the following fields:
 // - core.gardener.cloud/ControllerDeployment: helm.ociRepository
-func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Context, controllerDeployment gcorev1.ControllerDeployment) ([]verificationTarget, utils.KeyChainReader, error) {
+func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Context, controllerDeployment gardencorev1.ControllerDeployment) ([]verificationTarget, utils.KeyChainReader, error) {
 	var (
 		verificationTargets []verificationTarget
 		imagePullSecrets    []string
@@ -294,7 +294,7 @@ func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Con
 		imagePullSecrets = append(imagePullSecrets, controllerDeployment.Helm.OCIRepository.PullSecretRef.Name)
 	}
 
-	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, corev1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, v1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 
 	if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
 		verificationTargets = append(verificationTargets, verificationTarget{
@@ -320,7 +320,7 @@ func (h *handler) extractGardenletVerificationTargets(ctx context.Context, garde
 		imagePullSecrets = append(imagePullSecrets, gardenlet.Spec.Deployment.Helm.OCIRepository.PullSecretRef.Name)
 	}
 
-	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, corev1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, v1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 
 	verificationTargets = append(verificationTargets, verificationTarget{
 		artifactRef: gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(),
@@ -359,7 +359,7 @@ func (h *handler) extractExtensionVerificationTargets(ctx context.Context, exten
 		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef.Name)
 	}
 
-	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, corev1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, v1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 
 	if extension.Spec.Deployment != nil &&
 		extension.Spec.Deployment.AdmissionDeployment != nil &&
