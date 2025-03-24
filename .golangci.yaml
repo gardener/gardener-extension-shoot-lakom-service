@@ -231,8 +231,12 @@ linters-settings:
         alias: shootdnsrewriting
       - pkg: github.com/gardener/gardener/plugin/pkg/shoot/oidc
         alias: applier
-
-
       # Lakom packages
-      # - pkg: github.com/gardener/gardener/pkg/(\w+)/apis/config
-      #   alias: ${1}config
+      - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config
+        alias: apisconfig
+      - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1
+        alias: configv1alpha1
+      - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom
+        alias: apislakom
+      - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1
+        alias: lakomv1alpha1
