@@ -10,8 +10,8 @@ import (
 	"os"
 
 	lakomvalidator "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission/validator/lakom"
-	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
-	v1alpha1apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
+	apislakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+	lakomv1alpha1 "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
 
 	extensionscmdcontroller "github.com/gardener/gardener/extensions/pkg/controller/cmd"
 	extensionscmdwebhook "github.com/gardener/gardener/extensions/pkg/webhook/cmd"
@@ -124,10 +124,10 @@ func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 				return fmt.Errorf("failed to instantiate manager: %w", err)
 			}
 
-			if err := v1alpha1apilakom.AddToScheme(mgr.GetScheme()); err != nil {
+			if err := lakomv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 				return fmt.Errorf("failed to add `lakom.extensions.gardener.cloud/v1alpha1` to manager scheme: %w", err)
 			}
-			if err := apilakom.AddToScheme(mgr.GetScheme()); err != nil {
+			if err := apislakom.AddToScheme(mgr.GetScheme()); err != nil {
 				return fmt.Errorf("failed to add internal version of `lakom.extensions.gardener.cloud` to manager scheme: %w", err)
 			}
 			gardencoreinstall.Install(mgr.GetScheme())

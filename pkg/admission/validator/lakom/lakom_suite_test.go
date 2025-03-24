@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission/validator/lakom"
-	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+	apislakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
 
 	extensionswebhook "github.com/gardener/gardener/extensions/pkg/webhook"
@@ -48,7 +48,7 @@ var _ = Describe("Shoot validator", func() {
 	Describe("#Validate", func() {
 		BeforeEach(func() {
 			scheme := runtime.NewScheme()
-			utilruntime.Must(apilakom.AddToScheme(scheme))
+			utilruntime.Must(apislakom.AddToScheme(scheme))
 			utilruntime.Must(v1alpha1.AddToScheme(scheme))
 
 			decoder := serializer.NewCodecFactory(scheme, serializer.EnableStrict).UniversalDecoder()
@@ -72,7 +72,7 @@ var _ = Describe("Shoot validator", func() {
 										APIVersion: v1alpha1.SchemeGroupVersion.String(),
 										Kind:       "LakomConfig",
 									},
-									Scope: ptr.To(apilakom.Cluster),
+									Scope: ptr.To(apislakom.Cluster),
 								}),
 							},
 						},
@@ -108,7 +108,7 @@ var _ = Describe("Shoot validator", func() {
 		})
 
 		It("should fail if the given scope is not recognized", func() {
-			var scope apilakom.ScopeType = "invalid"
+			var scope apislakom.ScopeType = "invalid"
 
 			shoot.Spec.Extensions[0].ProviderConfig = &runtime.RawExtension{
 				Raw: encode(&v1alpha1.LakomConfig{

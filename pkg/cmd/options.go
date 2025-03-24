@@ -9,7 +9,7 @@ import (
 	"os"
 
 	apisconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
-	v1alpha1apisconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1"
+	configv1alpha1 "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1"
 	healthcheckcontroller "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
@@ -32,7 +32,7 @@ var (
 func init() {
 	scheme = runtime.NewScheme()
 	utilruntime.Must(apisconfig.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1apisconfig.AddToScheme(scheme))
+	utilruntime.Must(configv1alpha1.AddToScheme(scheme))
 
 	decoder = serializer.NewCodecFactory(scheme).UniversalDecoder()
 }
