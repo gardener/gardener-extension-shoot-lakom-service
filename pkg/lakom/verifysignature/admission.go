@@ -17,6 +17,7 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
 	gcorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
+	corev1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	"github.com/go-logr/logr"
@@ -284,9 +285,16 @@ func (h *handler) extractPodVerificationTargets(ctx context.Context, pod corev1.
 // The verification targets are extracted from the following fields:
 // - core.gardener.cloud/ControllerDeployment: helm.ociRepository
 func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Context, controllerDeployment gcorev1.ControllerDeployment) ([]verificationTarget, utils.KeyChainReader, error) {
-	var verificationTargets []verificationTarget
+	var (
+		verificationTargets []verificationTarget
+		imagePullSecrets    []string
+	)
 
-	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, controllerDeployment.Namespace, []string{}, h.useOnlyImagePullSecrets)
+	if controllerDeployment.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, controllerDeployment.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, corev1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 
 	if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
 		verificationTargets = append(verificationTargets, verificationTarget{
@@ -303,9 +311,16 @@ func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Con
 // - seedmanagement.gardener.cloud/Gardenlet: spec.deployment.helm.ociRepository
 // - seedmanagement.gardener.cloud/Gardenlet: spec.deployment.image
 func (h *handler) extractGardenletVerificationTargets(ctx context.Context, gardenlet seedmanagementv1alpha1.Gardenlet) ([]verificationTarget, utils.KeyChainReader, error) {
-	var verificationTargets []verificationTarget
+	var (
+		verificationTargets []verificationTarget
+		imagePullSecrets    []string
+	)
 
-	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, gardenlet.Namespace, []string{}, h.useOnlyImagePullSecrets)
+	if gardenlet.Spec.Deployment.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, gardenlet.Spec.Deployment.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, corev1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 
 	verificationTargets = append(verificationTargets, verificationTarget{
 		artifactRef: gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(),
@@ -327,9 +342,24 @@ func (h *handler) extractGardenletVerificationTargets(ctx context.Context, garde
 // - extensions.operator.gardener.cloud/Extension: spec.deployment.admission.virtualCluster.helm.ociRepository
 // - extensions.operator.gardener.cloud/Extension: spec.deployment.extension.helm.ociRepository
 func (h *handler) extractExtensionVerificationTargets(ctx context.Context, extension operatorv1alpha1.Extension) ([]verificationTarget, utils.KeyChainReader, error) {
-	var verificationTargets []verificationTarget
+	var (
+		verificationTargets []verificationTarget
+		imagePullSecrets    []string
+	)
 
-	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, extension.Namespace, []string{}, h.useOnlyImagePullSecrets)
+	if extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	if extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	if extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef != nil {
+		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef.Name)
+	}
+
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, corev1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 
 	if extension.Spec.Deployment != nil &&
 		extension.Spec.Deployment.AdmissionDeployment != nil &&

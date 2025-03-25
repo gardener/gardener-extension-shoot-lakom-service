@@ -41,7 +41,6 @@ type AddOptions struct {
 // AddToManager adds a Lakom Service Lifecycle controller to the given Controller Manager.
 func AddToManager(ctx context.Context, mgr manager.Manager) error {
 	return extension.Add(
-		ctx,
 		mgr,
 		extension.AddArgs{
 			Actuator:          NewActuator(mgr, DefaultAddOptions.ServiceConfig),
