@@ -26,3 +26,6 @@ dive.log
 
 # gosec
 gosec-report.sarif
+
+# generated golangci config file
+.golangci.yaml
