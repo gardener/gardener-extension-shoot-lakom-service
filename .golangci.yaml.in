@@ -27,6 +27,8 @@ issues:
 linters-settings:
   importas:
     alias:
+      # importas.alias is merged with the one from the github.com/gardener/gardener
+      # the configurations in this file take precedence and can overwrite configs from Gardener.
       # Lakom packages
       - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config
         alias: apisconfig
