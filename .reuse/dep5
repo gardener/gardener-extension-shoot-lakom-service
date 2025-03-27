@@ -11,7 +11,7 @@ Comment:
 Files:
   .github/*
   .gitignore
-  .golangci.yaml
+  .golangci.yaml.in
   .github/dependabot.yaml
   CODEOWNERS
   VERSION

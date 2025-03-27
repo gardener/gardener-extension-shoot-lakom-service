@@ -13,7 +13,7 @@ import (
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
 
-	gcorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
+	gardencorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
@@ -56,13 +56,13 @@ var _ = Describe("Admission Handler", func() {
 				}},
 			},
 		}
-		cd = &gcorev1.ControllerDeployment{
+		cd = &gardencorev1.ControllerDeployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "cd-namespace",
 				Name:      "cd-name",
 			},
-			Helm: &gcorev1.HelmControllerDeployment{
-				OCIRepository: &gcorev1.OCIRepository{
+			Helm: &gardencorev1.HelmControllerDeployment{
+				OCIRepository: &gardencorev1.OCIRepository{
 					Ref: &signedImageFullRef,
 				},
 			},
@@ -75,7 +75,7 @@ var _ = Describe("Admission Handler", func() {
 			Spec: seedmanagementv1alpha1.GardenletSpec{
 				Deployment: seedmanagementv1alpha1.GardenletSelfDeployment{
 					Helm: seedmanagementv1alpha1.GardenletHelm{
-						OCIRepository: gcorev1.OCIRepository{
+						OCIRepository: gardencorev1.OCIRepository{
 							Ref: &signedImageFullRef,
 						},
 					},
@@ -92,7 +92,7 @@ var _ = Describe("Admission Handler", func() {
 					ExtensionDeployment: &operatorv1alpha1.ExtensionDeploymentSpec{
 						DeploymentSpec: operatorv1alpha1.DeploymentSpec{
 							Helm: &operatorv1alpha1.ExtensionHelm{
-								OCIRepository: &gcorev1.OCIRepository{
+								OCIRepository: &gardencorev1.OCIRepository{
 									Ref: &signedImageFullRef,
 								},
 							},
@@ -101,14 +101,14 @@ var _ = Describe("Admission Handler", func() {
 					AdmissionDeployment: &operatorv1alpha1.AdmissionDeploymentSpec{
 						RuntimeCluster: &operatorv1alpha1.DeploymentSpec{
 							Helm: &operatorv1alpha1.ExtensionHelm{
-								OCIRepository: &gcorev1.OCIRepository{
+								OCIRepository: &gardencorev1.OCIRepository{
 									Ref: &signedImageFullRef,
 								},
 							},
 						},
 						VirtualCluster: &operatorv1alpha1.DeploymentSpec{
 							Helm: &operatorv1alpha1.ExtensionHelm{
-								OCIRepository: &gcorev1.OCIRepository{
+								OCIRepository: &gardencorev1.OCIRepository{
 									Ref: &signedImageFullRef,
 								},
 							},
@@ -270,7 +270,7 @@ func podWithImage(pod *corev1.Pod, image string) *corev1.Pod {
 	return p
 }
 
-func controllerDeploymentWithChart(controllerDeployment *gcorev1.ControllerDeployment, artifact string) *gcorev1.ControllerDeployment {
+func controllerDeploymentWithChart(controllerDeployment *gardencorev1.ControllerDeployment, artifact string) *gardencorev1.ControllerDeployment {
 	cd := controllerDeployment.DeepCopy()
 	cd.Helm.OCIRepository.Ref = &artifact
 	return cd

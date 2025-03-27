@@ -13,7 +13,7 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 
-	corev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
+	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils/test"
@@ -197,7 +197,7 @@ var _ = Describe("Actuator", func() {
     hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
     -----END PUBLIC KEY-----
 `)
-			resources    []corev1beta1.NamedResourceReference
+			resources    []gardencorev1beta1.NamedResourceReference
 			data         map[string][]byte
 			dataNoKeys   map[string][]byte
 			secret       *corev1.Secret
@@ -205,7 +205,7 @@ var _ = Describe("Actuator", func() {
 		)
 
 		BeforeEach(func() {
-			resources = []corev1beta1.NamedResourceReference{
+			resources = []gardencorev1beta1.NamedResourceReference{
 				{
 					Name: resourceName,
 					ResourceRef: autoscalingv1.CrossVersionObjectReference{

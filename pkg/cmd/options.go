@@ -8,14 +8,13 @@ import (
 	"errors"
 	"os"
 
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	apisconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
-	v1alpha1apisconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1"
+	configv1alpha1 "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1"
 	healthcheckcontroller "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
 
-	apisconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
+	extensionsconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	"github.com/gardener/gardener/extensions/pkg/controller/cmd"
 	extensionshealthcheckcontroller "github.com/gardener/gardener/extensions/pkg/controller/healthcheck"
 	extensionsheartbeatcontroller "github.com/gardener/gardener/extensions/pkg/controller/heartbeat"
@@ -33,7 +32,7 @@ var (
 func init() {
 	scheme = runtime.NewScheme()
 	utilruntime.Must(apisconfig.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1apisconfig.AddToScheme(scheme))
+	utilruntime.Must(configv1alpha1.AddToScheme(scheme))
 
 	decoder = serializer.NewCodecFactory(scheme).UniversalDecoder()
 }
@@ -83,12 +82,12 @@ type LakomServiceConfig struct {
 }
 
 // Apply applies the LakomServiceOptions to the passed ControllerOptions instance.
-func (c *LakomServiceConfig) Apply(config *config.Configuration) {
+func (c *LakomServiceConfig) Apply(config *apisconfig.Configuration) {
 	*config = c.config
 }
 
 // ApplyHealthCheckConfig applies the HealthCheckConfig to the config.
-func (c *LakomServiceConfig) ApplyHealthCheckConfig(config *apisconfigv1alpha1.HealthCheckConfig) {
+func (c *LakomServiceConfig) ApplyHealthCheckConfig(config *extensionsconfigv1alpha1.HealthCheckConfig) {
 	if c.config.HealthCheckConfig != nil {
 		*config = *c.config.HealthCheckConfig
 	}

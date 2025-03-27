@@ -10,16 +10,16 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/cmd/gardener-extension-shoot-lakom-service/app"
 
 	"github.com/gardener/gardener/pkg/logger"
-	runtimelog "sigs.k8s.io/controller-runtime/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 func main() {
-	runtimelog.SetLogger(logger.MustNewZapLogger(logger.InfoLevel, logger.FormatJSON))
+	logf.SetLogger(logger.MustNewZapLogger(logger.InfoLevel, logger.FormatJSON))
 
 	ctx := signals.SetupSignalHandler()
 	if err := app.NewServiceControllerCommand().ExecuteContext(ctx); err != nil {
-		runtimelog.Log.Error(err, "error executing the main controller command")
+		logf.Log.Error(err, "error executing the main controller command")
 		os.Exit(1)
 	}
 }

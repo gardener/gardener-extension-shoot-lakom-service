@@ -19,7 +19,7 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
-	corev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
+	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	v1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
@@ -30,13 +30,13 @@ import (
 	"github.com/gardener/gardener/pkg/extensions"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils"
-	gutil "github.com/gardener/gardener/pkg/utils/gardener"
-	kutil "github.com/gardener/gardener/pkg/utils/kubernetes"
+	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
+	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
-	secretutils "github.com/gardener/gardener/pkg/utils/secrets"
+	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	admissionregistration "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -97,7 +97,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		return err
 	}
 
-	lakomShootAccessSecret := gutil.NewShootAccessSecret(gutil.SecretNamePrefixShootAccess+constants.ApplicationName, namespace)
+	lakomShootAccessSecret := gardenerutils.NewShootAccessSecret(gardenerutils.SecretNamePrefixShootAccess+constants.ApplicationName, namespace)
 	lakomShootAccessSecret.Secret.SetLabels(utils.MergeStringMaps(
 		getLabels(),
 		lakomShootAccessSecret.Secret.GetLabels(),
@@ -183,7 +183,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	}
 
 	shootResources, err := getShootResources(
-		caBundleSecret.Data[secretutils.DataKeyCertificateBundle],
+		caBundleSecret.Data[secretsutils.DataKeyCertificateBundle],
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
 		*lakomProviderConfig.Scope,
@@ -321,7 +321,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 		},
 	}
 
-	if err := kutil.MakeUnique(&lakomConfigConfigMap); err != nil {
+	if err := kubernetesutils.MakeUnique(&lakomConfigConfigMap); err != nil {
 		return nil, err
 	}
 
@@ -347,11 +347,11 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: utils.MergeStringMaps(getLabels(), map[string]string{
-						v1beta1constants.LabelNetworkPolicyToDNS:                                                            v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                 v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                   v1beta1constants.LabelNetworkPolicyAllowed,
-						gutil.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
+						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
+						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
+						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
+						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
+						gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
 					}),
 				},
 				Spec: corev1.PodSpec{
@@ -383,7 +383,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 							"--health-bind-address=:" + healthPort.String(),
 							"--metrics-bind-address=:" + metricsPort.String(),
 							"--port=" + serverPort.String(),
-							"--kubeconfig=" + gutil.PathGenericKubeconfig,
+							"--kubeconfig=" + gardenerutils.PathGenericKubeconfig,
 							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
 							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
 							"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
@@ -465,7 +465,7 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 	}
 	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
 
-	if err := gutil.InjectGenericKubeconfig(lakomDeployment, genericKubeconfigName, shootAccessSecretName); err != nil {
+	if err := gardenerutils.InjectGenericKubeconfig(lakomDeployment, genericKubeconfigName, shootAccessSecretName); err != nil {
 		return nil, err
 	}
 
@@ -618,18 +618,18 @@ func scopeToNamespaceSelector(scope lakom.ScopeType) metav1.LabelSelector {
 
 func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName string, scope lakom.ScopeType) (map[string][]byte, error) {
 	var (
-		matchPolicy          = admissionregistration.Equivalent
-		sideEffectClass      = admissionregistration.SideEffectClassNone
-		failurePolicy        = admissionregistration.Fail
+		matchPolicy          = admissionregistrationv1.Equivalent
+		sideEffectClass      = admissionregistrationv1.SideEffectClassNone
+		failurePolicy        = admissionregistrationv1.Fail
 		timeOutSeconds       = ptr.To[int32](25)
 		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, extensionNamespace)
 		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
 		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
 		namespaceSelector    = scopeToNamespaceSelector(scope)
 		objectSelector       = scopeToObjectSelector(scope)
-		rules                = []admissionregistration.RuleWithOperations{{
-			Operations: []admissionregistration.OperationType{admissionregistration.Create, admissionregistration.Update},
-			Rule: admissionregistration.Rule{
+		rules                = []admissionregistrationv1.RuleWithOperations{{
+			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
+			Rule: admissionregistrationv1.Rule{
 				APIGroups:   []string{""},
 				APIVersions: []string{"v1"},
 				Resources:   []string{"pods", "pods/ephemeralcontainers"},
@@ -639,12 +639,12 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
 	shootResources, err := shootRegistry.AddAllAndSerialize(
-		&admissionregistration.MutatingWebhookConfiguration{
+		&admissionregistrationv1.MutatingWebhookConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   constants.WebhookConfigurationName,
 				Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
 			},
-			Webhooks: []admissionregistration.MutatingWebhook{{
+			Webhooks: []admissionregistrationv1.MutatingWebhook{{
 				Name:                    "resolve-tag.lakom.service.extensions.gardener.cloud",
 				Rules:                   rules,
 				FailurePolicy:           &failurePolicy,
@@ -652,7 +652,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 				SideEffects:             &sideEffectClass,
 				TimeoutSeconds:          timeOutSeconds,
 				AdmissionReviewVersions: []string{"v1"},
-				ClientConfig: admissionregistration.WebhookClientConfig{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &mutatingWebhookURL,
 					CABundle: webhookCaBundle,
 				},
@@ -660,12 +660,12 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 				ObjectSelector:    &objectSelector,
 			}},
 		},
-		&admissionregistration.ValidatingWebhookConfiguration{
+		&admissionregistrationv1.ValidatingWebhookConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   constants.WebhookConfigurationName,
 				Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
 			},
-			Webhooks: []admissionregistration.ValidatingWebhook{{
+			Webhooks: []admissionregistrationv1.ValidatingWebhook{{
 				Name:                    "verify-signature.lakom.service.extensions.gardener.cloud",
 				Rules:                   rules,
 				FailurePolicy:           &failurePolicy,
@@ -673,7 +673,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 				SideEffects:             &sideEffectClass,
 				TimeoutSeconds:          timeOutSeconds,
 				AdmissionReviewVersions: []string{"v1"},
-				ClientConfig: admissionregistration.WebhookClientConfig{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &validatingWebhookURL,
 					CABundle: webhookCaBundle,
 				},
@@ -704,7 +704,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 	return shootResources, nil
 }
 
-func getClientKeys(ctx context.Context, client client.Client, resources []corev1beta1.NamedResourceReference, resourceName, namespace string) ([]byte, error) {
+func getClientKeys(ctx context.Context, client client.Client, resources []gardencorev1beta1.NamedResourceReference, resourceName, namespace string) ([]byte, error) {
 	ref := v1beta1helper.GetResourceByName(resources, resourceName)
 	if ref == nil {
 		return nil, fmt.Errorf("failed to find referenced resource with name %s", resourceName)

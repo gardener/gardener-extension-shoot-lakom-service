@@ -10,13 +10,13 @@ import (
 	"os"
 
 	lakomvalidator "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/admission/validator/lakom"
-	apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
-	v1alpha1apilakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
+	apislakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+	lakomv1alpha1 "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
 
-	controllercmd "github.com/gardener/gardener/extensions/pkg/controller/cmd"
-	webhookcmd "github.com/gardener/gardener/extensions/pkg/webhook/cmd"
-	coreinstall "github.com/gardener/gardener/pkg/apis/core/install"
-	corev1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
+	extensionscmdcontroller "github.com/gardener/gardener/extensions/pkg/controller/cmd"
+	extensionscmdwebhook "github.com/gardener/gardener/extensions/pkg/webhook/cmd"
+	gardencoreinstall "github.com/gardener/gardener/pkg/apis/core/install"
+	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	gardenerhealthz "github.com/gardener/gardener/pkg/healthz"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -37,19 +37,19 @@ const admissionName = "shoot-lakom-admission"
 var log = logf.Log.WithName("gardener-extension-shoot-lakom-admission")
 
 // GardenWebhookSwitchOptions are the webhookcmd.SwitchOptions for the admission webhooks.
-func GardenWebhookSwitchOptions() *webhookcmd.SwitchOptions {
-	return webhookcmd.NewSwitchOptions(
-		webhookcmd.Switch(lakomvalidator.Name, lakomvalidator.New),
+func GardenWebhookSwitchOptions() *extensionscmdwebhook.SwitchOptions {
+	return extensionscmdwebhook.NewSwitchOptions(
+		extensionscmdwebhook.Switch(lakomvalidator.Name, lakomvalidator.New),
 	)
 }
 
 // NewAdmissionCommand creates a new command for running a shoot lakom validator
 func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 	var (
-		restOpts = &controllercmd.RESTOptions{}
-		mgrOpts  = &controllercmd.ManagerOptions{
+		restOpts = &extensionscmdcontroller.RESTOptions{}
+		mgrOpts  = &extensionscmdcontroller.ManagerOptions{
 			LeaderElection:     true,
-			LeaderElectionID:   controllercmd.LeaderElectionNameID(admissionName),
+			LeaderElectionID:   extensionscmdcontroller.LeaderElectionNameID(admissionName),
 			WebhookServerPort:  443,
 			MetricsBindAddress: ":8080",
 			HealthBindAddress:  ":8081",
@@ -57,11 +57,11 @@ func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 		}
 
 		// options for the webhook server
-		webhookServerOptions = &webhookcmd.ServerOptions{
+		webhookServerOptions = &extensionscmdwebhook.ServerOptions{
 			Namespace: os.Getenv("WEBHOOK_CONFIG_NAMESPACE"),
 		}
 		webhookSwitches = GardenWebhookSwitchOptions()
-		webhookOptions  = webhookcmd.NewAddToManagerOptions(
+		webhookOptions  = extensionscmdwebhook.NewAddToManagerOptions(
 			admissionName,
 			"",
 			nil,
@@ -69,7 +69,7 @@ func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 			webhookSwitches,
 		)
 
-		aggOption = controllercmd.NewOptionAggregator(
+		aggOption = extensionscmdcontroller.NewOptionAggregator(
 			restOpts,
 			mgrOpts,
 			webhookOptions,
@@ -124,19 +124,19 @@ func NewAdmissionCommand(ctx context.Context) *cobra.Command {
 				return fmt.Errorf("failed to instantiate manager: %w", err)
 			}
 
-			if err := v1alpha1apilakom.AddToScheme(mgr.GetScheme()); err != nil {
+			if err := lakomv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 				return fmt.Errorf("failed to add `lakom.extensions.gardener.cloud/v1alpha1` to manager scheme: %w", err)
 			}
-			if err := apilakom.AddToScheme(mgr.GetScheme()); err != nil {
+			if err := apislakom.AddToScheme(mgr.GetScheme()); err != nil {
 				return fmt.Errorf("failed to add internal version of `lakom.extensions.gardener.cloud` to manager scheme: %w", err)
 			}
-			coreinstall.Install(mgr.GetScheme())
+			gardencoreinstall.Install(mgr.GetScheme())
 
 			var sourceCluster cluster.Cluster
 			if sourceClusterConfig != nil {
 				sourceCluster, err = cluster.New(sourceClusterConfig, func(opts *cluster.Options) {
 					opts.Logger = log
-					opts.Cache.DefaultNamespaces = map[string]cache.Config{corev1beta1constants.GardenNamespace: {}}
+					opts.Cache.DefaultNamespaces = map[string]cache.Config{v1beta1constants.GardenNamespace: {}}
 				})
 				if err != nil {
 					return err

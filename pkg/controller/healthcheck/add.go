@@ -10,7 +10,7 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
-	apisconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
+	extensionsconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	"github.com/gardener/gardener/extensions/pkg/controller/healthcheck"
 	"github.com/gardener/gardener/extensions/pkg/controller/healthcheck/general"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
@@ -25,7 +25,7 @@ var (
 	defaultSyncPeriod = time.Second * 30
 	// DefaultAddOptions contains configuration for the health check controller.
 	DefaultAddOptions = healthcheck.DefaultAddArgs{
-		HealthCheckConfig: apisconfigv1alpha1.HealthCheckConfig{SyncPeriod: metav1.Duration{Duration: defaultSyncPeriod}},
+		HealthCheckConfig: extensionsconfigv1alpha1.HealthCheckConfig{SyncPeriod: metav1.Duration{Duration: defaultSyncPeriod}},
 	}
 )
 

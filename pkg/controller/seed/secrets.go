@@ -10,8 +10,8 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
-	kutil "github.com/gardener/gardener/pkg/utils/kubernetes"
-	secretutils "github.com/gardener/gardener/pkg/utils/secrets"
+	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
+	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
 )
 
@@ -29,10 +29,10 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 	threeMonths := day * 90
 	return []extensionssecretsmanager.SecretConfigWithOptions{
 		{
-			Config: &secretutils.CertificateSecretConfig{
+			Config: &secretsutils.CertificateSecretConfig{
 				Name:       CAName,
 				CommonName: CAName,
-				CertType:   secretutils.CACert,
+				CertType:   secretsutils.CACert,
 				Validity:   &year,
 			},
 			Options: []secretsmanager.GenerateOption{
@@ -41,11 +41,11 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 			},
 		},
 		{
-			Config: &secretutils.CertificateSecretConfig{
+			Config: &secretsutils.CertificateSecretConfig{
 				Name:                        constants.SeedWebhookTLSSecretName,
 				CommonName:                  constants.SeedExtensionServiceName,
-				DNSNames:                    kutil.DNSNamesForService(constants.SeedExtensionServiceName, namespace),
-				CertType:                    secretutils.ServerCert,
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.SeedExtensionServiceName, namespace),
+				CertType:                    secretsutils.ServerCert,
 				SkipPublishingCACertificate: true,
 				Validity:                    &threeMonths,
 			},
