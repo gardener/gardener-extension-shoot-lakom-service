@@ -93,6 +93,12 @@ rules:
   - patch
   - update
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - deletecollection
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
