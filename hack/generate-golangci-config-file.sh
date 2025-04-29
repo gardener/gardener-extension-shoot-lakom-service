@@ -20,5 +20,5 @@ if [ ! -s ${LAKOM_GOLANGCI_CONFIG} ]; then
     exit 1
 fi
 
-importas_alias=$(yq eval-all '.["linters-settings"].importas.alias as $item ireduce ([]; . + $item) | unique_by(.pkg)' ${LAKOM_GOLANGCI_CONFIG} ${GARDENER_GOLANGCI_CONFIG})
-importas_alias=${importas_alias} yq '.["linters-settings"].importas.alias = env(importas_alias)' ${LAKOM_GOLANGCI_CONFIG} > ${GOLANGCI_CONFIG}
+importas_alias=$(yq eval-all '.linters.settings.importas.alias as $item ireduce ([]; . + $item) | unique_by(.pkg)' ${LAKOM_GOLANGCI_CONFIG} ${GARDENER_GOLANGCI_CONFIG})
+importas_alias=${importas_alias} yq '.linters.settings.importas.alias = env(importas_alias)' ${LAKOM_GOLANGCI_CONFIG} > ${GOLANGCI_CONFIG}
