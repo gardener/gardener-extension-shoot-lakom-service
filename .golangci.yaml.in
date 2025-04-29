@@ -1,40 +1,49 @@
+version: "2"
 run:
   concurrency: 4
-  deadline: 10m
-
 linters:
   enable:
-  - gocritic
-  - gosec
-  - revive
-  - importas
-
-issues:
-  exclude-use-default: false
-  exclude:
-  # errcheck: Almost all programs ignore errors on these functions and in most cases it's ok
-  - Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*printf?|os\.(Un)?Setenv). is not checked
-  # revive:
-  - var-naming # ((var|const|struct field|func) .* should be .*
-  - dot-imports # should not use dot imports
-  - package-comments # package comment should be of the form
-  - unexported-return # exported func .* returns unexported type .*, which can be annoying to use
-  - indent-error-flow # if block ends with a return statement, so drop this else and outdent its block
-  - "exported: (type|func) name will be used as .* by other packages, and that stutters;"
-  exclude-files:
-  - "zz_generated\\..*\\.go$"
-
-linters-settings:
-  importas:
-    alias:
-      # importas.alias is merged with the one from the github.com/gardener/gardener
-      # the configurations in this file take precedence and can overwrite configs from Gardener.
-      # Lakom packages
-      - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config
-        alias: apisconfig
-      - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1
-        alias: configv1alpha1
-      - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom
-        alias: apislakom
-      - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1
-        alias: lakomv1alpha1
+    - gocritic
+    - gosec
+    - importas
+    - revive
+  settings:
+    importas:
+      alias:
+        - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config
+          alias: apisconfig
+        - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1
+          alias: configv1alpha1
+        - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom
+          alias: apislakom
+        - pkg: github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1
+          alias: lakomv1alpha1
+  exclusions:
+    generated: lax
+    rules:
+      - path: (.+)\.go$
+        text: Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*printf?|os\.(Un)?Setenv). is not checked
+      - path: (.+)\.go$
+        text: var-naming
+      - path: (.+)\.go$
+        text: dot-imports
+      - path: (.+)\.go$
+        text: package-comments
+      - path: (.+)\.go$
+        text: unexported-return
+      - path: (.+)\.go$
+        text: indent-error-flow
+      - path: (.+)\.go$
+        text: 'exported: (type|func) name will be used as .* by other packages, and that stutters;'
+    paths:
+      - zz_generated\..*\.go$
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
