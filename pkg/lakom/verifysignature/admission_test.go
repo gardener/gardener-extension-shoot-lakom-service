@@ -162,7 +162,7 @@ var _ = Describe("Admission Handler", func() {
 		pod.Spec.Containers[0].Image = signedImageFullRef
 		cd.Helm.OCIRepository.Ref = &signedImageFullRef
 		gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &signedImageFullRef
-		extension.Spec.Deployment.ExtensionDeployment.DeploymentSpec.Helm.OCIRepository.Ref = &signedImageFullRef
+		extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.Ref = &signedImageFullRef
 		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &signedImageFullRef
 		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &signedImageFullRef
 	})
@@ -284,7 +284,7 @@ func gardenletWithChart(gardenlet *seedmanagementv1alpha1.Gardenlet, artifact st
 
 func extensionWithChart(extension *operatorv1alpha1.Extension, artifact string) *operatorv1alpha1.Extension {
 	e := extension.DeepCopy()
-	e.Spec.Deployment.ExtensionDeployment.DeploymentSpec.Helm.OCIRepository.Ref = &artifact
+	e.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.Ref = &artifact
 	e.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &artifact
 	e.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &artifact
 	return e
@@ -300,10 +300,10 @@ type admissionRequestBuilder struct {
 func (a admissionRequestBuilder) Build() admission.Request {
 	request := admission.Request{}
 
-	request.AdmissionRequest.Kind = a.gvk
-	request.AdmissionRequest.SubResource = a.subResource
-	request.AdmissionRequest.Operation = a.operation
-	request.AdmissionRequest.Object = runtime.RawExtension{Raw: encode(a.object)}
+	request.Kind = a.gvk
+	request.SubResource = a.subResource
+	request.Operation = a.operation
+	request.Object = runtime.RawExtension{Raw: encode(a.object)}
 
 	return request
 }
