@@ -256,10 +256,10 @@ func (arb arb) withObject(object runtime.Object) arb {
 func (arb arb) Build() admission.Request {
 	request := admission.Request{}
 
-	request.AdmissionRequest.Kind = arb.gvk
-	request.AdmissionRequest.SubResource = arb.subResource
-	request.AdmissionRequest.Operation = arb.operation
-	request.AdmissionRequest.Object = arb.object
+	request.Kind = arb.gvk
+	request.SubResource = arb.subResource
+	request.Operation = arb.operation
+	request.Object = arb.object
 
 	return request
 }
