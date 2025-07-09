@@ -4,3 +4,18 @@ updates:
   directory: /
   schedule:
     interval: daily
+- package-ecosystem: gomod
+  directory: /
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 5
+  allow:
+  - dependency-name: "github.com/gardener/gardener"
+  - dependency-name: "github.com/gardener/service-account-issuer-discovery"
+  - dependency-name: "github.com/google/go-containerregistry"
+  - dependency-name: "github.com/google/go-containerregistry/pkg/authn/k8schain"
+  - dependency-name: "github.com/google/go-containerregistry/pkg/authn/kubernetes"
+  - dependency-name: "github.com/sigstore/cosign/v2"
+  - dependency-name: "github.com/sigstore/sigstore"
+  labels:
+  - kind/enhancement
