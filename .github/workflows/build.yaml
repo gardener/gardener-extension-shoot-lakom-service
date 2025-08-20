@@ -25,6 +25,7 @@ jobs:
     name: Build OCI-Images
     needs:
       - prepare
+      - verify
     permissions:
       contents: read
       packages: write
