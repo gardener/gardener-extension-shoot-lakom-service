@@ -120,7 +120,7 @@ generate: $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ) $(VGOPATH)
 .PHONY: format
 format: $(GOIMPORTSREVISER)
 	@GOIMPORTS_REVISER_OPTIONS="-imports-order std,project,general,company" \
-		bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test
+		bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test ./charts
 
 .PHONY: sast
 sast: $(GOSEC)
