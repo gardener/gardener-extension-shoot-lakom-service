@@ -1,5 +1,7 @@
 # [Gardener Extension for lakom services](https://gardener.cloud)
 
+[![Build](https://github.com/gardener/gardener-extension-shoot-lakom-service/actions/workflows/head-update.yaml/badge.svg)](https://github.com/gardener/gardener-extension-shoot-lakom-service/actions/workflows/head-update.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gardener/gardener-extension-shoot-lakom-service)](https://goreportcard.com/report/github.com/gardener/gardener-extension-shoot-lakom-service)
 [![REUSE status](https://api.reuse.software/badge/github.com/gardener/gardener-extension-shoot-lakom-service)](https://api.reuse.software/info/github.com/gardener/gardener-extension-shoot-lakom-service)
 
 Project Gardener implements the automated management and operation of [Kubernetes](https://kubernetes.io/) clusters as a service.
