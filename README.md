@@ -1,6 +1,6 @@
 # [Gardener Extension for lakom services](https://gardener.cloud)
 
-[![Build](https://github.com/gardener/gardener-extension-shoot-lakom-service/actions/workflows/head-update.yaml/badge.svg)](https://github.com/gardener/gardener-extension-shoot-lakom-service/actions/workflows/head-update.yaml)
+[![Build](https://github.com/gardener/gardener-extension-shoot-lakom-service/actions/workflows/non-release.yaml/badge.svg)](https://github.com/gardener/gardener-extension-shoot-lakom-service/actions/workflows/non-release.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gardener/gardener-extension-shoot-lakom-service)](https://goreportcard.com/report/github.com/gardener/gardener-extension-shoot-lakom-service)
 [![REUSE status](https://api.reuse.software/badge/github.com/gardener/gardener-extension-shoot-lakom-service)](https://api.reuse.software/info/github.com/gardener/gardener-extension-shoot-lakom-service)
 
