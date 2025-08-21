@@ -89,11 +89,7 @@ docker-images:
 .PHONY: tidy
 tidy:
 	@go mod tidy
-	@mkdir -p $(REPO_ROOT)/.ci/hack
-	@cp $(GARDENER_HACK_DIR)/.ci/* $(REPO_ROOT)/.ci/hack/
-	@chmod +xw $(REPO_ROOT)/.ci/hack/*
 	@cp $(GARDENER_HACK_DIR)/cherry-pick-pull.sh $(HACK_DIR)/cherry-pick-pull.sh && chmod +xw $(HACK_DIR)/cherry-pick-pull.sh
-#	@$(HACK_DIR)/update-github-templates.sh
 
 .PHONY: clean
 clean:
