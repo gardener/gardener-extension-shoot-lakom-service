@@ -4,7 +4,7 @@ on:
     branches:
     - main
     - 'release-v*'
-  pull_requests:
+  pull_request:
 
 jobs:
   build:
