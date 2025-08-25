@@ -84,6 +84,7 @@ jobs:
           - name: shoot-lakom-admission-application
             dir: charts/gardener-extension-shoot-lakom-admission/charts/application
             oci-repository: charts/gardener/extensions
+            ocm-mappings: []
           - name: shoot-lakom-admission-runtime
             dir: charts/gardener-extension-shoot-lakom-admission/charts/runtime
             oci-repository: charts/gardener/extensions
