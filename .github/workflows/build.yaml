@@ -52,6 +52,19 @@ jobs:
       oci-platforms: linux/amd64,linux/arm64
       extra-tags: latest
 
+  oci-images-summary:
+    name: OCI Images Summary
+    runs-on: solinas
+    needs:
+    - oci-images
+    if: ${{ always() }}  # Ensures this job runs even if the matrix partially fails
+    permissions:
+      contents: read
+    steps:
+      - name: Fail if OCI matrix failed
+        if: ${{ needs.oci-images.result != 'success' }}
+        run: exit 1
+
   helmcharts:
     name: Build Helmcharts
     needs:
@@ -100,6 +113,19 @@ jobs:
       oci-registry: ${{ needs.prepare.outputs.oci-registry }}
       oci-repository: ${{ matrix.args.oci-repository }}
       ocm-mappings: ${{ toJSON(matrix.args.ocm-mappings) }}
+
+  helmcharts-summary:
+    name: Helm Charts Summary
+    runs-on: solinas
+    needs:
+    - helmcharts
+    if: ${{ always() }}  # Ensures this job runs even if the matrix partially fails
+    permissions:
+      contents: read
+    steps:
+      - name: Fail if Helm Charts matrix failed
+        if: ${{ needs.helmcharts.result != 'success' }}
+        run: exit 1
 
   verify:
     runs-on: ubuntu-latest
