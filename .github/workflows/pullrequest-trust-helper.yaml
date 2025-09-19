@@ -14,4 +14,4 @@ jobs:
       github-app-secret-key: ${{ secrets.GARDENER_GITHUB_ACTIONS_PRIVATE_KEY }}
     uses: gardener/cc-utils/.github/workflows/pullrequest-trust-helper.yaml@master
     with:
-     trusted-teams: default
+     trusted-teams: lakom-maintainers
