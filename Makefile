@@ -89,11 +89,7 @@ docker-images:
 .PHONY: tidy
 tidy:
 	@go mod tidy
-	@mkdir -p $(REPO_ROOT)/.ci/hack
-	@cp $(GARDENER_HACK_DIR)/.ci/* $(REPO_ROOT)/.ci/hack/
-	@chmod +xw $(REPO_ROOT)/.ci/hack/*
 	@cp $(GARDENER_HACK_DIR)/cherry-pick-pull.sh $(HACK_DIR)/cherry-pick-pull.sh && chmod +xw $(HACK_DIR)/cherry-pick-pull.sh
-#	@$(HACK_DIR)/update-github-templates.sh
 
 .PHONY: clean
 clean:
@@ -120,7 +116,7 @@ generate: $(GEN_CRD_API_REFERENCE_DOCS) $(EXTENSION_GEN) $(HELM) $(KUSTOMIZE) $(
 .PHONY: format
 format: $(GOIMPORTSREVISER)
 	@GOIMPORTS_REVISER_OPTIONS="-imports-order std,project,general,company" \
-		bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test
+		bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test ./charts
 
 .PHONY: sast
 sast: $(GOSEC)

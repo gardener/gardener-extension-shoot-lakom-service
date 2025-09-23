@@ -74,7 +74,7 @@ var _ = Describe("Verifier", func() {
 			directVerifier verifysignature.Verifier
 		)
 		BeforeEach(func() {
-			// Interesting detail. Altough we've created the verifier to not allow insecure registries,
+			// Interesting detail. Although we've created the verifier to not allow insecure registries,
 			// (the `false` that is passed as a second argument), go-containerregistry still allows insecure
 			// connections if the registry is specifically `localhost`. Don't remember where the code for
 			// this logic was but I remember seeing it.

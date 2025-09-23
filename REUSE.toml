@@ -16,12 +16,6 @@ SPDX-FileCopyrightText = "2022 SAP SE or an SAP affiliate company and Gardener c
 SPDX-License-Identifier = "CC-BY-4.0"
 
 [[annotations]]
-path = ".ci/hack/**"
-precedence = "aggregate"
-SPDX-FileCopyrightText = "Copyright 2019 SAP SE or an SAP affiliate company and Gardener contributors"
-SPDX-License-Identifier = "Apache-2.0"
-
-[[annotations]]
 path = "pkg/lakom/utils/cosign_utils.go"
 precedence = "aggregate"
 SPDX-FileCopyrightText = ["Copyright 2021 The Sigstore Authors.", "Modifications Copyright 2022 SAP SE or an SAP affiliate company and Gardener contributors"]
