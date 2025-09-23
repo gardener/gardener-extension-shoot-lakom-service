@@ -537,6 +537,7 @@ spec:
     matchLabels:
       app.kubernetes.io/name: lakom
       app.kubernetes.io/part-of: shoot-lakom-service
+status: {}
 `
 }
 
