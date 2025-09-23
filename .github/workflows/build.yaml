@@ -54,7 +54,7 @@ jobs:
 
   oci-images-summary:
     name: OCI Images Summary
-    runs-on: solinas
+    runs-on: ubuntu-latest
     needs:
     - oci-images
     if: ${{ always() }}  # Ensures this job runs even if the matrix partially fails
@@ -116,7 +116,7 @@ jobs:
 
   helmcharts-summary:
     name: Helm Charts Summary
-    runs-on: solinas
+    runs-on: ubuntu-latest
     needs:
     - helmcharts
     if: ${{ always() }}  # Ensures this job runs even if the matrix partially fails
