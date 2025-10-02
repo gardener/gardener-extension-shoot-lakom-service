@@ -83,7 +83,7 @@ runtime:
   vpa:
     enabled: true
     updatePolicy:
-      updateMode: "Auto"
+      updateMode: "Recreate"
   additionalAnnotations:
     service: {}
   additionalLabels:
