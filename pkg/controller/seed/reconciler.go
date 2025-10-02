@@ -195,7 +195,7 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 		webhookTLSCertDir        = "/etc/lakom/tls"
 		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
 		requestMemory            = resource.MustParse("25M")
-		vpaUpdateMode            = vpaautoscalingv1.UpdateModeAuto
+		vpaUpdateMode            = vpaautoscalingv1.UpdateModeRecreate
 		kubeSystemNamespace      = metav1.NamespaceSystem
 		matchPolicy              = admissionregistrationv1.Equivalent
 		sideEffectClass          = admissionregistrationv1.SideEffectClassNone

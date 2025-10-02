@@ -537,7 +537,7 @@ spec:
     kind: Deployment
     name: extension-shoot-lakom-service-seed
   updatePolicy:
-    updateMode: Auto
+    updateMode: Recreate
 status: {}
 `
 }
