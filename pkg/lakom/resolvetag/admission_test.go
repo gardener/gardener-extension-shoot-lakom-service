@@ -18,8 +18,10 @@ import (
 	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
 	mockmanager "github.com/gardener/gardener/third_party/mock/controller-runtime/manager"
 	"github.com/go-logr/logr"
+	"github.com/google/go-containerregistry/pkg/name"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gstruct"
 	"go.uber.org/mock/gomock"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -133,6 +135,9 @@ var _ = Describe("Admission Handler", func() {
 				Name:      "invalid-name",
 			},
 		}
+
+		signedImageRepository string
+		signedImageDigest     string
 	)
 
 	BeforeEach(func() {
@@ -155,6 +160,11 @@ var _ = Describe("Admission Handler", func() {
 
 		handler = h
 		pod.Spec.Containers[0].Image = signedImageTagRef
+
+		ref, err := name.NewDigest(signedImageDigestRef)
+		Expect(err).ToNot(HaveOccurred())
+		signedImageRepository = ref.Context().Name()
+		signedImageDigest = ref.DigestStr()
 	})
 
 	DescribeTable(
@@ -167,7 +177,7 @@ var _ = Describe("Admission Handler", func() {
 				Expect(response.AdmissionResponse.Result.Code).To(BeEquivalentTo(http.StatusInternalServerError))
 			}
 		},
-		Entry("Allow apps/v1.deployments", arb{}.withKind(deploymentGVK).Build(), true, ""),
+		Entry("Allow apps/v1.deployments", arb{}.withKind(deploymentGVK).withOperation(admissionv1.Create).Build(), true, ""),
 		Entry("Allow status subResource requests on pods", arb{}.withKind(podGVK).withSubResource("status").Build(), true, ""),
 		Entry("Allow update status subResource requests on pods with invalid image", arb{}.withKind(podGVK).withSubResource("status").withOperation(admissionv1.Update).withObject(podWithImage(pod, "invalid-image@sha256:123")).Build(), true, ""),
 		Entry("Allow delete operation on pods", arb{}.withKind(podGVK).withOperation(admissionv1.Delete).Build(), true, ""),
@@ -195,16 +205,68 @@ var _ = Describe("Admission Handler", func() {
 		},
 		Entry("Resolve tag to digest for pod", func() admission.Request {
 			return arb{}.withKind(podGVK).withOperation(admissionv1.Create).withObject(pod).Build()
-		}, &signedImageFullRef, podExpectedPatchesCount, podPaths),
+		}, &signedImageDigestRef, podExpectedPatchesCount, podPaths),
 		Entry("Resolve tag to digest for controllerdeployment", func() admission.Request {
 			return arb{}.withKind(controllerDeploymentGVK).withOperation(admissionv1.Create).withObject(cd).Build()
-		}, &signedImageFullRef, cdExpectedPatchesCount, cdPaths),
-		Entry("Resolve tag to digest for gardenlet", func() admission.Request {
+		}, &signedImageDigestRef, cdExpectedPatchesCount, cdPaths),
+		Entry("Resolve tag to digest for gardenlet helm chart image", func() admission.Request {
 			return arb{}.withKind(gardenletGVK).withOperation(admissionv1.Create).withObject(gardenlet).Build()
-		}, &signedImageFullRef, gardenletExpectedPatchesCount, gardenletPaths),
+		}, &signedImageDigestRef, gardenletExpectedPatchesCount, gardenletPaths),
 		Entry("Resolve tag to digest for extension", func() admission.Request {
 			return arb{}.withKind(extensionGVK).withOperation(admissionv1.Create).withObject(extension).Build()
-		}, &signedImageFullRef, extensionExpectedPatchesCount, extensionPaths),
+		}, &signedImageDigestRef, extensionExpectedPatchesCount, extensionPaths),
+	)
+
+	It("Should resolve tag to digest for gardenlet container image", func() {
+		tag := signedImageTag
+		gardenlet.Spec.Deployment.GardenletDeployment = seedmanagementv1alpha1.GardenletDeployment{
+			Image: &seedmanagementv1alpha1.Image{
+				Repository: &signedImageRepository,
+				Tag:        &tag,
+			},
+		}
+		gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &signedImageDigestRef
+		request := arb{}.withKind(gardenletGVK).withOperation(admissionv1.Create).withObject(gardenlet).Build()
+
+		response := handler.Handle(ctx, request)
+		Expect(response.Allowed).To(BeTrue())
+		Expect(response.Patches).To(HaveLen(1))
+		Expect(response.Patches).To(HaveExactElements(
+			MatchFields(IgnoreExtras, Fields{
+				"Operation": Equal("replace"),
+				"Path":      Equal("/spec/deployment/image/tag"),
+				"Value":     Equal(signedImageDigest),
+			}),
+		))
+	})
+
+	DescribeTable(
+		"Do not patch resource already using digests",
+		func(requestBuilder func() admission.Request) {
+			request := requestBuilder()
+			response := handler.Handle(ctx, request)
+			Expect(response.Allowed).To(BeTrue())
+			Expect(response.Patches).To(BeEmpty())
+		},
+		Entry("pod", func() admission.Request {
+			return arb{}.withKind(podGVK).withOperation(admissionv1.Create).withObject(podWithImage(pod, signedImageDigestRef)).Build()
+		}),
+		Entry("controllerdeployment", func() admission.Request {
+			cd.Helm.OCIRepository.Ref = &signedImageDigestRef
+			return arb{}.withKind(controllerDeploymentGVK).withOperation(admissionv1.Create).withObject(cd).Build()
+		}),
+		Entry("gardenlet helm chart image", func() admission.Request {
+			gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &signedImageDigestRef
+			gardenlet.Spec.Deployment.Image.Repository = &signedImageRepository
+			gardenlet.Spec.Deployment.Image.Tag = &signedImageDigest
+			return arb{}.withKind(gardenletGVK).withOperation(admissionv1.Create).withObject(gardenlet).Build()
+		}),
+		Entry("extension", func() admission.Request {
+			extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.Ref = &signedImageDigestRef
+			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &signedImageDigestRef
+			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &signedImageDigestRef
+			return arb{}.withKind(extensionGVK).withOperation(admissionv1.Create).withObject(extension).Build()
+		}),
 	)
 })
 
