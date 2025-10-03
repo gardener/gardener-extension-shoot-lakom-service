@@ -1,0 +1,6 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+- gardener-extension-shoot-lakom-service-reviewers
+approvers:
+- gardener-extension-shoot-lakom-service-approvers
