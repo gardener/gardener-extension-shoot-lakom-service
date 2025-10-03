@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+aliases:
+  gardener-extension-shoot-lakom-service-reviewers:
+  - dimityrmirchev
+  - rrhubenov
+  - vpnachev
+  gardener-extension-shoot-lakom-service-approvers:
+  - dimityrmirchev
+  - rrhubenov
+  - vpnachev
