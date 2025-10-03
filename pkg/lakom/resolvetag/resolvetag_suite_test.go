@@ -38,8 +38,8 @@ import (
 
 var (
 	// FullRef use the digest instead of the tag.
-	signedImageFullRef   string
-	unsignedImageFullRef string
+	signedImageDigestRef   string
+	unsignedImageDigestRef string
 
 	// TagRef use the tag instead of the digest for referencing the artifact.
 	signedImageTagRef      string
@@ -64,14 +64,12 @@ func TestCMD(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	scheme = runtime.NewScheme()
-	err := corev1.AddToScheme(scheme)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
 	dirPath, err := os.MkdirTemp("", "verifysignature_test")
 	Expect(err).ToNot(HaveOccurred())
 	DeferCleanup(func() {
-		err := os.RemoveAll(dirPath)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(os.RemoveAll(dirPath)).To(Succeed())
 	})
 
 	// Tests rely on a fake registry
@@ -85,8 +83,8 @@ var _ = BeforeSuite(func() {
 	_, unsignedImageRef, err := createTestImage(registryURL, unsignedImageTag)
 	Expect(err).ToNot(HaveOccurred())
 
-	signedImageFullRef = signedImageRef.Name()
-	unsignedImageFullRef = unsignedImageRef.Name()
+	signedImageDigestRef = signedImageRef.Name()
+	unsignedImageDigestRef = unsignedImageRef.Name()
 
 	signedImageTagRef = signedImageRef.Context().Tag(signedImageTag).String()
 	unsignedImageTagRef = unsignedImageRef.Context().Tag(unsignedImageTag).String()
@@ -96,7 +94,7 @@ var _ = BeforeSuite(func() {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	Expect(err).ToNot(HaveOccurred())
 
-	Expect(signImage(signedImage, signedImageFullRef, privateKey)).ToNot(HaveOccurred())
+	Expect(signImage(signedImage, signedImageDigestRef, privateKey)).To(Succeed())
 })
 
 func startRegistry() (*url.URL, *httptest.Server) {

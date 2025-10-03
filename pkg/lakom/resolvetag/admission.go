@@ -213,14 +213,15 @@ func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagementv
 	if err != nil {
 		return nil, err
 	}
-	gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &resolved
+	gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &resolved.ref
 
 	if gardenlet.Spec.Deployment.Image != nil {
-		resolved, err = h.resolveArtifact(ctx, getURL(gardenlet.Spec.Deployment.Image), kcr, logger)
+		resolved, err := h.resolveArtifact(ctx, getURL(gardenlet.Spec.Deployment.Image), kcr, logger)
 		if err != nil {
 			return nil, err
 		}
-		gardenlet.Spec.Deployment.Image.Tag = &resolved
+		gardenlet.Spec.Deployment.Image.Repository = &resolved.repository
+		gardenlet.Spec.Deployment.Image.Tag = &resolved.digest
 	}
 
 	return json.Marshal(gardenlet)
@@ -248,7 +249,7 @@ func (h *handler) handleControllerDeployment(ctx context.Context, controllerDepl
 			return nil, err
 		}
 
-		controllerDeployment.Helm.OCIRepository.Ref = &resolved
+		controllerDeployment.Helm.OCIRepository.Ref = &resolved.ref
 	}
 
 	return json.Marshal(controllerDeployment)
@@ -289,7 +290,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 		if err != nil {
 			return nil, err
 		}
-		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &resolved
+		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &resolved.ref
 	}
 
 	if extension.Spec.Deployment != nil &&
@@ -301,7 +302,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 		if err != nil {
 			return nil, err
 		}
-		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &resolved
+		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &resolved.ref
 	}
 
 	if extension.Spec.Deployment != nil &&
@@ -312,7 +313,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 		if err != nil {
 			return nil, err
 		}
-		extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.Ref = &resolved
+		extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.Ref = &resolved.ref
 	}
 
 	return json.Marshal(extension)
@@ -331,7 +332,7 @@ func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error)
 			return nil, err
 		}
 
-		pod.Spec.InitContainers[idx].Image = resolved
+		pod.Spec.InitContainers[idx].Image = resolved.ref
 	}
 	for idx, c := range pod.Spec.Containers {
 		resolved, err := h.resolveArtifact(ctx, c.Image, kcr, logger)
@@ -339,7 +340,7 @@ func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error)
 			return nil, err
 		}
 
-		pod.Spec.Containers[idx].Image = resolved
+		pod.Spec.Containers[idx].Image = resolved.ref
 	}
 	for idx, ec := range pod.Spec.EphemeralContainers {
 		resolved, err := h.resolveArtifact(ctx, ec.Image, kcr, logger)
@@ -347,7 +348,7 @@ func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error)
 			return nil, err
 		}
 
-		pod.Spec.EphemeralContainers[idx].Image = resolved
+		pod.Spec.EphemeralContainers[idx].Image = resolved.ref
 	}
 
 	return json.Marshal(pod)
@@ -368,7 +369,9 @@ func getURL(img *seedmanagementv1alpha1.Image) string {
 	return strings.TrimPrefix(ref, "oci://")
 }
 
-func (h *handler) resolveArtifact(ctx context.Context, image string, kcr utils.KeyChainReader, logger logr.Logger) (string, error) {
+// resolveArtifact resolves OCI image artefact using tag to its sha256 digest.
+// It returns the full image reference, the repository and the digest.
+func (h *handler) resolveArtifact(ctx context.Context, image string, kcr utils.KeyChainReader, logger logr.Logger) (*resolvedArtefact, error) {
 	logger = logger.WithValues("originalImage", image)
 
 	opts := []name.Option{}
@@ -378,27 +381,46 @@ func (h *handler) resolveArtifact(ctx context.Context, image string, kcr utils.K
 
 	imageRef, err := name.ParseReference(image, opts...)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if _, ok := imageRef.(name.Digest); ok {
+	if imageDigest, ok := imageRef.(name.Digest); ok {
 		logger.Info("Image already using digest")
-		return image, nil
+		return &resolvedArtefact{
+			ref:        image,
+			repository: imageDigest.Context().Name(),
+			digest:     imageDigest.DigestStr(),
+		}, nil
 	}
 
 	tagRef, ok := imageRef.(name.Tag)
 	if !ok {
-		return "", fmt.Errorf("image reference %q cannot be converted to tagReference", imageRef.Name())
+		return nil, fmt.Errorf("image reference %q cannot be converted to tagReference", imageRef.Name())
 	}
 
 	resolved, err := h.resolver.Resolve(ctx, tagRef, kcr)
 	if err != nil {
 		metrics.ResolvedTagErrors.WithLabelValues().Inc()
-		return "", err
+		return nil, err
 	}
 
 	metrics.ResolvedTag.WithLabelValues().Inc()
 	logger.Info("Image has been resolved", "imageWithDigest", resolved)
 
-	return resolved, nil
+	digestRef, err := name.NewDigest(resolved, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse resolved reference %q as image using digest, err: %w", resolved, err)
+	}
+
+	return &resolvedArtefact{
+		ref:        resolved,
+		repository: digestRef.Context().Name(),
+		digest:     digestRef.DigestStr(),
+	}, nil
+}
+
+type resolvedArtefact struct {
+	ref        string
+	repository string
+	digest     string
 }
