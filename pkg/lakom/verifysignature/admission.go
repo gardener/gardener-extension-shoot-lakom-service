@@ -420,7 +420,7 @@ func (h *handler) validateTargets(ctx context.Context, logger logr.Logger, verif
 	for _, verificationTarget := range verificationTargets {
 		verified, err := h.validateArtifact(ctx, logger, verificationTarget.artifactRef, kcr)
 		if err != nil {
-			errorList = append(errorList, field.InternalError(verificationTarget.fldPath, err))
+			errorList = append(errorList, field.InternalError(verificationTarget.fldPath, fmt.Errorf("failed to validate artifact %q: %w", verificationTarget.artifactRef, err)))
 		} else if !verified {
 			errorList = append(errorList, field.Forbidden(verificationTarget.fldPath, fmt.Sprintf("%s for artifact %s", noSignatureFoundMsg, verificationTarget.artifactRef)))
 		}

@@ -69,7 +69,7 @@ func verify(ctx context.Context, artifactRef name.Reference, keys lakomconfig.Co
 		return false, fmt.Errorf("artifact reference is not a digest, reference: %q", artifactRef.Name())
 	}
 
-	logger := logf.FromContext(ctx)
+	logger := logf.FromContext(ctx).WithValues("image", artifactRef.Name())
 
 	// We need successful verification for at least one key, therefore any other failures can be ignored.
 	for _, k := range keys.Keys {
