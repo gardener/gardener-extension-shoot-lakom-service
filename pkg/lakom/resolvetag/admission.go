@@ -409,7 +409,7 @@ func (h *handler) resolveArtifact(ctx context.Context, image string, kcr utils.K
 
 	digestRef, err := name.NewDigest(resolved, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse resolved reference %q as image using digest, err: %w", resolved, err)
+		return nil, fmt.Errorf("failed to parse resolved reference %q as image using digest: %w", resolved, err)
 	}
 
 	return &resolvedArtefact{
