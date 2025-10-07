@@ -115,6 +115,7 @@ generate: $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ) $(VGOPATH)
 	@VGOPATH=$(VGOPATH) REPO_ROOT=$(REPO_ROOT) GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) \
 		bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./pkg/... ./test/...
 	@$(HACK_DIR)/set-controller-deployment-policy-to-always.sh
+	$(MAKE) format
 
 .PHONY: format
 format: $(GOIMPORTSREVISER)
