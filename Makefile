@@ -118,7 +118,7 @@ generate: $(GEN_CRD_API_REFERENCE_DOCS) $(HELM) $(MOCKGEN) $(YQ) $(VGOPATH)
 	$(MAKE) format
 
 .PHONY: format
-format: $(GOIMPORTSREVISER)
+format: $(GOIMPORTS) $(GOIMPORTSREVISER)
 	@GOIMPORTS_REVISER_OPTIONS="-imports-order std,project,general,company" \
 		bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test
 
