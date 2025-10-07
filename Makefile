@@ -112,9 +112,10 @@ generate: $(GEN_CRD_API_REFERENCE_DOCS) $(EXTENSION_GEN) $(HELM) $(KUSTOMIZE) $(
 	@VGOPATH=$(VGOPATH) REPO_ROOT=$(REPO_ROOT) GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) \
 		bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./example/... ./pkg/... ./test/...
 	@$(HACK_DIR)/set-controller-deployment-policy-to-always.sh
+	$(MAKE) format
 
 .PHONY: format
-format: $(GOIMPORTSREVISER)
+format: $(GOIMPORTS) $(GOIMPORTSREVISER)
 	@GOIMPORTS_REVISER_OPTIONS="-imports-order std,project,general,company" \
 		bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test ./charts
 
