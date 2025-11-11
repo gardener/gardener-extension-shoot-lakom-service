@@ -13,9 +13,9 @@ build:
     - garden.local.gardener.cloud
   artifacts:
     - image: local-skaffold/gardener-extension-shoot-lakom-service
-      # The extension controller uses the vectorImageOverwrite values to use 
-      # as the image for the resources it deploys.
-      # This requires that the admission controller is built before this image.
+      # The shoot-lakom-service controller uses imageVectorOverwrite to configure
+      # the image for the resources it deploys, i.e. lakom admission controller.
+      # This requires the lakom admission controller to be built before this image.
       requires:
         - image: local-skaffold/lakom
       hooks:
@@ -43,12 +43,12 @@ build:
             - pkg/secrets
             - VERSION
         ldflags:
-          - '{{.LD_FLAGS}}'
+          - '{{.EXTENSION_LD_FLAGS}}'
         main: ./cmd/gardener-extension-shoot-lakom-service
     - image: local-skaffold/lakom
-      # We need the image for the lakom admisison controller to be injected 
+      # We need the image for the lakom admission controller to be injected
       # into the imageVectorOverwrite for the controller registration.
-      # Skaffold currently does not give us an easy way to access the 
+      # Skaffold currently does not give us an easy way to access the
       # image name of the newly built lakom during deployment (eg. passing it
       # to kustomize).
       #
@@ -78,7 +78,7 @@ build:
             - pkg/lakom/verifysignature
             - VERSION
         ldflags:
-          - '{{.LD_FLAGS}}'
+          - '{{.ADMISSION_LD_FLAGS}}'
         main: ./cmd/lakom
 resourceSelector:
   allow:
@@ -121,7 +121,7 @@ build:
             - pkg/lakom/utils
             - VERSION
         ldflags:
-          - '{{.LD_FLAGS}}'
+          - '{{.SHOOT_ADMISSION_LD_FLAGS}}'
         main: ./cmd/gardener-extension-shoot-lakom-admission
 deploy:
   helm:
