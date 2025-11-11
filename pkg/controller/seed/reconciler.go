@@ -276,7 +276,13 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 							}},
 						},
 					},
-					ServiceAccountName:           constants.SeedExtensionServiceName,
+					ServiceAccountName: constants.SeedExtensionServiceName,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: ptr.To(true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					AutomountServiceAccountToken: ptr.To[bool](true),
 					Containers: []corev1.Container{{
 						Name:            constants.SeedApplicationName,
@@ -284,6 +290,7 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						SecurityContext: &corev1.SecurityContext{
 							AllowPrivilegeEscalation: ptr.To(false),
+							Privileged:               ptr.To(false),
 						},
 						Args: []string{
 							"--cache-ttl=" + cacheTTL.String(),

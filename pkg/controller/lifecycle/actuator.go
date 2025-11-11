@@ -368,12 +368,19 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 					},
 					AutomountServiceAccountToken: ptr.To[bool](false),
 					ServiceAccountName:           constants.ExtensionServiceName,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: ptr.To(true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					Containers: []corev1.Container{{
 						Name:            constants.ApplicationName,
 						Image:           image,
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						SecurityContext: &corev1.SecurityContext{
 							AllowPrivilegeEscalation: ptr.To(false),
+							Privileged:               ptr.To(false),
 						},
 						Args: []string{
 							"--cache-ttl=" + cacheTTL.String(),

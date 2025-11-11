@@ -65,12 +65,17 @@ spec:
       {{- else }}
       serviceAccountName: {{ .Values.global.name }}
       {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: lakom-admission-controller
         image: {{ include "image" . }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         securityContext:
           allowPrivilegeEscalation: false
+          privileged: false
         command:
         - /lakom
         - --cache-ttl={{ .Values.cache.ttl }}
