@@ -406,6 +406,7 @@ spec:
             memory: 25M
         securityContext:
           allowPrivilegeEscalation: false
+          privileged: false
         volumeMounts:
         - mountPath: /etc/lakom/config
           name: lakom-config
@@ -414,6 +415,10 @@ spec:
           name: lakom-server-tls
           readOnly: true
       priorityClassName: gardener-system-900
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: extension-shoot-lakom-service-seed
       volumes:
       - configMap:

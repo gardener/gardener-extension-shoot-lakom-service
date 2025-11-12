@@ -1,9 +1,6 @@
 # SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
 #
 # SPDX-License-Identifier: Apache-2.0
-
-# TODO(vpnachev): Remove unneeded permissions once the controller is ready
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -13,14 +10,6 @@ metadata:
     app.kubernetes.io/name: gardener-extension-{{ .Values.serviceName }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 rules:
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups:
   - extensions.gardener.cloud
   resources:
@@ -63,9 +52,13 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmaps
-  - secrets
   - events
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - secrets
   verbs:
   - create
   - delete
@@ -73,11 +66,6 @@ rules:
   - list
   - patch
   - update
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
   - deletecollection
 - apiGroups:
   - coordination.k8s.io

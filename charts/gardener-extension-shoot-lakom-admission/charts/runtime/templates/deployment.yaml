@@ -35,6 +35,10 @@ spec:
       priorityClassName: {{ .Values.gardener.runtimeCluster.priorityClassName }}
       {{- end }}
       serviceAccountName: {{ include "name" . }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       {{- if or .Values.kubeconfig .Values.projectedKubeconfig }}
       automountServiceAccountToken: false
       {{- end }}
@@ -44,6 +48,7 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         securityContext:
           allowPrivilegeEscalation: false
+          privileged: false
         args:
         - --webhook-config-server-port={{ .Values.webhookConfig.serverPort }}
         {{- if .Values.gardener.virtualCluster.enabled }}

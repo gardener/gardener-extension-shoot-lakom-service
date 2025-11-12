@@ -645,6 +645,7 @@ spec:
             memory: 25M
         securityContext:
           allowPrivilegeEscalation: false
+          privileged: false
         volumeMounts:
         - mountPath: /etc/lakom/config
           name: lakom-config
@@ -656,6 +657,10 @@ spec:
           name: kubeconfig
           readOnly: true
       priorityClassName: gardener-system-300
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: extension-shoot-lakom-service
       volumes:
       - configMap:
