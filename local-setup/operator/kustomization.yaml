@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- extension.yaml
+
+patches:
+- path: patch-imagevector-overwrite.yaml
+- path: patch-extension-image.yaml
+- path: patch-admission-image.yaml
+- patch: |
+    - op: add
+      path: /spec/deployment/extension/values/controllers
+      value:
+        allowUntrustedImages: true
+        allowInsecureRegistries: true
+        cosignPublicKeys:
+          publicKeys:
+          - name: example-01
+            algorithm: RSASSA-PKCS1-v1_5-SHA256
+            key: |-
+              -----BEGIN PUBLIC KEY-----
+              MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAKZef+D07q1AyXxf8xw3L23TgDSq
+              Scitl0xDpdLGpODUZXG6LbWY3QXS6yhCt0MZH6+Jf5l/8daO7HDRRvbQMg==
+              -----END PUBLIC KEY-----
+  target:
+    group: operator.gardener.cloud
+    kind: Extension
+    name: extension-shoot-lakom-service

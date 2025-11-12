@@ -32,9 +32,9 @@ ifneq ($(strip $(shell git status --porcelain 2>/dev/null)),)
 	EFFECTIVE_VERSION := $(EFFECTIVE_VERSION)-dirty
 endif
 
-EXTENSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(EXTENSION_NAME))"
-ADMISSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(ADMISSION_NAME))"
-SHOOT_ADMISSION_LD_FLAGS := "-w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(SHOOT_ADMISSION_NAME))"
+export EXTENSION_LD_FLAGS := -w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(EXTENSION_NAME))
+export ADMISSION_LD_FLAGS := -w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(ADMISSION_NAME))
+export SHOOT_ADMISSION_LD_FLAGS := -w $(shell bash $(GARDENER_HACK_DIR)/get-build-ld-flags.sh k8s.io/component-base $(REPO_ROOT)/VERSION $(SHOOT_ADMISSION_NAME))
 
 .PHONY: start
 start:
@@ -69,11 +69,11 @@ dev-setup: $(COSIGN)
 
 .PHONY: install
 install:
-	@LD_FLAGS=$(EXTENSION_LD_FLAGS) \
+	@LD_FLAGS="$(EXTENSION_LD_FLAGS)" \
 		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(EXTENSION_FULL_NAME)
-	@LD_FLAGS=$(ADMISSION_LD_FLAGS) \
+	@LD_FLAGS="$(ADMISSION_LD_FLAGS)" \
 		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(ADMISSION_NAME)
-	@LD_FLAGS=$(SHOOT_ADMISSION_LD_FLAGS) \
+	@LD_FLAGS="$(SHOOT_ADMISSION_LD_FLAGS)" \
 		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(SHOOT_ADMISSION_FULL_NAME)
 
 .PHONY: docker-images
@@ -151,16 +151,24 @@ update-skaffold-deps: $(YQ)
 
 # speed-up skaffold deployments by building all images concurrently
 export SKAFFOLD_BUILD_CONCURRENCY = 0
-extension-up extension-dev: export SKAFFOLD_DEFAULT_REPO = garden.local.gardener.cloud:5001
-extension-up extension-dev: export SKAFFOLD_PUSH = true
+extension-up extension-dev extension-operator-up: export SKAFFOLD_DEFAULT_REPO = garden.local.gardener.cloud:5001
+extension-up extension-dev extension-operator-up: export SKAFFOLD_PUSH = true
 # use static label for skaffold to prevent rolling all gardener components on every `skaffold` invocation
-extension-up extension-dev extension-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
+extension-up extension-dev extension-down extension-operator-up extension-operator-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
 
 extension-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL) $(CRANE)
-	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) --cache-artifacts=false run
+	$(SKAFFOLD) --cache-artifacts=false run
 
 extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL) $(CRANE) $(KIND)
-	@LD_FLAGS=$(LD_FLAGS) $(SKAFFOLD) dev --cleanup=false --trigger=manual
+	$(SKAFFOLD) dev --cleanup=false --trigger=manual
 
 extension-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
+	$(SKAFFOLD) delete
+
+extension-operator-up extension-operator-down: export SKAFFOLD_FILENAME = skaffold-operator.yaml
+extension-operator-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL)
+	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) \
+		$(SKAFFOLD) --cache-artifacts=false run
+
+extension-operator-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
 	$(SKAFFOLD) delete

@@ -1,0 +1,25 @@
+apiVersion: operator.gardener.cloud/v1alpha1
+kind: Extension
+metadata:
+  annotations:
+    security.gardener.cloud/pod-security-enforce: baseline
+  name: extension-shoot-lakom-service
+spec:
+  deployment:
+    admission:
+      runtimeCluster:
+        helm:
+          ociRepository:
+            ref: local-skaffold/gardener-extension-shoot-lakom-admission/charts/runtime
+      virtualCluster:
+        helm:
+          ociRepository:
+            ref: local-skaffold/gardener-extension-shoot-lakom-admission/charts/application
+    extension:
+      helm:
+        ociRepository:
+          ref: local-skaffold/gardener-extension-auditing/charts/extension
+      policy: Always
+  resources:
+  - kind: Extension
+    type: shoot-lakom-service

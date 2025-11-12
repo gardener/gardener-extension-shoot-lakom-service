@@ -1,0 +1,127 @@
+# SPDX-FileCopyrightText: SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: skaffold/v4beta12
+kind: Config
+metadata:
+  name: operator
+build:
+  tagPolicy:
+    customTemplate:
+      template: '{{.version}}-{{.sha}}'
+      components:
+        - name: version
+          envTemplate:
+            template: '{{.EFFECTIVE_VERSION}}'
+        - name: sha
+          inputDigest: {}
+  insecureRegistries:
+    - garden.local.gardener.cloud:5001
+  artifacts:
+    - image: local-skaffold/gardener-extension-shoot-lakom-service
+      requires:
+        - image: local-skaffold/lakom
+      ko:
+        dependencies:
+          paths:
+            - charts
+            - charts/images.yaml
+            - cmd/gardener-extension-shoot-lakom-service
+            - cmd/gardener-extension-shoot-lakom-service/app
+            - pkg/apis/config
+            - pkg/apis/config/v1alpha1
+            - pkg/apis/lakom
+            - pkg/apis/lakom/v1alpha1
+            - pkg/cmd
+            - pkg/constants
+            - pkg/controller/healthcheck
+            - pkg/controller/lifecycle
+            - pkg/controller/seed
+            - pkg/imagevector
+            - pkg/secrets
+            - VERSION
+        ldflags:
+          - '{{.EXTENSION_LD_FLAGS}}'
+        main: ./cmd/gardener-extension-shoot-lakom-service
+      hooks:
+        after:
+          - command: ["sh", "hack/skaffold-operator-extension-image.sh"]
+    - image: local-skaffold/gardener-extension-shoot-lakom-admission
+      ko:
+        dependencies:
+          paths:
+            - cmd/gardener-extension-shoot-lakom-admission
+            - cmd/gardener-extension-shoot-lakom-admission/app
+            - pkg/admission/validator/lakom
+            - pkg/apis/lakom
+            - pkg/apis/lakom/v1alpha1
+            - pkg/constants
+            - pkg/lakom/config
+            - pkg/lakom/utils
+            - VERSION
+        ldflags:
+          - '{{.SHOOT_ADMISSION_LD_FLAGS}}'
+        main: ./cmd/gardener-extension-shoot-lakom-admission
+      hooks:
+        after:
+          - command: ["sh", "hack/skaffold-operator-admission-image.sh"]
+    - image: local-skaffold/lakom
+      hooks:
+        after:
+          - command: ["sh", "hack/skaffold-operator-imagevector.sh"]
+      ko:
+        dependencies:
+          paths:
+            - cmd/lakom
+            - cmd/lakom/app
+            - pkg/constants
+            - pkg/lakom/config
+            - pkg/lakom/metrics
+            - pkg/lakom/resolvetag
+            - pkg/lakom/utils
+            - pkg/lakom/verifysignature
+            - VERSION
+        ldflags:
+          - '{{.ADMISSION_LD_FLAGS}}'
+        main: ./cmd/lakom
+    - image: local-skaffold/gardener-extension-shoot-lakom-admission/charts/application
+      custom:
+        buildCommand: |
+          bash "$GARDENER_HACK_DIR/push-helm.sh" ./charts/gardener-extension-shoot-lakom-admission/charts/application .image.ref
+        dependencies:
+          paths:
+            - charts/gardener-extension-shoot-lakom-admission/charts/application
+    - image: local-skaffold/gardener-extension-shoot-lakom-admission/charts/runtime
+      custom:
+        buildCommand: |
+          bash "$GARDENER_HACK_DIR/push-helm.sh" ./charts/gardener-extension-shoot-lakom-admission/charts/runtime .image.ref
+        dependencies:
+          paths:
+            - charts/gardener-extension-shoot-lakom-admission/charts/runtime
+      requires:
+        - image: local-skaffold/gardener-extension-shoot-lakom-admission
+          alias: IMG
+    - image: local-skaffold/gardener-extension-auditing/charts/extension
+      custom:
+        buildCommand: |
+          bash "$GARDENER_HACK_DIR/push-helm.sh" ./charts/gardener-extension-shoot-lakom-service .image.ref
+        dependencies:
+          paths:
+            - charts/gardener-extension-shoot-lakom-service
+      requires:
+        - image: local-skaffold/gardener-extension-shoot-lakom-service
+          alias: IMG
+manifests:
+  kustomize:
+    paths:
+      - local-setup/operator
+deploy:
+  kubectl: {}
+resourceSelector:
+  allow:
+    - groupKind: Extension.operator.gardener.cloud
+      image:
+        - .spec.deployment.extension.helm.ociRepository.ref
+        - .spec.deployment.admission.runtimeCluster.helm.ociRepository.ref
+        - .spec.deployment.admission.virtualCluster.helm.ociRepository.ref

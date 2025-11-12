@@ -45,24 +45,27 @@ Lakom, by default, tries to verify only workloads that belong to Gardener. Becau
 If you'd like to use Lakom as a tool for verifying your own workload, you'll need to add your own public keys to the ones that Lakom is already using. This can be achieved using Gardener [referenced resources](https://github.com/gardener/gardener/blob/master/docs/extensions/referenced-resources.md). More information about the keys and their format can be found [here](lakom.md#lakom-cosign-public-keys-configuration-file).
 
 Simply:
+
 1. Create a secret in your project namespace that contains a field `keys` with your keys as a value. Example keys:
-```
-- name: example-client-key1
-  algorithm: RSASSA-PSS-SHA256
-  key: |-
-    -----BEGIN PUBLIC KEY-----
-    MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAPeQXbIWMMXYV+9+j9b4jXTflnpfwn4E
-    GMrmqYVhm0sclXb2FPP5aV/NFH6SZdHDZcT8LCNsNgxzxV4N+UE/JIsCAwEAAQ==
-    -----END PUBLIC KEY-----
-- name: example-client-key2
-  algorithm: RSASSA-PSS-SHA256
-  key: |-
-    -----BEGIN PUBLIC KEY-----
-    MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAPeQXbIWMMXYV+9+j9b4jXTflnpfwn4E
-    GMrmqYVhm0sclXb2FPP5aV/NFH6SZdHDZcT8LCNsNgxzxV4N+UE/JIsCAwEAAQ==
-    -----END PUBLIC KEY-----
-```
-2. Add a reference to your secret via the `resources` field in the shoot spec as shown above.
-3. Add the name of your referenece in `trustedKeysResourceName ` in the provider config as shown above.
+
+    ```yaml
+    - name: example-client-key1
+      algorithm: RSASSA-PSS-SHA256
+      key: |-
+        -----BEGIN PUBLIC KEY-----
+        MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAPeQXbIWMMXYV+9+j9b4jXTflnpfwn4E
+        GMrmqYVhm0sclXb2FPP5aV/NFH6SZdHDZcT8LCNsNgxzxV4N+UE/JIsCAwEAAQ==
+        -----END PUBLIC KEY-----
+    - name: example-client-key2
+      algorithm: RSASSA-PSS-SHA256
+      key: |-
+        -----BEGIN PUBLIC KEY-----
+        MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAPeQXbIWMMXYV+9+j9b4jXTflnpfwn4E
+        GMrmqYVhm0sclXb2FPP5aV/NFH6SZdHDZcT8LCNsNgxzxV4N+UE/JIsCAwEAAQ==
+        -----END PUBLIC KEY-----
+    ```
+
+1. Add a reference to your secret via the `resources` field in the shoot spec as shown above.
+1. Add the name of your referenece in `trustedKeysResourceName ` in the provider config as shown above.
 
 Now, whenever Lakom tries to verify a Pod, it will make sure to use your public keys as well.
