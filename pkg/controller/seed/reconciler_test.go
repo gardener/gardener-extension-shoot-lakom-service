@@ -182,7 +182,6 @@ func expectedMutatingWebhook(caBundle []byte) string {
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -229,7 +228,6 @@ func expectedValidatingWebhook(caBundle []byte) string {
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -273,7 +271,6 @@ func expectedClusterRole() string {
 	return `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -292,7 +289,6 @@ func expectedClusterRoleBinding() string {
 	return `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -324,7 +320,6 @@ kind: Deployment
 metadata:
   annotations:
     ` + strings.Join(annotations, "\n    ") + `
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -347,7 +342,6 @@ spec:
     metadata:
       annotations:
         ` + strings.Join(annotations, "\n        ") + `
-      creationTimestamp: null
       labels:
         app.kubernetes.io/name: lakom-seed
         app.kubernetes.io/part-of: shoot-lakom-service
@@ -435,7 +429,6 @@ func expectedPDB(namespace string) string {
 	out := `apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -466,7 +459,6 @@ data:
 immutable: true
 kind: ConfigMap
 metadata:
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -482,7 +474,6 @@ kind: Service
 metadata:
   annotations:
     networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports: '[{"protocol":"TCP","port":10250}]'
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -512,7 +503,6 @@ func expectedServiceAccount(namespace string) string {
 automountServiceAccountToken: false
 kind: ServiceAccount
 metadata:
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -525,7 +515,6 @@ func expectedVPA(namespace string) string {
 	return `apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
-  creationTimestamp: null
   labels:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service

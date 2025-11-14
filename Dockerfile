@@ -18,7 +18,7 @@ COPY . .
 RUN make install EFFECTIVE_VERSION=$EFFECTIVE_VERSION GOARCH=$TARGETARCH
 
 ############# base
-FROM gcr.io/distroless/static-debian12:nonroot AS base
+FROM gcr.io/distroless/static-debian13:nonroot AS base
 
 ############# lakom
 FROM base AS lakom
