@@ -17,7 +17,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sigstore/cosign/v2/pkg/cosign"
+	"github.com/sigstore/cosign/v3/pkg/cosign"
 	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	logzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
