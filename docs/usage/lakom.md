@@ -69,9 +69,9 @@ Here:
 
 By default, Lakom validates only `Pod` resources in the clusters that it covers.
 However, it also has the capabilities to validate the following Gardener specific resources:
-- `controllerdeployments.core.gardener.cloud/v1`
-- `gardenlets.seedmanagement.gardener.cloud/v1alpha1`
-- `extensions.operator.gardener.cloud/v1alpha1`
+- `core.gardener.cloud/v1.ControllerDeployments`
+- `seedmanagement.gardener.cloud/v1alpha1.Gardenlets`
+- `operator.gardener.cloud/v1alpha1.Extensions`
 
 > [!IMPORTANT]
 > When deploying Lakom via the helm chart in `/charts/lakom`, the `admissionConfig.rules` key
