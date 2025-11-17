@@ -122,7 +122,7 @@ var (
 	podGVK                  = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
 	controllerDeploymentGVK = metav1.GroupVersionKind{Group: "core.gardener.cloud", Kind: "ControllerDeployment", Version: "v1"}
 	gardenletGVK            = metav1.GroupVersionKind{Group: "seedmanagement.gardener.cloud", Kind: "Gardenlet", Version: "v1alpha1"}
-	extensionGVK            = metav1.GroupVersionKind{Group: "extensions.operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
+	extensionGVK            = metav1.GroupVersionKind{Group: "operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
 	allowedResources        = sets.New(podGVK, controllerDeploymentGVK, gardenletGVK, extensionGVK)
 	controlledOperations    = sets.NewString(string(admissionv1.Create), string(admissionv1.Update))
 )
@@ -135,7 +135,7 @@ func (h *handler) GetLogger() logr.Logger {
 // - v1/Pod
 // - core.gardener.cloud/v1/ControllerDeployment
 // - seedmanagement.gardener.cloud/v1alpha1/Gardenlet
-// - extensions.operator.gardener.cloud/v1alpha1/Extension
+// - operator.gardener.cloud/v1alpha1/Extension
 func (h *handler) Handle(ctx context.Context, request admission.Request) admission.Response {
 	var (
 		patch []byte

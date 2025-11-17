@@ -36,7 +36,7 @@ var (
 	podGVK                  = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
 	controllerDeploymentGVK = metav1.GroupVersionKind{Group: "core.gardener.cloud", Kind: "ControllerDeployment", Version: "v1"}
 	gardenletGVK            = metav1.GroupVersionKind{Group: "seedmanagement.gardener.cloud", Kind: "Gardenlet", Version: "v1alpha1"}
-	extensionGVK            = metav1.GroupVersionKind{Group: "extensions.operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
+	extensionGVK            = metav1.GroupVersionKind{Group: "operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
 )
 
 var _ = Describe("Admission Handler", func() {

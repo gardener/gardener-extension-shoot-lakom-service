@@ -147,7 +147,7 @@ var (
 	podGVK                  = metav1.GroupVersionKind{Group: "", Kind: "Pod", Version: "v1"}
 	controllerDeploymentGVK = metav1.GroupVersionKind{Group: "core.gardener.cloud", Kind: "ControllerDeployment", Version: "v1"}
 	gardenletGVK            = metav1.GroupVersionKind{Group: "seedmanagement.gardener.cloud", Kind: "Gardenlet", Version: "v1alpha1"}
-	extensionGVK            = metav1.GroupVersionKind{Group: "extensions.operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
+	extensionGVK            = metav1.GroupVersionKind{Group: "operator.gardener.cloud", Kind: "Extension", Version: "v1alpha1"}
 	allowedResources        = sets.New(podGVK, controllerDeploymentGVK, gardenletGVK, extensionGVK)
 	controlledOperations    = sets.NewString(string(admissionv1.Create), string(admissionv1.Update))
 )
@@ -165,9 +165,9 @@ type verificationTarget struct {
 
 // Handle handles admission requests. It works only on create/update on one of:
 // - v1.Pod
-// - core.gardener.cloud/ControllerDeployment/v1
-// - seedmanagement.gardener.cloud/Gardenlet/v1alpha1
-// - extensions.operator.gardener.cloud/Extension/v1alpha1
+// - core.gardener.cloud/v1.ControllerDeployment
+// - seedmanagement.gardener.cloud/v1alpha1.Gardenlet
+// - operator.gardener.cloud/v1alpha1.Extension
 // and ignores anything else. Ensures that each resource is using images or
 // helm charts signed by at least one of the provided public cosign keys.
 //
@@ -338,9 +338,9 @@ func (h *handler) extractGardenletVerificationTargets(ctx context.Context, garde
 
 // extractExtensionVerificationTargets returns an array of verification targets from the extension.
 // The verification targets are extracted from the following fields:
-// - extensions.operator.gardener.cloud/Extension: spec.deployment.admission.runtimeCluster.helm.ociRepository
-// - extensions.operator.gardener.cloud/Extension: spec.deployment.admission.virtualCluster.helm.ociRepository
-// - extensions.operator.gardener.cloud/Extension: spec.deployment.extension.helm.ociRepository
+// - operator.gardener.cloud/v1alpha1.Extension: spec.deployment.admission.runtimeCluster.helm.ociRepository
+// - operator.gardener.cloud/v1alpha1.Extension: spec.deployment.admission.virtualCluster.helm.ociRepository
+// - operator.gardener.cloud/v1alpha1.Extension: spec.deployment.extension.helm.ociRepository
 func (h *handler) extractExtensionVerificationTargets(ctx context.Context, extension operatorv1alpha1.Extension) ([]verificationTarget, utils.KeyChainReader, error) {
 	var (
 		verificationTargets []verificationTarget
