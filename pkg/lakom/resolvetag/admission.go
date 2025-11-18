@@ -232,10 +232,10 @@ func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagementv
 // The following fields are checked:
 // - controllerDeployment.Spec.Helm.OCIRepository
 func (h *handler) handleControllerDeployment(ctx context.Context, controllerDeployment gardencorev1.ControllerDeployment) ([]byte, error) {
-	var logger = prepareLogger(h.logger, &controllerDeployment)
+	logger := prepareLogger(h.logger, &controllerDeployment)
 
 	if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
-		imagePullSecrets := []string{}
+		var imagePullSecrets []string
 		if controllerDeployment.Helm.OCIRepository.PullSecretRef != nil {
 			imagePullSecrets = append(imagePullSecrets, controllerDeployment.Helm.OCIRepository.PullSecretRef.Name)
 		}
@@ -258,7 +258,7 @@ func (h *handler) handleControllerDeployment(ctx context.Context, controllerDepl
 // - extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository
 // - extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository
 func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha1.Extension) ([]byte, error) {
-	var logger = prepareLogger(h.logger, &extension)
+	logger := prepareLogger(h.logger, &extension)
 
 	if extension.Spec.Deployment != nil &&
 		extension.Spec.Deployment.AdmissionDeployment != nil &&
@@ -266,7 +266,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm != nil &&
 		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository != nil {
 
-		imagePullSecrets := []string{}
+		var imagePullSecrets []string
 		if extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef != nil {
 			imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef.Name)
 		}
@@ -285,7 +285,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm != nil &&
 		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository != nil {
 
-		imagePullSecrets := []string{}
+		var imagePullSecrets []string
 		if extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef != nil {
 			imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef.Name)
 		}
@@ -303,7 +303,7 @@ func (h *handler) handleExtension(ctx context.Context, extension operatorv1alpha
 		extension.Spec.Deployment.ExtensionDeployment.Helm != nil &&
 		extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository != nil {
 
-		imagePullSecrets := []string{}
+		var imagePullSecrets []string
 		if extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef != nil {
 			imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef.Name)
 		}
@@ -426,7 +426,7 @@ type resolvedArtefact struct {
 }
 
 func prepareLogger(logger logr.Logger, obj client.Object) logr.Logger {
-	loggerKVs := []any{}
+	var loggerKVs []any
 
 	if kind := obj.GetObjectKind().GroupVersionKind().Kind; kind != "" {
 		loggerKVs = append(loggerKVs, "kind", kind)
