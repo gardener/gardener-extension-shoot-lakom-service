@@ -62,7 +62,7 @@ const (
 	unsignedImageTag = "unsigned"
 )
 
-func TestCMD(t *testing.T) {
+func TestVerifySignatureSuite(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "VerifySignature Suite")
 }
