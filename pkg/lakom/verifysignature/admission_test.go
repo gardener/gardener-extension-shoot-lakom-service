@@ -19,6 +19,7 @@ import (
 	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
 	mockmanager "github.com/gardener/gardener/third_party/mock/controller-runtime/manager"
 	"github.com/go-logr/logr"
+	"github.com/google/go-containerregistry/pkg/name"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
@@ -26,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -40,13 +42,76 @@ var (
 
 var _ = Describe("Admission Handler", func() {
 	var (
-		ctx          = context.Background()
+		ctx          context.Context
 		logger       logr.Logger
 		handler      admission.Handler
 		cosignConfig lakomconfig.Config
-		pod          = &corev1.Pod{
+
+		imagePullSecretName string
+
+		signedImageRepository string
+		signedImageDigest     string
+
+		pod                  *corev1.Pod
+		controllerDeployment *gardencorev1.ControllerDeployment
+		gardenlet            *seedmanagementv1alpha1.Gardenlet
+		extension            *operatorv1alpha1.Extension
+		invalidPod           runtime.Object
+	)
+
+	BeforeEach(func() {
+		const gardenNamespace = "garden"
+		ctx = context.Background()
+		ctrl = gomock.NewController(GinkgoT())
+		mgr = mockmanager.NewMockManager(ctrl)
+		apiReader = mockclient.NewMockReader(ctrl)
+
+		mgr.EXPECT().GetAPIReader().Return(apiReader)
+		mgr.EXPECT().GetScheme().Return(scheme)
+
+		logger = logzap.New(logzap.WriteTo(GinkgoWriter))
+		cosignConfig = lakomconfig.Config{
+			PublicKeys: []lakomconfig.Key{
+				{
+					Name: "test",
+					Key:  publicKey,
+				},
+			},
+		}
+
+		imagePullSecretName = "image-pull-secret" //#nosec G101 -- this is just a name of non-existing test resource
+		imagePullSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "pod-namespace",
+				Namespace: gardenNamespace,
+				Name:      imagePullSecretName,
+			},
+		}
+
+		apiReader.EXPECT().
+			Get(gomock.Any(), client.ObjectKey{Namespace: gardenNamespace, Name: imagePullSecretName}, gomock.AssignableToTypeOf(&corev1.Secret{})).
+			AnyTimes().
+			SetArg(2, *imagePullSecret)
+
+		ref, err := name.NewDigest(signedImageFullRef)
+		Expect(err).ToNot(HaveOccurred())
+		signedImageRepository = ref.Context().Name()
+		signedImageDigest = ref.DigestStr()
+
+		h, err := verifysignature.
+			NewHandleBuilder().
+			WithManager(mgr).
+			WithLogger(logger.WithName("test-cosign-signature-verifier")).
+			WithLakomConfig(cosignConfig).
+			WithCacheTTL(time.Minute * 10).
+			WithCacheRefreshInterval(time.Second * 30).
+			WithAllowUntrustedImages(false).
+			Build()
+		Expect(err).ToNot(HaveOccurred())
+		handler = h
+
+		pod = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: gardenNamespace,
 				Name:      "pod-name",
 			},
 			Spec: corev1.PodSpec{
@@ -54,16 +119,18 @@ var _ = Describe("Admission Handler", func() {
 					Name:  "container",
 					Image: signedImageFullRef,
 				}},
+				ImagePullSecrets: []corev1.LocalObjectReference{{Name: imagePullSecretName}},
 			},
 		}
-		cd = &gardencorev1.ControllerDeployment{
+		controllerDeployment = &gardencorev1.ControllerDeployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "cd-namespace",
 				Name:      "cd-name",
 			},
 			Helm: &gardencorev1.HelmControllerDeployment{
 				OCIRepository: &gardencorev1.OCIRepository{
-					Ref: &signedImageFullRef,
+					Ref:           &signedImageFullRef,
+					PullSecretRef: &corev1.LocalObjectReference{Name: imagePullSecretName},
 				},
 			},
 		}
@@ -76,7 +143,14 @@ var _ = Describe("Admission Handler", func() {
 				Deployment: seedmanagementv1alpha1.GardenletSelfDeployment{
 					Helm: seedmanagementv1alpha1.GardenletHelm{
 						OCIRepository: gardencorev1.OCIRepository{
-							Ref: &signedImageFullRef,
+							Ref:           &signedImageFullRef,
+							PullSecretRef: &corev1.LocalObjectReference{Name: imagePullSecretName},
+						},
+					},
+					GardenletDeployment: seedmanagementv1alpha1.GardenletDeployment{
+						Image: &seedmanagementv1alpha1.Image{
+							Repository: &signedImageRepository,
+							Tag:        &signedImageDigest,
 						},
 					},
 				},
@@ -93,7 +167,8 @@ var _ = Describe("Admission Handler", func() {
 						DeploymentSpec: operatorv1alpha1.DeploymentSpec{
 							Helm: &operatorv1alpha1.ExtensionHelm{
 								OCIRepository: &gardencorev1.OCIRepository{
-									Ref: &signedImageFullRef,
+									Ref:           &signedImageFullRef,
+									PullSecretRef: &corev1.LocalObjectReference{Name: imagePullSecretName},
 								},
 							},
 						},
@@ -102,14 +177,16 @@ var _ = Describe("Admission Handler", func() {
 						RuntimeCluster: &operatorv1alpha1.DeploymentSpec{
 							Helm: &operatorv1alpha1.ExtensionHelm{
 								OCIRepository: &gardencorev1.OCIRepository{
-									Ref: &signedImageFullRef,
+									Ref:           &signedImageFullRef,
+									PullSecretRef: &corev1.LocalObjectReference{Name: imagePullSecretName},
 								},
 							},
 						},
 						VirtualCluster: &operatorv1alpha1.DeploymentSpec{
 							Helm: &operatorv1alpha1.ExtensionHelm{
 								OCIRepository: &gardencorev1.OCIRepository{
-									Ref: &signedImageFullRef,
+									Ref:           &signedImageFullRef,
+									PullSecretRef: &corev1.LocalObjectReference{Name: imagePullSecretName},
 								},
 							},
 						},
@@ -128,48 +205,11 @@ var _ = Describe("Admission Handler", func() {
 				Name:      "invalid-name",
 			},
 		}
-	)
-
-	BeforeEach(func() {
-		ctrl = gomock.NewController(GinkgoT())
-		mgr = mockmanager.NewMockManager(ctrl)
-		apiReader = mockclient.NewMockReader(ctrl)
-
-		mgr.EXPECT().GetAPIReader().Return(apiReader)
-		mgr.EXPECT().GetScheme().Return(scheme)
-
-		logger = logzap.New(logzap.WriteTo(GinkgoWriter))
-		cosignConfig = lakomconfig.Config{
-			PublicKeys: []lakomconfig.Key{
-				{
-					Name: "test",
-					Key:  publicKey,
-				},
-			},
-		}
-		h, err := verifysignature.
-			NewHandleBuilder().
-			WithManager(mgr).
-			WithLogger(logger.WithName("test-cosign-signature-verifier")).
-			WithLakomConfig(cosignConfig).
-			WithCacheTTL(time.Minute * 10).
-			WithCacheRefreshInterval(time.Second * 30).
-			WithAllowUntrustedImages(false).
-			Build()
-		Expect(err).ToNot(HaveOccurred())
-		handler = h
-
-		pod.Spec.Containers[0].Image = signedImageFullRef
-		cd.Helm.OCIRepository.Ref = &signedImageFullRef
-		gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &signedImageFullRef
-		extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.Ref = &signedImageFullRef
-		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.Ref = &signedImageFullRef
-		extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.Ref = &signedImageFullRef
 	})
 
-	DescribeTable(
-		"Resource handling",
-		func(request admission.Request, allowed bool, errMsg string) {
+	DescribeTable("Resource handling",
+		func(requestBuilder func() admission.Request, allowed bool, errMsg string) {
+			request := requestBuilder()
 			response := handler.Handle(ctx, request)
 			Expect(response.Allowed).To(Equal(allowed))
 			if !allowed {
@@ -177,24 +217,45 @@ var _ = Describe("Admission Handler", func() {
 				Expect(response.AdmissionResponse.Result.Code).To(Satisfy(isHTTPError))
 			}
 		},
-		Entry("Allow apps/v1.deployments", admissionRequestBuilder{gvk: deploymentGVK}.Build(), true, ""),
-		Entry("Allow status subResource requests on pods", admissionRequestBuilder{gvk: podGVK, subResource: "status"}.Build(), true, ""),
-		Entry("Allow update status subResource requests on pods with invalid image", admissionRequestBuilder{gvk: podGVK, subResource: "status", operation: admissionv1.Update, object: podWithImage(pod, "invalid-image@sha256:123")}.Build(), true, ""),
-		Entry("Allow delete operation on pods", admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Delete}.Build(), true, ""),
-		Entry("Allow connect operation on pods", admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Connect}.Build(), true, ""),
-		Entry("Disallow undecodable pod", admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: invalidPod}.Build(), false, `no kind "InvalidKind" is registered for version`),
-		Entry("Disallow pod with invalid image", admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, "invalid-image@sha256:123")}.Build(), false, "could not parse reference"),
-		Entry("Disallow pod with invalid image via ephemeralcontainers subResource request", admissionRequestBuilder{gvk: podGVK, subResource: "ephemeralcontainers", operation: admissionv1.Update, object: podWithImage(pod, "invalid-image@sha256:123")}.Build(), false, "could not parse reference"),
-		Entry("Disallow controller deployment with invalid artifact", admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Create, object: controllerDeploymentWithChart(cd, "invalid-artifact@sha256:123")}.Build(), false, "could not parse reference"),
-		Entry("Disallow gardenlet with invalid artifact", admissionRequestBuilder{gvk: gardenletGVK, operation: admissionv1.Create, object: gardenletWithChart(gardenlet, "invalid-artifact@sha256:123")}.Build(), false, "could not parse reference"),
-		Entry("Disallow extension with invalid artifact", admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extensionWithChart(extension, "invalid-artifact@sha256:123")}.Build(), false, "could not parse reference"),
+		Entry("Allow apps/v1.deployments", func() admission.Request {
+			return admissionRequestBuilder{gvk: deploymentGVK}.Build()
+		}, true, ""),
+		Entry("Allow status subResource requests on pods", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, subResource: "status"}.Build()
+		}, true, ""),
+		Entry("Allow update status subResource requests on pods with invalid image", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, subResource: "status", operation: admissionv1.Update, object: podWithImage(pod, "invalid-image@sha256:123")}.Build()
+		}, true, ""),
+		Entry("Allow delete operation on pods", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Delete}.Build()
+		}, true, ""),
+		Entry("Allow connect operation on pods", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Connect}.Build()
+		}, true, ""),
+		Entry("Disallow undecodable pod", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: invalidPod}.Build()
+		}, false, `no kind "InvalidKind" is registered for version`),
+		Entry("Disallow pod with invalid image", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, "invalid-image@sha256:123")}.Build()
+		}, false, "could not parse reference"),
+		Entry("Disallow pod with invalid image via ephemeralcontainers subResource request", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, subResource: "ephemeralcontainers", operation: admissionv1.Update, object: podWithImage(pod, "invalid-image@sha256:123")}.Build()
+		}, false, "could not parse reference"),
+		Entry("Disallow controller deployment with invalid artifact", func() admission.Request {
+			return admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Create, object: controllerDeploymentWithChart(controllerDeployment, "invalid-artifact@sha256:123")}.Build()
+		}, false, "could not parse reference"),
+		Entry("Disallow gardenlet with invalid artifact", func() admission.Request {
+			return admissionRequestBuilder{gvk: gardenletGVK, operation: admissionv1.Create, object: gardenletWithChart(gardenlet, "invalid-artifact@sha256:123")}.Build()
+		}, false, "could not parse reference"),
+		Entry("Disallow extension with invalid artifact", func() admission.Request {
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extensionWithChart(extension, "invalid-artifact@sha256:123")}.Build()
+		}, false, "could not parse reference"),
 	)
 
 	// Use a closure for building the request to capture a ref of the
 	// the object (pod, controllerdeployment, ...) instead of the value.
 	// Ref: https://github.com/onsi/ginkgo/issues/378
-	DescribeTable(
-		"Proper verification of artifacts",
+	DescribeTable("Proper verification of artifacts",
 		func(requestBuilder func() admission.Request, allowed bool) {
 			request := requestBuilder()
 			response := handler.Handle(ctx, request)
@@ -205,7 +266,7 @@ var _ = Describe("Admission Handler", func() {
 			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: pod}.Build()
 		}, true),
 		Entry("Should properly verify controllerdeployment artifact signature", func() admission.Request {
-			return admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Create, object: cd}.Build()
+			return admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Create, object: controllerDeployment}.Build()
 		}, true),
 		Entry("Should properly verify gardenlet artifact signature", func() admission.Request {
 			return admissionRequestBuilder{gvk: gardenletGVK, operation: admissionv1.Create, object: gardenlet}.Build()
@@ -247,6 +308,96 @@ var _ = Describe("Admission Handler", func() {
 		Expect(ar.Result.Code).To(Satisfy(isHTTPError))
 		Expect(ar.Result.Message).To(ContainSubstring("Forbidden: no valid signature found for artifact"))
 	})
+
+	DescribeTable("Should succeed when optional fields are missing",
+		func(requestBuilder func() admission.Request) {
+			request := requestBuilder()
+			response := handler.Handle(ctx, request)
+			Expect(response.Allowed).To(BeTrue())
+			Expect(response.Result).ToNot(BeNil())
+			Expect(response.Result.Code).To(BeEquivalentTo(http.StatusOK))
+		},
+		Entry("gardenlet.spec.deployment.helm.ociRepository.pullSecretRef is nil", func() admission.Request {
+			gardenlet.Spec.Deployment.Helm.OCIRepository.PullSecretRef = nil
+			return admissionRequestBuilder{gvk: gardenletGVK, operation: admissionv1.Create, object: gardenlet}.Build()
+		}),
+		Entry("gardenlet.spec.deployment.image is nil", func() admission.Request {
+			gardenlet.Spec.Deployment.Image = nil
+			return admissionRequestBuilder{gvk: gardenletGVK, operation: admissionv1.Create, object: gardenlet}.Build()
+		}),
+		Entry("controllerDeployment.helm is nil", func() admission.Request {
+			controllerDeployment.Helm = nil
+			return admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Create, object: controllerDeployment}.Build()
+		}),
+		Entry("controllerDeployment.helm.ociRepository is nil", func() admission.Request {
+			controllerDeployment.Helm.OCIRepository = nil
+			return admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Create, object: controllerDeployment}.Build()
+		}),
+		Entry("controllerDeployment.helm.ociRepository.pullSecretRef is nil", func() admission.Request {
+			controllerDeployment.Helm.OCIRepository.PullSecretRef = nil
+			return admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Create, object: controllerDeployment}.Build()
+		}),
+		Entry("extension.spec.deployment is nil", func() admission.Request {
+			extension.Spec.Deployment = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.admissionDeployment is nil", func() admission.Request {
+			extension.Spec.Deployment.AdmissionDeployment = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.admissionDeployment.runtimeCluster is nil", func() admission.Request {
+			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.admissionDeployment.runtimeCluster.helm is nil", func() admission.Request {
+			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.admissionDeployment.runtimeCluster.helm.ociRepository is nil", func() admission.Request {
+			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.admissionDeployment.runtimeCluster.helm.ociRepository.pullSecretRef is nil", func() admission.Request {
+			extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.admissionDeployment.virtualCluster is nil", func() admission.Request {
+			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.admissionDeployment.virtualCluster.helm is nil", func() admission.Request {
+			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.admissionDeployment.virtualCluster.helm.ociRepository is nil", func() admission.Request {
+			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.admissionDeployment.virtualCluster.helm.ociRepository.pullSecretRef is nil", func() admission.Request {
+			extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.extensionDeployment is nil", func() admission.Request {
+			extension.Spec.Deployment.ExtensionDeployment = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.ExtensionDeployment.helm is nil", func() admission.Request {
+			extension.Spec.Deployment.ExtensionDeployment.Helm = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.ExtensionDeployment.helm.ociRepository is nil", func() admission.Request {
+			extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.ExtensionDeployment.helm.ociRepository.pullSecretRef is nil", func() admission.Request {
+			extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+		Entry("extension.spec.deployment.extensionDeployment is nil", func() admission.Request {
+			extension.Spec.Deployment.ExtensionDeployment = nil
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extension}.Build()
+		}),
+	)
 })
 
 func isHTTPError(code int32) bool {

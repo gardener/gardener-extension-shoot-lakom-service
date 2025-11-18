@@ -290,19 +290,18 @@ func (h *handler) extractControllerDeploymentVerificationTargets(ctx context.Con
 		imagePullSecrets    []string
 	)
 
-	if controllerDeployment.Helm.OCIRepository.PullSecretRef != nil {
-		imagePullSecrets = append(imagePullSecrets, controllerDeployment.Helm.OCIRepository.PullSecretRef.Name)
-	}
-
-	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, v1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
-
 	if controllerDeployment.Helm != nil && controllerDeployment.Helm.OCIRepository != nil {
 		verificationTargets = append(verificationTargets, verificationTarget{
 			artifactRef: controllerDeployment.Helm.OCIRepository.GetURL(),
 			fldPath:     field.NewPath("helm", "ociRepository"),
 		})
+
+		if controllerDeployment.Helm.OCIRepository.PullSecretRef != nil {
+			imagePullSecrets = append(imagePullSecrets, controllerDeployment.Helm.OCIRepository.PullSecretRef.Name)
+		}
 	}
 
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, v1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 	return verificationTargets, kcr, nil
 }
 
@@ -347,20 +346,6 @@ func (h *handler) extractExtensionVerificationTargets(ctx context.Context, exten
 		imagePullSecrets    []string
 	)
 
-	if extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef != nil {
-		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef.Name)
-	}
-
-	if extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef != nil {
-		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef.Name)
-	}
-
-	if extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef != nil {
-		imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef.Name)
-	}
-
-	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, v1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
-
 	if extension.Spec.Deployment != nil &&
 		extension.Spec.Deployment.AdmissionDeployment != nil &&
 		extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster != nil &&
@@ -370,6 +355,10 @@ func (h *handler) extractExtensionVerificationTargets(ctx context.Context, exten
 			artifactRef: extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.GetURL(),
 			fldPath:     field.NewPath("spec", "deployment", "admissionDeployment", "runtimeCluster", "helm", "ociRepository"),
 		})
+
+		if extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef != nil {
+			imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.RuntimeCluster.Helm.OCIRepository.PullSecretRef.Name)
+		}
 	}
 
 	if extension.Spec.Deployment != nil &&
@@ -381,6 +370,10 @@ func (h *handler) extractExtensionVerificationTargets(ctx context.Context, exten
 			artifactRef: extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.GetURL(),
 			fldPath:     field.NewPath("spec", "deployment", "admissionDeployment", "virtualCluster", "helm", "ociRepository"),
 		})
+
+		if extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef != nil {
+			imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.AdmissionDeployment.VirtualCluster.Helm.OCIRepository.PullSecretRef.Name)
+		}
 	}
 
 	if extension.Spec.Deployment != nil &&
@@ -391,8 +384,13 @@ func (h *handler) extractExtensionVerificationTargets(ctx context.Context, exten
 			artifactRef: extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.GetURL(),
 			fldPath:     field.NewPath("spec", "deployment", "extensionDeployment", "helm", "ociRepository"),
 		})
+
+		if extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef != nil {
+			imagePullSecrets = append(imagePullSecrets, extension.Spec.Deployment.ExtensionDeployment.Helm.OCIRepository.PullSecretRef.Name)
+		}
 	}
 
+	kcr := utils.NewLazyKeyChainReaderFromSecrets(ctx, h.reader, v1beta1constants.GardenNamespace, imagePullSecrets, h.useOnlyImagePullSecrets)
 	return verificationTargets, kcr, nil
 }
 
