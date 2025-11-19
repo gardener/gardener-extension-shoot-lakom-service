@@ -57,7 +57,7 @@ const (
 	unsignedImageTag = "unsigned"
 )
 
-func TestCMD(t *testing.T) {
+func TestResolveTagSuite(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "ResolveTag Suite")
 }
@@ -66,7 +66,7 @@ var _ = BeforeSuite(func() {
 	scheme = runtime.NewScheme()
 	Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
-	dirPath, err := os.MkdirTemp("", "verifysignature_test")
+	dirPath, err := os.MkdirTemp("", "resolvetag_test")
 	Expect(err).ToNot(HaveOccurred())
 	DeferCleanup(func() {
 		Expect(os.RemoveAll(dirPath)).To(Succeed())

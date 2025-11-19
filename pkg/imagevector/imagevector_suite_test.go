@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestCMD(t *testing.T) {
+func TestImageVectorSuite(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "ImageVector Suite")
 }
