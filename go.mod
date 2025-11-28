@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
-	github.com/gardener/gardener v1.132.1
+	github.com/gardener/gardener v1.133.0
 	github.com/gardener/service-account-issuer-discovery v0.11.0
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-containerregistry v0.20.6
@@ -12,7 +12,7 @@ require (
 	github.com/google/go-containerregistry/pkg/authn/kubernetes v0.0.0-20251113034745-2bb5bb01b8d9
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.86.2
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.87.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sigstore/cosign/v3 v3.0.2
 	github.com/sigstore/sigstore v1.9.6-0.20250729224751-181c5d3339b3
@@ -21,12 +21,12 @@ require (
 	go.uber.org/mock v0.6.0
 	golang.org/x/sync v0.18.0
 	golang.org/x/tools v0.39.0
-	k8s.io/api v0.34.1
-	k8s.io/apimachinery v0.34.1
+	k8s.io/api v0.34.2
+	k8s.io/apimachinery v0.34.2
 	k8s.io/autoscaler/vertical-pod-autoscaler v1.5.1
-	k8s.io/client-go v0.34.1
-	k8s.io/code-generator v0.34.1
-	k8s.io/component-base v0.34.1
+	k8s.io/client-go v0.34.2
+	k8s.io/code-generator v0.34.2
+	k8s.io/component-base v0.34.2
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	sigs.k8s.io/controller-runtime v0.22.4
 	sigs.k8s.io/yaml v1.6.0
@@ -100,7 +100,7 @@ require (
 	github.com/digitorus/pkcs7 v0.0.0-20250730155240-ffadbf3f398c // indirect
 	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/docker/cli v29.0.0+incompatible // indirect
+	github.com/docker/cli v29.0.4+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -148,6 +148,7 @@ require (
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
@@ -212,7 +213,7 @@ require (
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.67.2 // indirect
+	github.com/prometheus/common v0.67.4 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -281,7 +282,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.3 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect
 	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
@@ -305,18 +306,18 @@ require (
 	helm.sh/helm/v3 v3.19.2 // indirect
 	istio.io/api v1.28.0 // indirect
 	istio.io/client-go v1.28.0 // indirect
-	k8s.io/apiextensions-apiserver v0.34.1 // indirect
-	k8s.io/apiserver v0.34.1 // indirect
-	k8s.io/cluster-bootstrap v0.34.1 // indirect
-	k8s.io/component-helpers v0.34.1 // indirect
+	k8s.io/apiextensions-apiserver v0.34.2 // indirect
+	k8s.io/apiserver v0.34.2 // indirect
+	k8s.io/cluster-bootstrap v0.34.2 // indirect
+	k8s.io/component-helpers v0.34.2 // indirect
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250820003526-c297c0c1eb9d // indirect
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
-	k8s.io/kube-aggregator v0.34.1 // indirect
+	k8s.io/kube-aggregator v0.34.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
-	k8s.io/kubelet v0.34.1 // indirect
-	k8s.io/metrics v0.34.1 // indirect
+	k8s.io/kubelet v0.34.2 // indirect
+	k8s.io/metrics v0.34.2 // indirect
 	sigs.k8s.io/controller-tools v0.19.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
