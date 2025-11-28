@@ -15,7 +15,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.87.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sigstore/cosign/v3 v3.0.2
-	github.com/sigstore/sigstore v1.9.6-0.20250729224751-181c5d3339b3
+	github.com/sigstore/sigstore v1.10.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.10
 	go.uber.org/mock v0.6.0
@@ -183,7 +183,6 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0 // indirect
 	github.com/labstack/echo/v4 v4.13.4 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
-	github.com/letsencrypt/boulder v0.20251110.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
@@ -209,6 +208,7 @@ require (
 	github.com/perses/common v0.28.0 // indirect
 	github.com/perses/perses v0.52.0 // indirect
 	github.com/perses/perses-operator v0.2.0 // indirect
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
@@ -221,7 +221,6 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/sassoftware/relic v7.2.1+incompatible // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.9.1 // indirect
-	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sigstore/protobuf-specs v0.5.0 // indirect
@@ -230,7 +229,6 @@ require (
 	github.com/sigstore/sigstore-go v1.1.3 // indirect
 	github.com/sigstore/timestamp-authority v1.2.9 // indirect
 	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af // indirect
-	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/viper v1.21.0 // indirect
@@ -240,7 +238,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/theupdateframework/go-tuf v0.7.0 // indirect
 	github.com/theupdateframework/go-tuf/v2 v2.3.0 // indirect
-	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/transparency-dev/formats v0.0.0-20251110090430-df1ffe27d819 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
 	github.com/transparency-dev/tessera v1.0.0 // indirect
