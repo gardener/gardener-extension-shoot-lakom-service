@@ -91,9 +91,9 @@ jobs:
             oci-repository: charts/gardener/extensions
             ocm-mappings:
               - ref: ocm-resource:lakom.repository
-                attribute: image.repository
+                attribute: runtime.image.repository
               - ref: ocm-resource:lakom.tag
-                attribute: image.tag
+                attribute: runtime.image.tag
           - name: shoot-lakom-admission-application
             dir: charts/gardener-extension-shoot-lakom-admission/charts/application
             oci-repository: charts/gardener/extensions
