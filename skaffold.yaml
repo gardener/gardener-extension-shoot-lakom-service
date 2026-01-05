@@ -10,7 +10,7 @@ build:
   tagPolicy:
     inputDigest: {}
   insecureRegistries:
-    - garden.local.gardener.cloud
+    - registry.local.gardener.cloud
   artifacts:
     - image: local-skaffold/gardener-extension-shoot-lakom-service
       # The shoot-lakom-service controller uses imageVectorOverwrite to configure

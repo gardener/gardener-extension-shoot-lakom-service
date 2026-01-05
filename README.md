@@ -46,7 +46,7 @@ The `Lakom` admission controller can be configured with `make dev-setup` and sta
 You can run the lakom extension controller locally on your machine by executing `make start`.
 
 If you'd like to develop Lakom using a local cluster such as KinD, make sure your `KUBECONFIG` environment variable is targeting the local Garden cluster.
-Add `127.0.0.1 garden.local.gardener.cloud` to your `/etc/hosts`. You can then run:
+Add `127.0.0.1 registry.local.gardener.cloud` to your `/etc/hosts`. You can then run:
 
 ```bash
 make extension-up
