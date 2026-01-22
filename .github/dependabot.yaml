@@ -4,6 +4,8 @@ updates:
   directory: /
   schedule:
     interval: daily
+  labels:
+  - kind/enhancement
 - package-ecosystem: gomod
   directory: /
   schedule:
