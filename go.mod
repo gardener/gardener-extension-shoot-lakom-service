@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
-	github.com/gardener/gardener v1.134.1
+	github.com/gardener/gardener v1.134.3
 	github.com/gardener/service-account-issuer-discovery v0.11.0
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-containerregistry v0.20.7
