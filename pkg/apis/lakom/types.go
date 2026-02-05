@@ -17,7 +17,7 @@ type ScopeType string
 const (
 	// KubeSystem denotes the `kube-system` namespace
 	KubeSystem ScopeType = "KubeSystem"
-	// KubeSystemManagedByGardener denotes pods in the `kube-system` namespace that have a `managed-by/gardener` label
+	// KubeSystemManagedByGardener denotes pods in the `kube-system` namespace that have a `resources.gardener.cloud/managed-by=gardener` label
 	KubeSystemManagedByGardener ScopeType = "KubeSystemManagedByGardener"
 	// Cluster denotes the whole cluster
 	Cluster ScopeType = "Cluster"
