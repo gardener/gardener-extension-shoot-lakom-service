@@ -19,7 +19,7 @@ vpa:
       cpu: 2
       memory: 2Gi
   updatePolicy:
-    updateMode: "Recreate"
+    updateMode: "InPlaceOrRecreate"
 webhookConfig:
   serverPort: 10250
 # Kubeconfig to the target cluster. In-cluster configuration will be used if not specified.
