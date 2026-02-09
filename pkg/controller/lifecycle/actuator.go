@@ -334,7 +334,7 @@ func getSeedResources(
 		webhookTLSCertDir        = "/etc/lakom/tls"
 		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
 		requestMemory            = resource.MustParse("25M")
-		vpaUpdateMode            = vpaautoscalingv1.UpdateModeRecreate
+		vpaUpdateMode            = vpaautoscalingv1.UpdateModeInPlaceOrRecreate
 	)
 
 	lakomConfigConfigMap := corev1.ConfigMap{
