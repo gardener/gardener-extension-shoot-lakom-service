@@ -3,9 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ############# builder
-FROM golang:1.26.0 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.0 AS builder
 
 ARG EFFECTIVE_VERSION
+ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /go/src/github.com/gardener/gardener-extension-shoot-lakom-service
 
@@ -15,7 +16,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN make install EFFECTIVE_VERSION=$EFFECTIVE_VERSION GOARCH=$TARGETARCH
+RUN make build EFFECTIVE_VERSION=$EFFECTIVE_VERSION GOOS=$TARGETOS GOARCH=$TARGETARCH BUILD_OUTPUT_FILE="/output/bin/"
 
 ############# base
 FROM gcr.io/distroless/static-debian13:nonroot AS base
@@ -24,19 +25,19 @@ FROM gcr.io/distroless/static-debian13:nonroot AS base
 FROM base AS lakom
 WORKDIR /
 
-COPY --from=builder /go/bin/lakom /lakom
+COPY --from=builder /output/bin/lakom /lakom
 ENTRYPOINT ["/lakom"]
 
 ############# gardener-extension-shoot-lakom-service
 FROM base AS gardener-extension-shoot-lakom-service
 
 COPY charts /charts
-COPY --from=builder /go/bin/gardener-extension-shoot-lakom-service /gardener-extension-shoot-lakom-service
+COPY --from=builder /output/bin/gardener-extension-shoot-lakom-service /gardener-extension-shoot-lakom-service
 ENTRYPOINT ["/gardener-extension-shoot-lakom-service"]
 
 
 ############# gardener-extension-shoot-lakom-admission
 FROM base AS gardener-extension-shoot-lakom-admission
 
-COPY --from=builder /go/bin/gardener-extension-shoot-lakom-admission /gardener-extension-shoot-lakom-admission
+COPY --from=builder /output/bin/gardener-extension-shoot-lakom-admission /gardener-extension-shoot-lakom-admission
 ENTRYPOINT ["/gardener-extension-shoot-lakom-admission"]

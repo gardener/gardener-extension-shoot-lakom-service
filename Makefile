@@ -22,7 +22,7 @@ IGNORE_OPERATION_ANNOTATION := true
 CACHE_TTL                   ?= 10m
 CACHE_REFRESH_INTERVAL      ?= 30s
 KUBECONFIG                  ?= $(HOME)/.kube/config
-GOARCH                      ?= $(shell go env GOARCH)
+TARGET_PLATFORMS            ?= linux/$(shell go env GOARCH)
 
 TOOLS_DIR := $(HACK_DIR)/tools
 include $(GARDENER_HACK_DIR)/tools.mk
@@ -76,11 +76,22 @@ install:
 	@LD_FLAGS="$(SHOOT_ADMISSION_LD_FLAGS)" \
 		bash $(GARDENER_HACK_DIR)/install.sh ./cmd/$(SHOOT_ADMISSION_FULL_NAME)
 
+BUILD_OUTPUT_FILE ?= .
+
+.PHONY: build
+build:
+	@LD_FLAGS="$(EXTENSION_LD_FLAGS)" EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) \
+		bash $(GARDENER_HACK_DIR)/build.sh -o $(BUILD_OUTPUT_FILE) ./cmd/$(EXTENSION_FULL_NAME)
+	@LD_FLAGS="$(ADMISSION_LD_FLAGS)" EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) \
+		bash $(GARDENER_HACK_DIR)/build.sh -o $(BUILD_OUTPUT_FILE) ./cmd/$(ADMISSION_NAME)
+	@LD_FLAGS="$(SHOOT_ADMISSION_LD_FLAGS)" EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) \
+		bash $(GARDENER_HACK_DIR)/build.sh -o $(BUILD_OUTPUT_FILE) ./cmd/$(SHOOT_ADMISSION_FULL_NAME)
+
 .PHONY: docker-images
 docker-images:
-	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):latest -f Dockerfile -m 6g --target $(EXTENSION_FULL_NAME) .
-	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):latest -f Dockerfile -m 6g --target $(ADMISSION_NAME) .
-	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --build-arg TARGETARCH=$(GOARCH) -t $(IMAGE_PREFIX)/$(SHOOT_ADMISSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(SHOOT_ADMISSION_NAME):latest -f Dockerfile -m 6g --target $(SHOOT_ADMISSION_FULL_NAME) .
+	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --platform=$(TARGET_PLATFORMS) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):$(EFFECTIVE_VERSION).      -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):latest       -f Dockerfile -m 6g --target $(EXTENSION_FULL_NAME) .
+	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --platform=$(TARGET_PLATFORMS) -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):$(EFFECTIVE_VERSION).      -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):latest       -f Dockerfile -m 6g --target $(ADMISSION_NAME) .
+	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --platform=$(TARGET_PLATFORMS) -t $(IMAGE_PREFIX)/$(SHOOT_ADMISSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(SHOOT_ADMISSION_NAME):latest -f Dockerfile -m 6g --target $(SHOOT_ADMISSION_FULL_NAME) .
 
 #####################################################################
 # Rules for verification, formatting, linting, testing and cleaning #
