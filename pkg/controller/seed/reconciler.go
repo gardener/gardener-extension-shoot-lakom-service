@@ -14,12 +14,14 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 
+	"github.com/Masterminds/semver/v3"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils"
+	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
 	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
 	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
@@ -45,8 +47,10 @@ import (
 )
 
 type kubeSystemReconciler struct {
-	client        client.Client
-	serviceConfig config.Configuration
+	client                          client.Client
+	serviceConfig                   config.Configuration
+	seedK8sVersion                  *semver.Version
+	seedTopologyAwareRoutingEnabled bool
 }
 
 // Reconcile installs the lakom admission controller in the kube-system namespace.
@@ -123,6 +127,8 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		kcr.serviceConfig.UseOnlyImagePullSecrets,
 		kcr.serviceConfig.AllowUntrustedImages,
 		kcr.serviceConfig.AllowInsecureRegistries,
+		kcr.seedTopologyAwareRoutingEnabled,
+		kcr.seedK8sVersion,
 	)
 	if err != nil {
 		return err
@@ -182,7 +188,16 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	return nil
 }
 
-func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundle []byte, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) (map[string][]byte, error) {
+func getResources(serverTLSSecretName,
+	image,
+	lakomConfig string,
+	webhookCaBundle []byte,
+	useOnlyImagePullSecrets,
+	allowUntrustedImages,
+	allowInsecureRegistries,
+	seedTopologyAwareRoutingEnabled bool,
+	seedK8sVersion *semver.Version,
+) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
 		serverPort               = intstr.FromInt32(10250)
@@ -413,6 +428,8 @@ func getResources(serverTLSSecretName, image, lakomConfig string, webhookCaBundl
 			},
 		},
 	}
+
+	gardenerutils.ReconcileTopologyAwareRoutingSettings(lakomService, seedTopologyAwareRoutingEnabled, seedK8sVersion)
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{

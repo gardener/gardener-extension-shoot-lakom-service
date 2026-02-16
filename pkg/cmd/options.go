@@ -39,13 +39,16 @@ func init() {
 
 // LakomServiceOptions holds options related to the Lakom service.
 type LakomServiceOptions struct {
-	ConfigLocation string
-	config         *LakomServiceConfig
+	ConfigLocation                  string
+	SeedTopologyAwareRoutingEnabled bool
+
+	config *LakomServiceConfig
 }
 
 // AddFlags implements Flagger.AddFlags.
 func (o *LakomServiceOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.ConfigLocation, "config", "", "Path to lakom service configuration")
+	fs.BoolVar(&o.SeedTopologyAwareRoutingEnabled, "seed-topology-aware-routing-enabled", false, "The flag is used to instruct the seed controller whether the seed topology aware routing is enabled or not.")
 }
 
 // Complete implements Completer.Complete.

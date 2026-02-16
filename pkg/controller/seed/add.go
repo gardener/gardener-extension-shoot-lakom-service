@@ -6,11 +6,14 @@ package seed
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -33,13 +36,33 @@ type AddOptions struct {
 	ControllerOptions controller.Options
 	// ServiceConfig contains configuration for the shoot Lakom service.
 	ServiceConfig config.Configuration
+	// SeedTopologyAwareRoutingEnabled determines whether the seed topology aware routing is enabled or not.
+	SeedTopologyAwareRoutingEnabled bool
 }
 
 // AddToManager adds a Lakom Service seed bootstrap controller to the given Controller Manager.
 func AddToManager(_ context.Context, mgr manager.Manager) error {
+	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		return fmt.Errorf("could not create Kubernetes clientset: %w", err)
+	}
+
+	k8sVersionInfo, err := clientset.Discovery().ServerVersion()
+	if err != nil {
+		return err
+	}
+
+	k8sVersion, err := semver.NewVersion(k8sVersionInfo.GitVersion)
+	if err != nil {
+		return err
+	}
+
 	r := &kubeSystemReconciler{
 		client:        mgr.GetClient(),
 		serviceConfig: DefaultAddOptions.ServiceConfig,
+
+		seedK8sVersion:                  k8sVersion,
+		seedTopologyAwareRoutingEnabled: DefaultAddOptions.SeedTopologyAwareRoutingEnabled,
 	}
 
 	DefaultAddOptions.ControllerOptions.Reconciler = r
