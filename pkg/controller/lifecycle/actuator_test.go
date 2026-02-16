@@ -749,6 +749,7 @@ spec:
   selector:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
+  trafficDistribution: PreferSameZone
   type: ClusterIP
 status:
   loadBalancer: {}
