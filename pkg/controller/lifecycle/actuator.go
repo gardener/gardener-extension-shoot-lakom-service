@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
@@ -177,6 +178,8 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
 		a.serviceConfig.AllowInsecureRegistries,
+		isTopologyAwareRoutingForShootControlPlaneEnabled(cluster),
+		*cluster.Seed.Status.KubernetesVersion,
 	)
 	if err != nil {
 		return err
@@ -294,7 +297,20 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) (map[string][]byte, error) {
+func getSeedResources(
+	lakomReplicas *int32,
+	namespace,
+	genericKubeconfigName,
+	shootAccessSecretName,
+	serverTLSSecretName,
+	lakomConfig,
+	image string,
+	useOnlyImagePullSecrets,
+	allowUntrustedImages,
+	allowInsecureRegistries,
+	topologyAwareRoutingEnabled bool,
+	seedK8SVersion string,
+) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
 		serverPort               = intstr.FromInt32(10250)
@@ -509,6 +525,12 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 			},
 		},
 	}
+
+	version, err := semver.NewVersion(seedK8SVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse seed k8s version %q as semantic version: %w", seedK8SVersion, err)
+	}
+	gardenerutils.ReconcileTopologyAwareRoutingSettings(lakomService, topologyAwareRoutingEnabled, version)
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
@@ -778,4 +800,14 @@ func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string)
 		RoleRef:  roleRef,
 		Subjects: subjects,
 	}
+}
+
+func isTopologyAwareRoutingForShootControlPlaneEnabled(cluster *extensions.Cluster) bool {
+	var (
+		seed  = cluster.Seed
+		shoot = cluster.Shoot
+	)
+
+	return seed != nil && shoot != nil &&
+		v1beta1helper.IsTopologyAwareRoutingForShootControlPlaneEnabled(seed, shoot)
 }

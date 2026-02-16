@@ -339,6 +339,8 @@ var _ = Describe("Actuator", func() {
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					allowInsecureRegistries,
+					true,
+					"v1.34.0",
 				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveKey("data.yaml.br"))
