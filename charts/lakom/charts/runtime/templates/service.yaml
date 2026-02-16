@@ -11,10 +11,16 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ .Values.global.name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-  {{- if .Values.additionalAnnotations.service }}
+    {{- if and .Values.service.topologyAwareRouting.enabled (semverCompare "< 1.32-0" .Capabilities.KubeVersion.Version) }}
+    endpoint-slice-hints.resources.gardener.cloud/consider: "true"
+    {{- end }}
   annotations:
+    {{- if .Values.additionalAnnotations.service }}
     {{- toYaml .Values.additionalAnnotations.service | trim | nindent 4 }}
-  {{- end }}
+    {{- end }}
+    {{- if and .Values.service.topologyAwareRouting.enabled (semverCompare "< 1.31-0" .Capabilities.KubeVersion.Version) }}
+    service.kubernetes.io/topology-mode: "auto"
+    {{- end }}
 spec:
   type: ClusterIP
   selector:
@@ -24,3 +30,6 @@ spec:
   - port: 443
     protocol: TCP
     targetPort: {{ .Values.serverPort }}
+  {{- if and .Values.service.topologyAwareRouting.enabled (semverCompare ">= 1.31-0" .Capabilities.KubeVersion.Version) }}
+  trafficDistribution: PreferSameZone
+  {{- end }}

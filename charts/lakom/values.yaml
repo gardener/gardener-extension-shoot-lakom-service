@@ -88,3 +88,7 @@ runtime:
     service: {}
   additionalLabels:
     deployment: {}
+
+  service:
+    topologyAwareRouting:
+      enabled: true
