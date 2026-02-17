@@ -91,4 +91,4 @@ runtime:
 
   service:
     topologyAwareRouting:
-      enabled: true
+      enabled: false
