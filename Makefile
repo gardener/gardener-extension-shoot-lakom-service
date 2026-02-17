@@ -89,8 +89,8 @@ build:
 
 .PHONY: docker-images
 docker-images:
-	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --platform=$(TARGET_PLATFORMS) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):$(EFFECTIVE_VERSION).      -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):latest       -f Dockerfile -m 6g --target $(EXTENSION_FULL_NAME) .
-	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --platform=$(TARGET_PLATFORMS) -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):$(EFFECTIVE_VERSION).      -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):latest       -f Dockerfile -m 6g --target $(ADMISSION_NAME) .
+	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --platform=$(TARGET_PLATFORMS) -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):$(EFFECTIVE_VERSION)       -t $(IMAGE_PREFIX)/$(EXTENSION_NAME):latest       -f Dockerfile -m 6g --target $(EXTENSION_FULL_NAME) .
+	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --platform=$(TARGET_PLATFORMS) -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):$(EFFECTIVE_VERSION)       -t $(IMAGE_PREFIX)/$(ADMISSION_NAME):latest       -f Dockerfile -m 6g --target $(ADMISSION_NAME) .
 	@docker build --build-arg EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) --platform=$(TARGET_PLATFORMS) -t $(IMAGE_PREFIX)/$(SHOOT_ADMISSION_NAME):$(EFFECTIVE_VERSION) -t $(IMAGE_PREFIX)/$(SHOOT_ADMISSION_NAME):latest -f Dockerfile -m 6g --target $(SHOOT_ADMISSION_FULL_NAME) .
 
 #####################################################################
