@@ -8,15 +8,15 @@ spec:
       runtimeCluster:
         helm:
           ociRepository:
-            ref: europe-docker.pkg.dev/gardener-project/public/charts/gardener/extensions/shoot-lakom-admission-runtime:v0.24.0
+            ref: europe-docker.pkg.dev/gardener-project/public/charts/gardener/extensions/shoot-lakom-admission-runtime:v0.25.0-dev
       virtualCluster:
         helm:
           ociRepository:
-            ref: europe-docker.pkg.dev/gardener-project/public/charts/gardener/extensions/shoot-lakom-admission-application:v0.24.0
+            ref: europe-docker.pkg.dev/gardener-project/public/charts/gardener/extensions/shoot-lakom-admission-application:v0.25.0-dev
     extension:
       helm:
         ociRepository:
-          ref: europe-docker.pkg.dev/gardener-project/public/charts/gardener/extensions/shoot-lakom-service:v0.24.0
+          ref: europe-docker.pkg.dev/gardener-project/public/charts/gardener/extensions/shoot-lakom-service:v0.25.0-dev
   resources:
   - kind: Extension
     type: shoot-lakom-service
