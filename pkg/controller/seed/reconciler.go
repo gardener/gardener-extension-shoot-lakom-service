@@ -188,7 +188,8 @@ func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context,
 	return nil
 }
 
-func getResources(serverTLSSecretName,
+func getResources(
+	serverTLSSecretName,
 	image,
 	lakomConfig string,
 	webhookCaBundle []byte,
@@ -429,6 +430,10 @@ func getResources(serverTLSSecretName,
 		},
 	}
 
+	// Note, this may not have effect for seeds running on Kubernetes <= v1.31.0 because
+	// the services labeled with `endpoint-slice-hints.resources.gardener.cloud/consider=true`
+	// are handled by a GRM webhook but GRM is ignoring the `kube-system` namespace.
+	// In general, it is expected only non-managed seeds to make use of the seed bootstrap controller.
 	gardenerutils.ReconcileTopologyAwareRoutingSettings(lakomService, seedTopologyAwareRoutingEnabled, seedK8sVersion)
 
 	pdb := &policyv1.PodDisruptionBudget{

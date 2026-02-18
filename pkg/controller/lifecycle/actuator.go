@@ -178,7 +178,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
 		a.serviceConfig.AllowInsecureRegistries,
-		isTopologyAwareRoutingForShootControlPlaneEnabled(cluster),
+		v1beta1helper.IsTopologyAwareRoutingForShootControlPlaneEnabled(cluster.Seed, cluster.Shoot),
 		*cluster.Seed.Status.KubernetesVersion,
 	)
 	if err != nil {
@@ -800,14 +800,4 @@ func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string)
 		RoleRef:  roleRef,
 		Subjects: subjects,
 	}
-}
-
-func isTopologyAwareRoutingForShootControlPlaneEnabled(cluster *extensions.Cluster) bool {
-	var (
-		seed  = cluster.Seed
-		shoot = cluster.Shoot
-	)
-
-	return seed != nil && shoot != nil &&
-		v1beta1helper.IsTopologyAwareRoutingForShootControlPlaneEnabled(seed, shoot)
 }

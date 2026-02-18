@@ -13,7 +13,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -42,19 +42,19 @@ type AddOptions struct {
 
 // AddToManager adds a Lakom Service seed bootstrap controller to the given Controller Manager.
 func AddToManager(_ context.Context, mgr manager.Manager) error {
-	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
 	if err != nil {
-		return fmt.Errorf("could not create Kubernetes clientset: %w", err)
+		return fmt.Errorf("could not create a discovery client: %w", err)
 	}
 
-	k8sVersionInfo, err := clientset.Discovery().ServerVersion()
+	k8sVersionInfo, err := discoveryClient.ServerVersion()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to discover the Seed Kubernetes version: %w", err)
 	}
 
 	k8sVersion, err := semver.NewVersion(k8sVersionInfo.GitVersion)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse the Seed Kubernetes version %q as semantic version: %w", k8sVersionInfo.GitVersion, err)
 	}
 
 	r := &kubeSystemReconciler{
