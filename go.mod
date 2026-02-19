@@ -6,7 +6,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
 	github.com/gardener/gardener v1.136.0
-	github.com/gardener/service-account-issuer-discovery v0.11.0
+	github.com/gardener/service-account-issuer-discovery v0.12.0
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-containerregistry v0.20.7
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20251113034745-2bb5bb01b8d9
@@ -22,10 +22,10 @@ require (
 	go.uber.org/mock v0.6.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/tools v0.42.0
-	k8s.io/api v0.34.3
-	k8s.io/apimachinery v0.34.3
+	k8s.io/api v0.35.0
+	k8s.io/apimachinery v0.35.0
 	k8s.io/autoscaler/vertical-pod-autoscaler v1.5.1
-	k8s.io/client-go v0.34.3
+	k8s.io/client-go v0.35.0
 	k8s.io/code-generator v0.34.3
 	k8s.io/component-base v0.34.3
 	k8s.io/utils v0.0.0-20260108192941-914a6e750570
