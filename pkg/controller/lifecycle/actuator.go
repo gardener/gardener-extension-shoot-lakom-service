@@ -16,6 +16,7 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/imagevector"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/secrets"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
@@ -177,6 +178,8 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
 		a.serviceConfig.AllowInsecureRegistries,
+		v1beta1helper.IsTopologyAwareRoutingForShootControlPlaneEnabled(cluster.Seed, cluster.Shoot),
+		*cluster.Seed.Status.KubernetesVersion,
 	)
 	if err != nil {
 		return err
@@ -294,7 +297,20 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, shootAccessSecretName, serverTLSSecretName, lakomConfig, image string, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) (map[string][]byte, error) {
+func getSeedResources(
+	lakomReplicas *int32,
+	namespace,
+	genericKubeconfigName,
+	shootAccessSecretName,
+	serverTLSSecretName,
+	lakomConfig,
+	image string,
+	useOnlyImagePullSecrets,
+	allowUntrustedImages,
+	allowInsecureRegistries,
+	topologyAwareRoutingEnabled bool,
+	seedK8SVersion string,
+) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
 		serverPort               = intstr.FromInt32(10250)
@@ -509,6 +525,12 @@ func getSeedResources(lakomReplicas *int32, namespace, genericKubeconfigName, sh
 			},
 		},
 	}
+
+	version, err := semver.NewVersion(seedK8SVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse seed k8s version %q as semantic version: %w", seedK8SVersion, err)
+	}
+	gardenerutils.ReconcileTopologyAwareRoutingSettings(lakomService, topologyAwareRoutingEnabled, version)
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{

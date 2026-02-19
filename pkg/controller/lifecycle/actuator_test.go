@@ -339,6 +339,8 @@ var _ = Describe("Actuator", func() {
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					allowInsecureRegistries,
+					true,
+					"v1.34.0",
 				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveKey("data.yaml.br"))
@@ -747,6 +749,7 @@ spec:
   selector:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
+  trafficDistribution: PreferSameZone
   type: ClusterIP
 status:
   loadBalancer: {}

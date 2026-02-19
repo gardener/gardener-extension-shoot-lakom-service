@@ -133,6 +133,8 @@ func (o *Options) run(ctx context.Context) error {
 	o.healthOptions.Completed().Apply(&healthcheck.DefaultAddOptions.Controller)
 	o.heartbeatOptions.Completed().Apply(&heartbeat.DefaultAddOptions)
 
+	seed.DefaultAddOptions.SeedTopologyAwareRoutingEnabled = o.lakomOptions.SeedTopologyAwareRoutingEnabled
+
 	if err := o.controllerSwitches.Completed().AddToManager(ctx, mgr); err != nil {
 		return fmt.Errorf("could not add controllers to manager: %s", err)
 	}

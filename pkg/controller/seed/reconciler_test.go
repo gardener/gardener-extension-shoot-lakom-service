@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
@@ -32,19 +33,21 @@ var _ = Describe("Reconciler", func() {
 
 	Context("getResources", func() {
 		const (
-			namespace                = "kube-system"
-			ownerNamespace           = "garden"
-			lakomConfigConfigMapName = "extension-shoot-lakom-service-seed-lakom-config-5ccba116"
-			serverTLSSecretName      = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
-			image                    = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
-			useOnlyImagePullSecrets  = true
-			allowUntrustedImages     = false
-			insecureRegistries       = false
+			namespace                       = "kube-system"
+			ownerNamespace                  = "garden"
+			lakomConfigConfigMapName        = "extension-shoot-lakom-service-seed-lakom-config-5ccba116"
+			serverTLSSecretName             = "shoot-lakom-service-seed-tls" //#nosec G101 -- this is false positive
+			image                           = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
+			useOnlyImagePullSecrets         = true
+			allowUntrustedImages            = false
+			insecureRegistries              = false
+			seedTopologyAwareRoutingEnabled = true
 		)
 
 		var (
-			lakomConfig string
-			caBundle    = []byte("caBundle")
+			lakomConfig    string
+			caBundle       = []byte("caBundle")
+			seedK8sVersion *semver.Version
 		)
 
 		BeforeEach(func() {
@@ -65,6 +68,9 @@ var _ = Describe("Reconciler", func() {
     -----END PUBLIC KEY-----
 `
 
+			var err error
+			seedK8sVersion, err = semver.NewVersion("v1.34.1")
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		DescribeTable("Should ensure resources are correctly created",
@@ -77,6 +83,8 @@ var _ = Describe("Reconciler", func() {
 					onlyImagePullSecrets,
 					untrustedImages,
 					insecureRegistries,
+					seedTopologyAwareRoutingEnabled,
+					seedK8sVersion,
 				)
 
 				Expect(err).ToNot(HaveOccurred())
@@ -123,6 +131,8 @@ var _ = Describe("Reconciler", func() {
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					insecureRegistries,
+					seedTopologyAwareRoutingEnabled,
+					seedK8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -144,6 +154,8 @@ var _ = Describe("Reconciler", func() {
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					insecureRegistries,
+					seedTopologyAwareRoutingEnabled,
+					seedK8sVersion,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -164,6 +176,8 @@ var _ = Describe("Reconciler", func() {
 				useOnlyImagePullSecrets,
 				allowUntrustedImages,
 				insecureRegistries,
+				seedTopologyAwareRoutingEnabled,
+				seedK8sVersion,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -492,6 +506,7 @@ spec:
   selector:
     app.kubernetes.io/name: lakom-seed
     app.kubernetes.io/part-of: shoot-lakom-service
+  trafficDistribution: PreferSameZone
   type: ClusterIP
 status:
   loadBalancer: {}

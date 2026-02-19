@@ -59,3 +59,11 @@ controllers:
   debugConfig:
     enableProfiling: false
     enableContentionProfiling: false
+
+# gardener values are set by gardenlet when the controllerinstallation is deployed.
+gardener:
+  seed:
+    spec:
+      settings:
+        topologyAwareRouting:
+          enabled: false
