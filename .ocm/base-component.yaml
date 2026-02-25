@@ -9,3 +9,7 @@ main-source:
         policy: skip
         comment: |
           we use gosec for sast scanning. See attached log.
+    - name: cloud.gardener.cnudie/dso/scanning-hints/package-versions
+      value:
+        - name: go-yaml # Explicitly set the version of go.yaml.in/yaml/v2 for scanning tools that cannot detect it properly.
+          version: v2.4.3
