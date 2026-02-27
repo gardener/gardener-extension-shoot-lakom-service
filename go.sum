@@ -274,8 +274,8 @@ github.com/gardener/gardener/pkg/apis v1.137.0 h1:YK7OFoJ6lY4s4+Uoh0VWr/eJVo94S5
 github.com/gardener/gardener/pkg/apis v1.137.0/go.mod h1:QUINW0KPDxMiYQ5bAmIKnsK3oWpseuqMrHnLrMEC5W4=
 github.com/gardener/machine-controller-manager v0.61.2 h1:kG8DgmOqqlljWqxa4x0ER4+L5zg1lxNd1dQXT9gKbvA=
 github.com/gardener/machine-controller-manager v0.61.2/go.mod h1:8eE1qLztrWIbOM71mHSQGaC6Q+pl5lvOyN08qP39D7o=
-github.com/gardener/service-account-issuer-discovery v0.11.0 h1:GzfpVlE68/PInU2RgvapMyxn53h4pPWRszz6ehZ8uDc=
-github.com/gardener/service-account-issuer-discovery v0.11.0/go.mod h1:Rr8XT7zneKdqOnvaWM+5hTUcWJXuVn/64xQIJ5rIP0A=
+github.com/gardener/service-account-issuer-discovery v0.12.0 h1:O89X3JBaFxtWGwMDMJmQf0h85m2xKFZ1BZdFoNrFQjc=
+github.com/gardener/service-account-issuer-discovery v0.12.0/go.mod h1:cxHfRUrveDXeuI3ww2V4UkQuNW4ImWnfMD9+dADm9uE=
 github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/gkampitakis/ciinfo v0.3.2 h1:JcuOPk8ZU7nZQjdUhctuhQofk7BGHuIy0c9Ez8BNhXs=
 github.com/gkampitakis/ciinfo v0.3.2/go.mod h1:1NIwaOcFChN4fa/B0hEBdAb6npDlFL8Bwx4dfRLRqAo=
