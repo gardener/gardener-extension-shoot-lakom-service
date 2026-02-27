@@ -93,7 +93,15 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	logger.Info("Installing lakom admission controller to the seed cluster")
 
 	secretsConfig := ConfigsFor(kubeSystemNamespaceName)
-	secretsManager, err := secretsmanager.New(ctx, logger.WithName("seed-secretsmanager"), clock.RealClock{}, kcr.client, ManagerIdentity, secretsmanager.Config{CASecretAutoRotation: true}, kubeSystemNamespaceName)
+	secretsManager, err := secretsmanager.New(
+		ctx,
+		logger.WithName("seed-secretsmanager"),
+		clock.RealClock{},
+		kcr.client,
+		ManagerIdentity,
+		secretsmanager.WithCASecretAutoRotation(),
+		secretsmanager.WithNamespaces(kubeSystemNamespaceName),
+	)
 	if err != nil {
 		return err
 	}

@@ -283,7 +283,7 @@ func requestAPIServer(ctx context.Context, caBundle []byte, apiserverURL, bearer
 		},
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // #nosec G704 -- apiserverURL is controlled in tests, not user input
 	if err != nil {
 		return nil, err
 	}
