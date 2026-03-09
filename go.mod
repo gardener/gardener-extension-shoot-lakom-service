@@ -9,7 +9,7 @@ require (
 	github.com/gardener/gardener/pkg/apis v1.137.0
 	github.com/gardener/service-account-issuer-discovery v0.12.0
 	github.com/go-logr/logr v1.4.3
-	github.com/google/go-containerregistry v0.21.1
+	github.com/google/go-containerregistry v0.21.2
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20251113034745-2bb5bb01b8d9
 	github.com/google/go-containerregistry/pkg/authn/kubernetes v0.0.0-20251113034745-2bb5bb01b8d9
 	github.com/onsi/ginkgo/v2 v2.28.1
