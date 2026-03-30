@@ -17,7 +17,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.89.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sigstore/cosign/v3 v3.0.5
-	github.com/sigstore/sigstore v1.10.4
+	github.com/sigstore/sigstore v1.10.5
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	go.uber.org/mock v0.6.0
@@ -169,7 +169,7 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0 // indirect
 	github.com/labstack/echo/v4 v4.13.4 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
-	github.com/letsencrypt/boulder v0.20251110.0 // indirect
+	github.com/letsencrypt/boulder v0.20260223.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
