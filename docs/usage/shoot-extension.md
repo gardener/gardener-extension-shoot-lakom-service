@@ -1,10 +1,11 @@
 # Introduction
 
-This extension implements [cosign](https://github.com/sigstore/cosign) image verification. It is strictly limited only to the kubernetes system components deployed by Gardener and other Gardener Extensions in the `kube-system` namespace of a shoot cluster.
+This extension implements non-keyless [cosign](https://github.com/sigstore/cosign) image signature verification.
 
 ## Shoot Feature Gate
 
-In most of the Gardener setups the `shoot-lakom-service` extension is enabled globally and thus can be configured per shoot cluster. Please adapt the shoot specification by the configuration shown below to disable the extension individually.
+Usually the `shoot-lakom-service` extension is enabled globally but also can be configured per shoot cluster.
+The example below shows the exposed configuration options, including how to disable the extensions.
 
 ```yaml
 kind: Shoot
@@ -29,14 +30,13 @@ spec:
 
 ### Scope
 
-The `scope` field instruct lakom which pods to validate. The possible values are:
+The `scope` field instruct lakom which pods to consider for validation.
 
-- `KubeSystem`
-Lakom will validate all pods in the `kube-system` namespace.
-- `KubeSystemManagedByGardener`
-Lakom will validate all pods in the `kube-system` namespace that are labeled with "resources.gardener.cloud/managed-by=gardener". This is the default value.
-- `Cluster`
-Lakom will validate all pods in all namespaces.
+|Scope|Description|
+|-----|-----------|
+|`KubeSystem`|Lakom will validate all pods in the `kube-system` namespace.|
+|`KubeSystemManagedByGardener`(default)|Lakom will validate all pods in the `kube-system` namespace that are labeled with `resources.gardener.cloud/managed-by=gardener`.|
+|`Cluster`|Lakom will validate all pods in all namespaces.|
 
 ### TrustedKeysResourceName
 
