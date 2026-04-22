@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
-	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
+	github.com/elastic/crd-ref-docs v0.3.0
 	github.com/gardener/gardener v1.140.1
 	github.com/gardener/gardener/pkg/apis v1.140.1
 	github.com/gardener/service-account-issuer-discovery v0.12.0
@@ -99,7 +99,6 @@ require (
 	github.com/docker/cli v29.4.0+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.5 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/elastic/crd-ref-docs v0.3.0 // indirect
 	github.com/elliotchance/orderedmap/v3 v3.1.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
@@ -202,7 +201,6 @@ require (
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/prometheus/sigv4 v0.3.0 // indirect
-	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/sassoftware/relic v7.2.1+incompatible // indirect
@@ -288,9 +286,7 @@ require (
 	k8s.io/apiserver v0.35.3 // indirect
 	k8s.io/cluster-bootstrap v0.35.3 // indirect
 	k8s.io/component-helpers v0.35.3 // indirect
-	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01 // indirect
 	k8s.io/gengo/v2 v2.0.0-20251215205346-5ee0d033ba5b // indirect
-	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-aggregator v0.35.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect

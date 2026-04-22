@@ -4,17 +4,20 @@
 <a href="#lakom.extensions.gardener.cloud%2fv1alpha1">lakom.extensions.gardener.cloud/v1alpha1</a>
 </li>
 </ul>
+
 <h2 id="lakom.extensions.gardener.cloud/v1alpha1">lakom.extensions.gardener.cloud/v1alpha1</h2>
 <p>
-<p>Package v1alpha1 contains the Lakom Shoot Service extension configuration.</p>
+
 </p>
-Resource Types:
-<ul></ul>
-<h3 id="lakom.extensions.gardener.cloud/v1alpha1.LakomConfig">LakomConfig
+
+<h3 id="lakomconfig">LakomConfig
 </h3>
+
+
 <p>
-<p>LakomConfig contains information about the Lakom service configuration.</p>
+LakomConfig contains information about the Lakom service configuration.
 </p>
+
 <table>
 <thead>
 <tr>
@@ -23,11 +26,12 @@ Resource Types:
 </tr>
 </thead>
 <tbody>
+
 <tr>
 <td>
 <code>scope</code></br>
 <em>
-github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom.ScopeType
+<a href="#scopetype">ScopeType</a>
 </em>
 </td>
 <td>
@@ -47,9 +51,8 @@ string
 <p>TrustedKeysResourceName is the name of the shoot resource providing additional cosign public keys for image signature validation.</p>
 </td>
 </tr>
+
 </tbody>
 </table>
-<hr/>
-<p><em>
-Generated with <a href="https://github.com/ahmetb/gen-crd-api-reference-docs">gen-crd-api-reference-docs</a>
-</em></p>
+
+
