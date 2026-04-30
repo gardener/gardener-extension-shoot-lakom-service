@@ -111,12 +111,12 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	if ex.Spec.ProviderConfig != nil {
 		if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
 			// Apply default values if provider config has not been provided
-			logger.Error(err, "Could not decode provider config. Using default value `KubeSystemManagedByGardener` for scope")
+			logger.Error(err, "Could not decode provider config. Using default value `KubeSystem` for scope")
 		}
 	}
 	if lakomProviderConfig.Scope == nil {
-		logger.Info("No scope specified. Using default value `KubeSystemManagedByGardener` for scope")
-		lakomProviderConfig.Scope = ptr.To(lakom.KubeSystemManagedByGardener)
+		logger.Info("No scope specified. Using default value `KubeSystem` for scope")
+		lakomProviderConfig.Scope = ptr.To(lakom.KubeSystem)
 	}
 
 	// initialize SecretsManager based on Cluster object

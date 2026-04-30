@@ -58,7 +58,7 @@ var _ = Describe("Actuator", func() {
 		const (
 			shootNamespace                  = "garden-foo"
 			extensionNamespace              = "shoot--foo--bar"
-			scope                           = lakom.KubeSystemManagedByGardener
+			scope                           = lakom.KubeSystem
 			shootAccessServiceAccountName   = "extension-shoot-lakom-service-access"
 			managedByGardenerObjectSelector = `
     matchExpressions:
@@ -87,8 +87,8 @@ var _ = Describe("Actuator", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(manifests).To(ConsistOf(
-				expectedSeedValidatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
-				expectedShootMutatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
+				expectedSeedValidatingWebhook(caBundle, extensionNamespace, emptyObjectSelector, kubeSystemNamespaceSelector),
+				expectedShootMutatingWebhook(caBundle, extensionNamespace, emptyObjectSelector, kubeSystemNamespaceSelector),
 				expectedShootClusterRole(),
 				expectedShootRoleBinding(shootAccessServiceAccountName, scope),
 			))
@@ -101,7 +101,7 @@ var _ = Describe("Actuator", func() {
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(manifests).To(ContainElement(expectedShootMutatingWebhook(ca, ns, managedByGardenerObjectSelector, kubeSystemNamespaceSelector)))
+				Expect(manifests).To(ContainElement(expectedShootMutatingWebhook(ca, ns, emptyObjectSelector, kubeSystemNamespaceSelector)))
 			},
 			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
 			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
@@ -114,7 +114,7 @@ var _ = Describe("Actuator", func() {
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(manifests).To(ContainElement(expectedSeedValidatingWebhook(ca, ns, managedByGardenerObjectSelector, kubeSystemNamespaceSelector)))
+				Expect(manifests).To(ContainElement(expectedSeedValidatingWebhook(ca, ns, emptyObjectSelector, kubeSystemNamespaceSelector)))
 			},
 			Entry("Global CA bundle and namespace name", caBundle, extensionNamespace),
 			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
