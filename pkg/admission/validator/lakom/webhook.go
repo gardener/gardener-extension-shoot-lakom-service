@@ -5,8 +5,6 @@
 package lakom
 
 import (
-	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
-
 	extensionswebhook "github.com/gardener/gardener/extensions/pkg/webhook"
 	"github.com/gardener/gardener/pkg/apis/core"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,9 +28,8 @@ func New(mgr manager.Manager) (*extensionswebhook.Webhook, error) {
 	apiReader := mgr.GetAPIReader()
 
 	return extensionswebhook.New(mgr, extensionswebhook.Args{
-		Provider: constants.ExtensionType,
-		Name:     Name,
-		Path:     "/webhooks/shoot-lakom-admission",
+		Name: Name,
+		Path: "/webhooks/shoot-lakom-admission",
 		Validators: map[extensionswebhook.Validator][]extensionswebhook.Type{
 			NewShootValidator(apiReader, decoder): {{Obj: &core.Shoot{}}},
 		},

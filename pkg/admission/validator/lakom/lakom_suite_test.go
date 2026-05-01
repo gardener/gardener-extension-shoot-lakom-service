@@ -15,11 +15,9 @@ import (
 
 	extensionswebhook "github.com/gardener/gardener/extensions/pkg/webhook"
 	"github.com/gardener/gardener/pkg/apis/core"
-	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
-	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +25,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestLakom(t *testing.T) {
@@ -36,24 +35,22 @@ func TestLakom(t *testing.T) {
 
 var _ = Describe("Shoot validator", func() {
 	var (
-		ctx = context.Background()
+		ctx context.Context
 
 		shootValidator extensionswebhook.Validator
-		ctrl           *gomock.Controller
-		apiReader      *mockclient.MockReader
 
 		shoot *core.Shoot
 	)
 
 	Describe("#Validate", func() {
 		BeforeEach(func() {
+			ctx = context.Background()
 			scheme := runtime.NewScheme()
 			utilruntime.Must(apislakom.AddToScheme(scheme))
 			utilruntime.Must(v1alpha1.AddToScheme(scheme))
 
 			decoder := serializer.NewCodecFactory(scheme, serializer.EnableStrict).UniversalDecoder()
-			apiReader = mockclient.NewMockReader(ctrl)
-			ctrl = gomock.NewController(GinkgoT())
+			apiReader := fake.NewFakeClient()
 
 			shootValidator = lakom.NewShootValidator(apiReader, decoder)
 

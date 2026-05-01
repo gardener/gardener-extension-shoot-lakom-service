@@ -23,6 +23,7 @@ CACHE_TTL                   ?= 10m
 CACHE_REFRESH_INTERVAL      ?= 30s
 KUBECONFIG                  ?= $(HOME)/.kube/config
 TARGET_PLATFORMS            ?= linux/$(shell go env GOARCH)
+PARALLEL_MODE               := sequential
 
 TOOLS_DIR := $(HACK_DIR)/tools
 include $(GARDENER_HACK_DIR)/tools.mk
@@ -119,7 +120,7 @@ check: $(GOIMPORTS) $(GOLANGCI_LINT) $(HELM) $(YQ)
 	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) $(HACK_DIR)/check-skaffold-deps.sh
 
 .PHONY: generate
-generate: $(CRD_REF_DOCS) $(EXTENSION_GEN) $(HELM) $(KUSTOMIZE) $(MOCKGEN) $(YQ)
+generate: $(CRD_REF_DOCS) $(EXTENSION_GEN) $(HELM) $(KUSTOMIZE) $(YQ)
 	@go mod download
 	@REPO_ROOT=$(REPO_ROOT) GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) \
 		bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./example/... ./pkg/... ./test/...
@@ -129,6 +130,7 @@ generate: $(CRD_REF_DOCS) $(EXTENSION_GEN) $(HELM) $(KUSTOMIZE) $(MOCKGEN) $(YQ)
 .PHONY: format
 format: $(GOIMPORTS) $(GOIMPORTSREVISER)
 	@GOIMPORTS_REVISER_OPTIONS="-imports-order std,project,general,company" \
+		MODE=$(PARALLEL_MODE) \
 		bash $(GARDENER_HACK_DIR)/format.sh ./cmd ./pkg ./test ./charts
 
 .PHONY: sast

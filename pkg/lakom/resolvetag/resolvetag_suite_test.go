@@ -17,8 +17,7 @@ import (
 	"os"
 	"testing"
 
-	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
-	mockmanager "github.com/gardener/gardener/third_party/mock/controller-runtime/manager"
+	"github.com/gardener/gardener/pkg/utils/test"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 	registryv1 "github.com/google/go-containerregistry/pkg/v1"
@@ -31,7 +30,6 @@ import (
 	"github.com/sigstore/cosign/v3/pkg/oci/signed"
 	"github.com/sigstore/cosign/v3/pkg/oci/static"
 	"github.com/sigstore/sigstore/pkg/signature"
-	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -46,10 +44,8 @@ var (
 	unsignedImageTagRef    string
 	nonExistentImageTagRef string
 
-	scheme    *runtime.Scheme
-	ctrl      *gomock.Controller
-	mgr       *mockmanager.MockManager
-	apiReader *mockclient.MockReader
+	scheme *runtime.Scheme
+	mgr    test.FakeManager
 )
 
 const (
@@ -65,6 +61,7 @@ func TestResolveTagSuite(t *testing.T) {
 var _ = BeforeSuite(func() {
 	scheme = runtime.NewScheme()
 	Expect(corev1.AddToScheme(scheme)).To(Succeed())
+	mgr.Scheme = scheme
 
 	dirPath, err := os.MkdirTemp("", "resolvetag_test")
 	Expect(err).ToNot(HaveOccurred())
