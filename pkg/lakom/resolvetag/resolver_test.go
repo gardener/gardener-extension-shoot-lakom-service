@@ -39,10 +39,11 @@ var _ = Describe("Resolver", func() {
 		ttl            = time.Second
 		kcr            = &anonymousKeyChainReader{}
 		directResolver = resolvetag.NewDirectResolver()
-		ctx            = context.Background()
+		ctx            context.Context
 	)
 
 	BeforeEach(func() {
+		ctx = context.Background()
 		var err error
 		cache, err = resolvetag.NewDigestCache(refresh, ttl)
 		Expect(err).ToNot(HaveOccurred())

@@ -15,19 +15,16 @@ import (
 	gardencorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
-	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
-	mockmanager "github.com/gardener/gardener/third_party/mock/controller-runtime/manager"
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/name"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
-	"go.uber.org/mock/gomock"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	logzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -72,12 +69,6 @@ var _ = Describe("Admission Handler", func() {
 	BeforeEach(func() {
 		const gardenNamespace = "garden"
 		ctx = context.Background()
-		ctrl = gomock.NewController(GinkgoT())
-		mgr = mockmanager.NewMockManager(ctrl)
-		apiReader = mockclient.NewMockReader(ctrl)
-
-		mgr.EXPECT().GetAPIReader().Return(apiReader)
-		mgr.EXPECT().GetScheme().Return(scheme)
 
 		imagePullSecretName = "image-pull-secret" //#nosec G101 -- this is just a name of non-existing test resource
 		imagePullSecret := &corev1.Secret{
@@ -87,10 +78,7 @@ var _ = Describe("Admission Handler", func() {
 			},
 		}
 
-		apiReader.EXPECT().
-			Get(gomock.Any(), client.ObjectKey{Namespace: gardenNamespace, Name: imagePullSecretName}, gomock.AssignableToTypeOf(&corev1.Secret{})).
-			AnyTimes().
-			SetArg(2, *imagePullSecret)
+		mgr.APIReader = fake.NewFakeClient(imagePullSecret)
 
 		logger = logzap.New(logzap.WriteTo(GinkgoWriter))
 		h, err := resolvetag.
