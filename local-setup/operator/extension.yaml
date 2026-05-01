@@ -18,7 +18,7 @@ spec:
     extension:
       helm:
         ociRepository:
-          ref: local-skaffold/gardener-extension-auditing/charts/extension
+          ref: local-skaffold/gardener-extension-shoot-lakom-service/charts/extension
       policy: Always
   resources:
   - kind: Extension
