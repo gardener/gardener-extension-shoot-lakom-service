@@ -26,3 +26,4 @@ data:
     debugConfig:
       enableProfiling: {{ .Values.controllers.debugConfig.enableProfiling | default false }}
       enableContentionProfiling: {{ .Values.controllers.debugConfig.enableContentionProfiling | default false }}
+    defaultLakomScope: {{ .Values.controllers.defaultLakomScope }}

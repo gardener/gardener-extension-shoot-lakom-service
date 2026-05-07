@@ -80,6 +80,20 @@ type actuator struct {
 	serviceConfig config.Configuration
 }
 
+func resolveScope(logger logr.Logger, cfg *lakom.LakomConfig, defaultScope lakom.ScopeType) {
+	if cfg.Scope == nil {
+		if defaultScope != "" {
+			logger.Info("No scope specified. Using extension configured DefaultLakomScope", "scope", defaultScope)
+			cfg.Scope = ptr.To(defaultScope)
+		} else {
+			logger.Info("No scope specified. Using global default", "scope", lakom.KubeSystemManagedByGardener)
+			cfg.Scope = ptr.To(lakom.KubeSystemManagedByGardener)
+		}
+	} else {
+		logger.Info("Extension configured own scope", "scope", *cfg.Scope)
+	}
+}
+
 func getLakomReplicas(hibernated bool) *int32 {
 	// Scale to 0 if cluster is hibernated
 	if hibernated {
@@ -110,14 +124,11 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	lakomProviderConfig := &lakom.LakomConfig{}
 	if ex.Spec.ProviderConfig != nil {
 		if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
-			// Apply default values if provider config has not been provided
-			logger.Error(err, "Could not decode provider config. Using default value `KubeSystemManagedByGardener` for scope")
+			return fmt.Errorf("Could not decode provider config, err: %w", err)
 		}
 	}
-	if lakomProviderConfig.Scope == nil {
-		logger.Info("No scope specified. Using default value `KubeSystemManagedByGardener` for scope")
-		lakomProviderConfig.Scope = ptr.To(lakom.KubeSystemManagedByGardener)
-	}
+
+	resolveScope(logger, lakomProviderConfig, a.serviceConfig.DefaultLakomScope)
 
 	// initialize SecretsManager based on Cluster object
 	configs := secrets.ConfigsFor(namespace)

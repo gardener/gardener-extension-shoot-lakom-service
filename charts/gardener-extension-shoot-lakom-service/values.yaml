@@ -59,6 +59,7 @@ controllers:
   debugConfig:
     enableProfiling: false
     enableContentionProfiling: false
+  #defaultLakomScope: KubeSystemManagedByGardener
 
 # gardener values are set by gardenlet when the controllerinstallation is deployed.
 gardener:

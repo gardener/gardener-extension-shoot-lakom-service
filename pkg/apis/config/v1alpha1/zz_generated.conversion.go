@@ -13,6 +13,7 @@ import (
 	unsafe "unsafe"
 
 	config "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
+	lakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	configv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -68,6 +69,7 @@ func autoConvert_v1alpha1_Configuration_To_config_Configuration(in *Configuratio
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
 	out.AllowUntrustedImages = in.AllowUntrustedImages
 	out.AllowInsecureRegistries = in.AllowInsecureRegistries
+	out.DefaultLakomScope = lakom.ScopeType(in.DefaultLakomScope)
 	return nil
 }
 
@@ -86,6 +88,7 @@ func autoConvert_config_Configuration_To_v1alpha1_Configuration(in *config.Confi
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
 	out.AllowUntrustedImages = in.AllowUntrustedImages
 	out.AllowInsecureRegistries = in.AllowInsecureRegistries
+	out.DefaultLakomScope = lakom.ScopeType(in.DefaultLakomScope)
 	return nil
 }
 

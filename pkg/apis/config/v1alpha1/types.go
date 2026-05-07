@@ -5,6 +5,8 @@
 package v1alpha1
 
 import (
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+
 	extensionsconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +37,9 @@ type Configuration struct {
 	AllowUntrustedImages bool `json:"allowUntrustedImages"`
 	// AllowInsecureRegistries allows Lakom to use HTTP for communication with the registries
 	AllowInsecureRegistries bool `json:"allowInsecureRegistries"`
+	// DefaultLakomScope is configuration exposing the option to overwrite the default scope
+	// for the lakom admission controller managed by the extension controller.
+	DefaultLakomScope lakom.ScopeType `json:"defaultLakomScope"`
 }
 
 // DebugConfig contains debug configurations for the controller.
