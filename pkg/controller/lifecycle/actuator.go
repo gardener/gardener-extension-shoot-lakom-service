@@ -124,7 +124,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	lakomProviderConfig := &lakom.LakomConfig{}
 	if ex.Spec.ProviderConfig != nil {
 		if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
-			return fmt.Errorf("Could not decode provider config, err: %w", err)
+			return fmt.Errorf("could not decode provider config, err: %w", err)
 		}
 	}
 
