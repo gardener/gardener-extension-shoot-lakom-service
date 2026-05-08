@@ -15,11 +15,15 @@ import (
 type ScopeType string
 
 const (
-	// KubeSystem denotes the `kube-system` namespace
+	// KubeSystem scope is used to restrict the scope of lakom admission to all pods in the `kube-system` namespaces.
+	// When the Gardener `KubernetesDashboard` addon is enabled, the pods in the `kubernetes-dashboard` namespace are also validated.
 	KubeSystem ScopeType = "KubeSystem"
-	// KubeSystemManagedByGardener denotes pods in the `kube-system` namespace that have a `resources.gardener.cloud/managed-by=gardener` label
+	// KubeSystemManagedByGardener scope is used to restrict the scope of lakom admission to the pods in the `kube-system`
+	// namespaces that are labeled with `resources.gardener.cloud/managed-by=gardener`.
+	// When the Gardener `KubernetesDashboard` addon is enabled, the pods with the same label
+	// in the `kubernetes-dashboard` namespace are also validated.
 	KubeSystemManagedByGardener ScopeType = "KubeSystemManagedByGardener"
-	// Cluster denotes the whole cluster
+	// Cluster scope configured lakom admission for all pods in all namespaces.
 	Cluster ScopeType = "Cluster"
 )
 

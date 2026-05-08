@@ -34,8 +34,8 @@ The `scope` field instruct lakom which pods to consider for validation.
 
 | Scope | Description |
 | ----- | ----------- |
-| `KubeSystem` | Lakom will validate all pods in the `kube-system` namespace. |
-| `KubeSystemManagedByGardener`(default) | Lakom will validate all pods in the `kube-system` namespace that are labeled with `resources.gardener.cloud/managed-by=gardener`. |
+| `KubeSystem` | Lakom will validate all pods in the `kube-system` namespace. When the Gardener `KubernetesDashboard` addon is enabled, the pods in the `kubernetes-dashboard` namespace are also validated. |
+| `KubeSystemManagedByGardener`(default) | Lakom will validate all pods in the `kube-system` namespace that are labeled with `resources.gardener.cloud/managed-by=gardener`. When the Gardener `KubernetesDashboard` addon is enabled, the pods with same label in the`kubernetes-dashboard` namespace are also validated. |
 | `Cluster` | Lakom will validate all pods in all namespaces. |
 
 > [!NOTE]
