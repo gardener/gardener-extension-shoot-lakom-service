@@ -80,18 +80,12 @@ type actuator struct {
 	serviceConfig config.Configuration
 }
 
-func resolveScope(logger logr.Logger, cfg *lakom.LakomConfig, defaultScope lakom.ScopeType) {
-	if cfg.Scope == nil {
-		if defaultScope != "" {
-			logger.Info("No scope specified. Using extension configured DefaultLakomScope", "scope", defaultScope)
-			cfg.Scope = ptr.To(defaultScope)
-		} else {
-			logger.Info("No scope specified. Using global default", "scope", lakom.KubeSystemManagedByGardener)
-			cfg.Scope = ptr.To(lakom.KubeSystemManagedByGardener)
-		}
-	} else {
-		logger.Info("Extension configured own scope", "scope", *cfg.Scope)
+func getScope(defaultScope lakom.ScopeType) *lakom.ScopeType {
+	if defaultScope != "" {
+		return ptr.To(defaultScope)
 	}
+
+	return ptr.To(lakom.KubeSystemManagedByGardener)
 }
 
 func getLakomReplicas(hibernated bool) *int32 {
@@ -128,7 +122,10 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		}
 	}
 
-	resolveScope(logger, lakomProviderConfig, a.serviceConfig.DefaultLakomScope)
+	if lakomProviderConfig.Scope == nil {
+		lakomProviderConfig.Scope = getScope(a.serviceConfig.DefaultLakomScope)
+	}
+	logger.Info("Extension is configured with admission scope", "scope", *lakomProviderConfig.Scope)
 
 	// initialize SecretsManager based on Cluster object
 	configs := secrets.ConfigsFor(namespace)

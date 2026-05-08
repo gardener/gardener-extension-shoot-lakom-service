@@ -17,15 +17,12 @@ import (
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils/test"
-	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	logzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var _ = Describe("Actuator", func() {
@@ -57,39 +54,14 @@ var _ = Describe("Actuator", func() {
 		Expect(appPartOf).To(Equal("shoot-lakom-service"))
 	})
 
-	Context("resolveScope", func() {
-		var logger logr.Logger
-
-		BeforeEach(func() {
-			logger = logzap.New(logzap.WriteTo(GinkgoWriter))
-		})
-
-		It("Should use provider config scope when explicitly set", func() {
-			cfg := &lakom.LakomConfig{Scope: ptr.To(lakom.Cluster)}
-			resolveScope(logger, cfg, "")
-			Expect(*cfg.Scope).To(Equal(lakom.Cluster))
-		})
-
-		It("Should use provider config scope even when defaultScope is configured", func() {
-			cfg := &lakom.LakomConfig{Scope: ptr.To(lakom.KubeSystem)}
-			resolveScope(logger, cfg, lakom.Cluster)
-			Expect(*cfg.Scope).To(Equal(lakom.KubeSystem))
-		})
-
-		It("Should use DefaultLakomScope when scope is nil and defaultScope is set", func() {
-			cfg := &lakom.LakomConfig{}
-			resolveScope(logger, cfg, lakom.Cluster)
-			Expect(cfg.Scope).NotTo(BeNil())
-			Expect(*cfg.Scope).To(Equal(lakom.Cluster))
-		})
-
-		It("Should fall back to KubeSystemManagedByGardener when scope is nil and defaultScope is empty", func() {
-			cfg := &lakom.LakomConfig{}
-			resolveScope(logger, cfg, "")
-			Expect(cfg.Scope).NotTo(BeNil())
-			Expect(*cfg.Scope).To(Equal(lakom.KubeSystemManagedByGardener))
-		})
-	})
+	DescribeTable("Should get the expected scope", func(configurableScope lakom.ScopeType, expected string) {
+		Expect(getScope(lakom.ScopeType(configurableScope))).To(BeEquivalentTo(&expected))
+	},
+		Entry("Global default scope: KubeSystemManagedByGardener", lakom.ScopeType(""), "KubeSystemManagedByGardener"),
+		Entry("Overwrite scope: Cluster", lakom.Cluster, "Cluster"),
+		Entry("Overwrite scope: KubeSystem", lakom.KubeSystem, "KubeSystem"),
+		Entry("Overwrite scope: KubeSystemManagedByGardener", lakom.KubeSystemManagedByGardener, "KubeSystemManagedByGardener"),
+	)
 
 	Context("getShootResources", func() {
 		const (
