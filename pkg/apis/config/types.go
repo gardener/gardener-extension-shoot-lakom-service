@@ -35,9 +35,9 @@ type Configuration struct {
 	// AllowInsecureRegistries sets the lakom webhook to allow HTTP communication with OCI registries.
 	// It first tries HTTPS and then falls back to HTTP.
 	AllowInsecureRegistries bool
-	// DefaultLakomScope is configuration exposing the option to overwrite the default scope
+	// DefaultAdmissionScope is configuration exposing the option to overwrite the default scope
 	// for the lakom admission controller managed by the extension controller.
-	DefaultLakomScope lakom.ScopeType
+	DefaultAdmissionScope lakom.ScopeType
 }
 
 // DebugConfig contains debug configurations for the controller.

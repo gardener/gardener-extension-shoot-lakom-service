@@ -123,7 +123,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	}
 
 	if lakomProviderConfig.Scope == nil {
-		lakomProviderConfig.Scope = getScope(a.serviceConfig.DefaultLakomScope)
+		lakomProviderConfig.Scope = getScope(a.serviceConfig.DefaultAdmissionScope)
 	}
 	logger.Info("Extension is configured with admission scope", "scope", *lakomProviderConfig.Scope)
 

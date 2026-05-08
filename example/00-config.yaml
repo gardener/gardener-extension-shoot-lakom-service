@@ -21,4 +21,4 @@ allowInsecureRegistries: true
 debugConfig:
   enableProfiling: false
   enableContentionProfiling: false
-defaultLakomScope: KubeSystemManagedByGardener
+defaultAdmissionScope: KubeSystemManagedByGardener

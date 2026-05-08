@@ -37,9 +37,9 @@ type Configuration struct {
 	AllowUntrustedImages bool `json:"allowUntrustedImages"`
 	// AllowInsecureRegistries allows Lakom to use HTTP for communication with the registries
 	AllowInsecureRegistries bool `json:"allowInsecureRegistries"`
-	// DefaultLakomScope is configuration exposing the option to overwrite the default scope
+	// DefaultAdmissionScope is configuration exposing the option to overwrite the default scope
 	// for the lakom admission controller managed by the extension controller.
-	DefaultLakomScope lakom.ScopeType `json:"defaultLakomScope"`
+	DefaultAdmissionScope lakom.ScopeType `json:"defaultAdmissionScope"`
 }
 
 // DebugConfig contains debug configurations for the controller.

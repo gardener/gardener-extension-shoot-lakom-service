@@ -110,9 +110,9 @@ func ControllerSwitches() *cmd.SwitchOptions {
 
 // Validate validates the options.
 func (o *LakomServiceOptions) Validate() error {
-	if scope := o.config.config.DefaultLakomScope; scope != "" {
+	if scope := o.config.config.DefaultAdmissionScope; scope != "" {
 		if !lakom.AllowedScopes.Has(scope) {
-			return fmt.Errorf("unsupported defaultLakomScope: %s, supported scopes: %v", scope, lakom.AllowedScopes.UnsortedList())
+			return fmt.Errorf("unsupported defaultAdmissionScope: %s, supported scopes: %v", scope, lakom.AllowedScopes.UnsortedList())
 		}
 	}
 	return nil

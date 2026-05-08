@@ -46,7 +46,7 @@ var _ = Describe("options", func() {
 
 	Describe("Validate", func() {
 		DescribeTable("Should allow supported scopes", func(scope lakom.ScopeType) {
-			svcOpt, cleanupFunc := prepareServiceOptions(`defaultLakomScope: ` + string(scope))
+			svcOpt, cleanupFunc := prepareServiceOptions(`defaultAdmissionScope: ` + string(scope))
 			defer cleanupFunc()
 			Expect(svcOpt.Complete()).To(Succeed())
 			Expect(svcOpt.Validate()).To(Succeed())
@@ -65,12 +65,12 @@ var _ = Describe("options", func() {
 		})
 
 		It("Should disallow unsupported scope", func() {
-			svcOpt, cleanupFunc := prepareServiceOptions("defaultLakomScope: unsupportedScope123")
+			svcOpt, cleanupFunc := prepareServiceOptions("defaultAdmissionScope: unsupportedScope123")
 			defer cleanupFunc()
 			Expect(svcOpt.Complete()).To(Succeed())
 			Expect(svcOpt.Validate()).To(And(
 				HaveOccurred(),
-				MatchError(ContainSubstring("unsupported defaultLakomScope")),
+				MatchError(ContainSubstring("unsupported defaultAdmissionScope")),
 			))
 		})
 	})
