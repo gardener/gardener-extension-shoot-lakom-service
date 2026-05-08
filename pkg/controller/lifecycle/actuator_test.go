@@ -81,7 +81,8 @@ var _ = Describe("Actuator", func() {
     - key: kubernetes.io/metadata.name
       operator: In
       values:
-      - kube-system`
+      - kube-system
+      - kubernetes-dashboard`
 			emptyNamespaceSelector = ` {}`
 		)
 		var (

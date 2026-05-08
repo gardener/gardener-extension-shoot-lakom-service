@@ -613,44 +613,34 @@ func getSeedResources(
 }
 
 func scopeToObjectSelector(scope lakom.ScopeType) metav1.LabelSelector {
-	var objectSelector = metav1.LabelSelector{}
-	switch scope {
-	case lakom.KubeSystemManagedByGardener:
-		objectSelector = metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key:      resourcesv1alpha1.ManagedBy,
-					Operator: metav1.LabelSelectorOpIn,
-					Values:   []string{"gardener"},
-				},
+	if scope == lakom.KubeSystemManagedByGardener {
+		return metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      resourcesv1alpha1.ManagedBy,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"gardener"},
 			},
-		}
-	case lakom.KubeSystem:
-	case lakom.Cluster:
+		}}
 	}
 
-	return objectSelector
+	return metav1.LabelSelector{}
 }
 
 func scopeToNamespaceSelector(scope lakom.ScopeType) metav1.LabelSelector {
-	namespaceSelector := metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key:      corev1.LabelMetadataName,
-				Operator: metav1.LabelSelectorOpIn,
-				Values:   []string{metav1.NamespaceSystem},
+	if scope == lakom.Cluster {
+		return metav1.LabelSelector{}
+	}
+
+	return metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+		{
+			Key:      corev1.LabelMetadataName,
+			Operator: metav1.LabelSelectorOpIn,
+			Values: []string{
+				metav1.NamespaceSystem,
+				"kubernetes-dashboard", // TODO(vpnachev): Remove after support for shoots using kubernetes version <v1.35.0 is dropped, i.e. the support for the kubernetes dashboard addon is removed.
 			},
 		},
-	}
-
-	switch scope {
-	case lakom.KubeSystemManagedByGardener:
-	case lakom.KubeSystem:
-	case lakom.Cluster:
-		namespaceSelector = metav1.LabelSelector{}
-	}
-
-	return namespaceSelector
+	}}
 }
 
 func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName string, scope lakom.ScopeType) (map[string][]byte, error) {
