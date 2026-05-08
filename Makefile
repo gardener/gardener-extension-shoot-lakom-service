@@ -40,7 +40,7 @@ export SHOOT_ADMISSION_LD_FLAGS := -w $(shell bash $(GARDENER_HACK_DIR)/get-buil
 .PHONY: start
 start:
 	@LEADER_ELECTION_NAMESPACE=$(LEADER_ELECTION_NAMESPACE) go run \
-		-ldflags $(EXTENSION_LD_FLAGS) \
+		-ldflags "$(EXTENSION_LD_FLAGS)" \
 		./cmd/$(EXTENSION_FULL_NAME) \
 		--ignore-operation-annotation=$(IGNORE_OPERATION_ANNOTATION) \
 		--leader-election=$(LEADER_ELECTION) \
@@ -50,7 +50,7 @@ start:
 .PHONY: start-lakom
 start-lakom:
 	@go run \
-		-ldflags $(ADMISSION_LD_FLAGS) \
+		-ldflags "$(ADMISSION_LD_FLAGS)" \
 		./cmd/$(ADMISSION_NAME) \
 		--kubeconfig=$(KUBECONFIG) \
 		--tls-cert-dir=example/lakom/tls/ \
