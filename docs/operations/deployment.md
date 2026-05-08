@@ -20,6 +20,18 @@ spec:
       globallyEnabled: true
 ```
 
+Via the ControllerDeployment helm values (field path `.helm.values`), the extension controller behaviour can be additionally configured.
+Most of the configuration options are listed in the sample chart [values](../../charts/gardener-extension-shoot-lakom-service/values.yaml) file.
+Those affecting the lakom admission controller behaviour in the shoot cluster are:
+
+| Values Field Path | Description | Default Value |
+| ---------- | ----------- | ------------- |
+| `.controllers.cosignPublicKeys` | The public cosign keys used to verify the OCI image signatures | `{}` |
+| `.controllers.useOnlyImagePullSecrets` | Configures lakom admission controller to use only the explicitly configured image pull secrets, otherwise also the node identity and docker config file are used | `true` |
+| `.controllers.allowUntrustedImages` | Configures lakom admission controllers whether to deny resources using images with untrusted signatures or just to warn about them | `false` |
+| `.controllers.allowInsecureRegistries` | Configures lakom admission controllers whether to all communication over `HTTP` with OCI registries, otherwise only `HTTPS` is used | `false` |
+| `.controllers.defaultAdmissionScope` | Can be used to overwrite the default Lakom scope of `KubeSystemManagedByGardener` for all shoots | `<unset>` |
+
 ### Shoot Feature Gate
 
 If the shoot Lakom service is not globally enabled by default (depends on the extension registration on the garden cluster), it can be enabled per shoot. To enable the service for a shoot, the shoot manifest must explicitly add the `shoot-lakom-service` extension.
