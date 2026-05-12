@@ -59,6 +59,7 @@ controllers:
   debugConfig:
     enableProfiling: false
     enableContentionProfiling: false
+  #defaultAdmissionScope: KubeSystemManagedByGardener
 
 # gardener values are set by gardenlet when the controllerinstallation is deployed.
 gardener:

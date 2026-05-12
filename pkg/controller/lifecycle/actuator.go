@@ -80,6 +80,14 @@ type actuator struct {
 	serviceConfig config.Configuration
 }
 
+func getScope(defaultScope lakom.ScopeType) *lakom.ScopeType {
+	if defaultScope != "" {
+		return ptr.To(defaultScope)
+	}
+
+	return ptr.To(lakom.KubeSystemManagedByGardener)
+}
+
 func getLakomReplicas(hibernated bool) *int32 {
 	// Scale to 0 if cluster is hibernated
 	if hibernated {
@@ -110,14 +118,14 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	lakomProviderConfig := &lakom.LakomConfig{}
 	if ex.Spec.ProviderConfig != nil {
 		if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
-			// Apply default values if provider config has not been provided
-			logger.Error(err, "Could not decode provider config. Using default value `KubeSystemManagedByGardener` for scope")
+			return fmt.Errorf("could not decode provider config, err: %w", err)
 		}
 	}
+
 	if lakomProviderConfig.Scope == nil {
-		logger.Info("No scope specified. Using default value `KubeSystemManagedByGardener` for scope")
-		lakomProviderConfig.Scope = ptr.To(lakom.KubeSystemManagedByGardener)
+		lakomProviderConfig.Scope = getScope(a.serviceConfig.DefaultAdmissionScope)
 	}
+	logger.Info("Extension is configured with admission scope", "scope", *lakomProviderConfig.Scope)
 
 	// initialize SecretsManager based on Cluster object
 	configs := secrets.ConfigsFor(namespace)

@@ -61,7 +61,10 @@ func NewServiceControllerCommand() *cobra.Command {
 			})
 
 			if err := options.heartbeatOptions.Validate(); err != nil {
-				return err
+				return fmt.Errorf("heartBeat option validation failed: %w", err)
+			}
+			if err := options.lakomOptions.Validate(); err != nil {
+				return fmt.Errorf("lakom option validation failed: %w", err)
 			}
 			cmd.SilenceUsage = true
 			return options.run(cmd.Context())

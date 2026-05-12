@@ -26,3 +26,6 @@ data:
     debugConfig:
       enableProfiling: {{ .Values.controllers.debugConfig.enableProfiling | default false }}
       enableContentionProfiling: {{ .Values.controllers.debugConfig.enableContentionProfiling | default false }}
+    {{- if .Values.controllers.defaultAdmissionScope }}
+    defaultAdmissionScope: {{ .Values.controllers.defaultAdmissionScope }}
+    {{- end }}

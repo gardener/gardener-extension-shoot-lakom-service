@@ -6,10 +6,12 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	apisconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	configv1alpha1 "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config/v1alpha1"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	healthcheckcontroller "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
@@ -104,4 +106,14 @@ func ControllerSwitches() *cmd.SwitchOptions {
 		cmd.Switch(extensionshealthcheckcontroller.ControllerName, healthcheckcontroller.AddToManager),
 		cmd.Switch(extensionsheartbeatcontroller.ControllerName, extensionsheartbeatcontroller.AddToManager),
 	)
+}
+
+// Validate validates the options.
+func (o *LakomServiceOptions) Validate() error {
+	if scope := o.config.config.DefaultAdmissionScope; scope != "" {
+		if !lakom.AllowedScopes.Has(scope) {
+			return fmt.Errorf("unsupported defaultAdmissionScope: %s, supported scopes: %v", scope, lakom.AllowedScopes.UnsortedList())
+		}
+	}
+	return nil
 }

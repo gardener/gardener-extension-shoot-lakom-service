@@ -5,6 +5,8 @@
 package config
 
 import (
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+
 	extensionsconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +35,9 @@ type Configuration struct {
 	// AllowInsecureRegistries sets the lakom webhook to allow HTTP communication with OCI registries.
 	// It first tries HTTPS and then falls back to HTTP.
 	AllowInsecureRegistries bool
+	// DefaultAdmissionScope is configuration exposing the option to overwrite the default scope
+	// for the lakom admission controller managed by the extension controller.
+	DefaultAdmissionScope lakom.ScopeType
 }
 
 // DebugConfig contains debug configurations for the controller.

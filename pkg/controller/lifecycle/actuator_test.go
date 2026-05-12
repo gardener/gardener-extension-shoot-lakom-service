@@ -54,6 +54,15 @@ var _ = Describe("Actuator", func() {
 		Expect(appPartOf).To(Equal("shoot-lakom-service"))
 	})
 
+	DescribeTable("Should get the expected scope", func(configurableScope lakom.ScopeType, expected string) {
+		Expect(getScope(lakom.ScopeType(configurableScope))).To(BeEquivalentTo(&expected))
+	},
+		Entry("Global default scope: KubeSystemManagedByGardener", lakom.ScopeType(""), "KubeSystemManagedByGardener"),
+		Entry("Overwrite scope: Cluster", lakom.Cluster, "Cluster"),
+		Entry("Overwrite scope: KubeSystem", lakom.KubeSystem, "KubeSystem"),
+		Entry("Overwrite scope: KubeSystemManagedByGardener", lakom.KubeSystemManagedByGardener, "KubeSystemManagedByGardener"),
+	)
+
 	Context("getShootResources", func() {
 		const (
 			shootNamespace                  = "garden-foo"
