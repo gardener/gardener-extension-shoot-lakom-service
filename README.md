@@ -1,4 +1,4 @@
-# [Gardener Extension for lakom services](https://gardener.cloud)
+# Gardener Extension for lakom services
 
 [![Build](https://github.com/gardener/gardener-extension-shoot-lakom-service/actions/workflows/non-release.yaml/badge.svg)](https://github.com/gardener/gardener-extension-shoot-lakom-service/actions/workflows/non-release.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gardener/gardener-extension-shoot-lakom-service)](https://goreportcard.com/report/github.com/gardener/gardener-extension-shoot-lakom-service)
