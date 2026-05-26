@@ -80,7 +80,7 @@ var _ = Describe("Actuator", func() {
 		}
 	},
 		Entry("One ClusterRoleBinding only when scope is Cluster (dashboard disabled)", lakom.Cluster, false, true, 1),
-		Entry("One ClusterRoleBinding only when scope is Cluster (dashboard enabled)", lakom.Cluster, false, true, 1),
+		Entry("One ClusterRoleBinding only when scope is Cluster (dashboard enabled)", lakom.Cluster, true, true, 1),
 		Entry("One RoleBinding when scope is KubeSystem (dashboard disabled)", lakom.KubeSystem, false, false, 1),
 		Entry("Two RoleBindings when scope is KubeSystem (dashboard enabled)", lakom.KubeSystem, true, false, 2),
 		Entry("One RoleBinding when scope is KubeSystemManagedByGardener (dashboard disabled)", lakom.KubeSystemManagedByGardener, false, false, 1),
