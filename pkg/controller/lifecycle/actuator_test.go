@@ -21,6 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -63,11 +64,35 @@ var _ = Describe("Actuator", func() {
 		Entry("Overwrite scope: KubeSystemManagedByGardener", lakom.KubeSystemManagedByGardener, "KubeSystemManagedByGardener"),
 	)
 
+	DescribeTable("Should get correct (cluster)rolebindings", func(scope lakom.ScopeType, dashboardEnabled bool, expectCRB bool, expectedBindingsCount int) {
+		bindings := getRoleBindings(scope, "sa-name", dashboardEnabled)
+		Expect(bindings).To(HaveLen(expectedBindingsCount))
+		if expectCRB {
+			Expect(bindings[0]).To(BeAssignableToTypeOf(&rbacv1.ClusterRoleBinding{}))
+		} else {
+			Expect(bindings[0]).To(BeAssignableToTypeOf(&rbacv1.RoleBinding{}))
+			Expect(bindings[0].GetNamespace()).To(Equal("kube-system"))
+
+			if expectedBindingsCount == 2 {
+				Expect(bindings[1]).To(BeAssignableToTypeOf(&rbacv1.RoleBinding{}))
+				Expect(bindings[1].GetNamespace()).To(Equal("kubernetes-dashboard"))
+			}
+		}
+	},
+		Entry("One ClusterRoleBinding only when scope is Cluster (dashboard disabled)", lakom.Cluster, false, true, 1),
+		Entry("One ClusterRoleBinding only when scope is Cluster (dashboard enabled)", lakom.Cluster, true, true, 1),
+		Entry("One RoleBinding when scope is KubeSystem (dashboard disabled)", lakom.KubeSystem, false, false, 1),
+		Entry("Two RoleBindings when scope is KubeSystem (dashboard enabled)", lakom.KubeSystem, true, false, 2),
+		Entry("One RoleBinding when scope is KubeSystemManagedByGardener (dashboard disabled)", lakom.KubeSystemManagedByGardener, false, false, 1),
+		Entry("Two RoleBindings when scope is KubeSystemManagedByGardener (dashboard enabled)", lakom.KubeSystemManagedByGardener, true, false, 2),
+	)
+
 	Context("getShootResources", func() {
 		const (
 			shootNamespace                  = "garden-foo"
 			extensionNamespace              = "shoot--foo--bar"
 			scope                           = lakom.KubeSystemManagedByGardener
+			dashboardEnabled                = false
 			shootAccessServiceAccountName   = "extension-shoot-lakom-service-access"
 			managedByGardenerObjectSelector = `
     matchExpressions:
@@ -82,6 +107,13 @@ var _ = Describe("Actuator", func() {
       operator: In
       values:
       - kube-system`
+			kubeSystemAndDashboardNamespaceSelector = `
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: In
+      values:
+      - kube-system
+      - kubernetes-dashboard`
 			emptyNamespaceSelector = ` {}`
 		)
 		var (
@@ -90,7 +122,7 @@ var _ = Describe("Actuator", func() {
 
 		It("Should ensure the correct shoot resources are created", func() {
 
-			resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope)
+			resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope, false)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 			Expect(err).ToNot(HaveOccurred())
@@ -99,13 +131,27 @@ var _ = Describe("Actuator", func() {
 				expectedSeedValidatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
 				expectedShootMutatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemNamespaceSelector),
 				expectedShootClusterRole(),
-				expectedShootRoleBinding(shootAccessServiceAccountName, scope),
+				expectedShootRoleBinding(shootAccessServiceAccountName, scope, "kube-system"),
+			))
+
+			By("Enable kubernetes dashboard addon")
+			resources, err = getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope, true)
+			Expect(err).ToNot(HaveOccurred())
+			manifests, err = test.ExtractManifestsFromManagedResourceData(resources)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(manifests).To(ConsistOf(
+				expectedSeedValidatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemAndDashboardNamespaceSelector),
+				expectedShootMutatingWebhook(caBundle, extensionNamespace, managedByGardenerObjectSelector, kubeSystemAndDashboardNamespaceSelector),
+				expectedShootClusterRole(),
+				expectedShootRoleBinding(shootAccessServiceAccountName, scope, "kube-system"),
+				expectedShootRoleBinding(shootAccessServiceAccountName, scope, "kubernetes-dashboard"),
 			))
 		})
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope)
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -118,7 +164,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope)
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -129,9 +175,9 @@ var _ = Describe("Actuator", func() {
 			Entry("Custom CA bundle and namespace name", []byte("anotherCABundle"), "different-namespace"),
 		)
 
-		DescribeTable("Should return an empty object selector for the webhooks when shoot is in the garden namespace",
+		DescribeTable("Should return an empty object selector for the webhooks when scope is KubeSystem",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, v1beta1constants.GardenNamespace)
+				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, lakom.KubeSystem, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -146,22 +192,22 @@ var _ = Describe("Actuator", func() {
 		)
 
 		DescribeTable("Should ensure the rolebinding is correctly set",
-			func(saName string, lakomScope lakom.ScopeType) {
-				resources, err := getShootResources(caBundle, extensionNamespace, saName, lakomScope)
+			func(saName string, lakomScope lakom.ScopeType, bindingNamespace string) {
+				resources, err := getShootResources(caBundle, extensionNamespace, saName, lakomScope, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(manifests).To(ContainElement(expectedShootRoleBinding(saName, lakomScope)))
+				Expect(manifests).To(ContainElement(expectedShootRoleBinding(saName, lakomScope, bindingNamespace)))
 			},
-			Entry("ServiceAccount name: test, scope: KubeSystemManagedByGardener", "test", lakom.KubeSystemManagedByGardener),
-			Entry("ServiceAccount name: foo-bar, scope: KubeSystem", "foo-bar", lakom.KubeSystem),
-			Entry("ServiceAccount name: foo-bar, scope: Cluster", "foo-bar", lakom.Cluster),
+			Entry("ServiceAccount name: test, scope: KubeSystemManagedByGardener", "test", lakom.KubeSystemManagedByGardener, "kube-system"),
+			Entry("ServiceAccount name: foo-bar, scope: KubeSystem", "foo-bar", lakom.KubeSystem, "kube-system"),
+			Entry("ServiceAccount name: foo-bar, scope: Cluster", "foo-bar", lakom.Cluster, ""),
 		)
 
 		DescribeTable("Should return the correct object and namespace selectors based on scope",
 			func(scope lakom.ScopeType, objectSelector, namespaceSelector string) {
-				resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope)
+				resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -478,7 +524,7 @@ rules:
 `
 }
 
-func expectedShootRoleBinding(saName string, lakomScope lakom.ScopeType) string {
+func expectedShootRoleBinding(saName string, lakomScope lakom.ScopeType, namespace string) string {
 	if lakomScope == lakom.Cluster {
 		return `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -509,7 +555,7 @@ metadata:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
   name: gardener-extension-shoot-lakom-service-resource-reader
-  namespace: kube-system
+  namespace: ` + namespace + `
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

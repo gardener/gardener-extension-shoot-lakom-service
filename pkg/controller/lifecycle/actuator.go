@@ -61,6 +61,8 @@ import (
 const (
 	// ActuatorName is the name of the Lakom Service actuator.
 	ActuatorName = constants.ExtensionType + "-actuator"
+
+	kubernetesDashboardNamespaceName = "kubernetes-dashboard"
 )
 
 // NewActuator returns an actuator responsible for Extension resources.
@@ -198,6 +200,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		namespace,
 		lakomShootAccessSecret.ServiceAccountName,
 		*lakomProviderConfig.Scope,
+		v1beta1helper.KubernetesDashboardEnabled(cluster.Shoot.Spec.Addons), //nolint:staticcheck
 	)
 
 	if err != nil {
@@ -613,47 +616,41 @@ func getSeedResources(
 }
 
 func scopeToObjectSelector(scope lakom.ScopeType) metav1.LabelSelector {
-	var objectSelector = metav1.LabelSelector{}
-	switch scope {
-	case lakom.KubeSystemManagedByGardener:
-		objectSelector = metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key:      resourcesv1alpha1.ManagedBy,
-					Operator: metav1.LabelSelectorOpIn,
-					Values:   []string{"gardener"},
-				},
-			},
-		}
-	case lakom.KubeSystem:
-	case lakom.Cluster:
-	}
-
-	return objectSelector
-}
-
-func scopeToNamespaceSelector(scope lakom.ScopeType) metav1.LabelSelector {
-	namespaceSelector := metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
+	if scope == lakom.KubeSystemManagedByGardener {
+		return metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
-				Key:      corev1.LabelMetadataName,
+				Key:      resourcesv1alpha1.ManagedBy,
 				Operator: metav1.LabelSelectorOpIn,
-				Values:   []string{metav1.NamespaceSystem},
+				Values:   []string{"gardener"},
 			},
-		},
+		}}
 	}
 
-	switch scope {
-	case lakom.KubeSystemManagedByGardener:
-	case lakom.KubeSystem:
-	case lakom.Cluster:
-		namespaceSelector = metav1.LabelSelector{}
-	}
-
-	return namespaceSelector
+	return metav1.LabelSelector{}
 }
 
-func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName string, scope lakom.ScopeType) (map[string][]byte, error) {
+func scopeToNamespaceSelector(scope lakom.ScopeType, dashboardEnabled bool) metav1.LabelSelector {
+	if scope == lakom.Cluster {
+		return metav1.LabelSelector{}
+	}
+
+	namespaces := []string{metav1.NamespaceSystem}
+	if dashboardEnabled {
+		// TODO(vpnachev): Remove after support for shoots using kubernetes version <v1.35.0 is dropped,
+		// i.e. the support for the kubernetes dashboard addon is removed.
+		namespaces = append(namespaces, kubernetesDashboardNamespaceName)
+	}
+
+	return metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+		{
+			Key:      corev1.LabelMetadataName,
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   namespaces,
+		},
+	}}
+}
+
+func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName string, scope lakom.ScopeType, dashboardEnabled bool) (map[string][]byte, error) {
 	var (
 		matchPolicy          = admissionregistrationv1.Equivalent
 		sideEffectClass      = admissionregistrationv1.SideEffectClassNone
@@ -662,7 +659,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, extensionNamespace)
 		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
 		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
-		namespaceSelector    = scopeToNamespaceSelector(scope)
+		namespaceSelector    = scopeToNamespaceSelector(scope, dashboardEnabled)
 		objectSelector       = scopeToObjectSelector(scope)
 		rules                = []admissionregistrationv1.RuleWithOperations{{
 			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
@@ -675,7 +672,8 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 	)
 
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
-	shootResources, err := shootRegistry.AddAllAndSerialize(
+	shootResources, err := shootRegistry.AddAllAndSerialize(append(
+		getRoleBindings(scope, shootAccessServiceAccountName, dashboardEnabled),
 		&admissionregistrationv1.MutatingWebhookConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   constants.WebhookConfigurationName,
@@ -731,8 +729,7 @@ func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessSe
 				},
 			},
 		},
-		getRoleBinding(scope, shootAccessServiceAccountName),
-	)
+	)...)
 
 	if err != nil {
 		return nil, err
@@ -769,7 +766,7 @@ func getClientKeys(ctx context.Context, client client.Client, resources []garden
 	return clientKeys, nil
 }
 
-func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string) client.Object {
+func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string, dashboardEnabled bool) []client.Object {
 	roleRef := rbacv1.RoleRef{
 		APIGroup: "rbac.authorization.k8s.io",
 		Kind:     "ClusterRole",
@@ -787,7 +784,7 @@ func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string)
 	}
 
 	if scope == lakom.Cluster {
-		return &rbacv1.ClusterRoleBinding{
+		return []client.Object{&rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        constants.LakomResourceReader,
 				Labels:      getLabels(),
@@ -795,10 +792,10 @@ func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string)
 			},
 			RoleRef:  roleRef,
 			Subjects: subjects,
-		}
+		}}
 	}
 
-	return &rbacv1.RoleBinding{
+	roleBindings := []client.Object{&rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        constants.LakomResourceReader,
 			Namespace:   metav1.NamespaceSystem,
@@ -807,5 +804,20 @@ func getRoleBinding(scope lakom.ScopeType, shootAccessServiceAccountName string)
 		},
 		RoleRef:  roleRef,
 		Subjects: subjects,
+	}}
+
+	if dashboardEnabled {
+		roleBindings = append(roleBindings, &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        constants.LakomResourceReader,
+				Namespace:   kubernetesDashboardNamespaceName,
+				Labels:      getLabels(),
+				Annotations: annotations,
+			},
+			RoleRef:  roleRef,
+			Subjects: subjects,
+		})
 	}
+
+	return roleBindings
 }
