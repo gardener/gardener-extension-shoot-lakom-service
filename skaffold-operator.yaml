@@ -102,7 +102,7 @@ build:
       requires:
         - image: local-skaffold/gardener-extension-shoot-lakom-admission
           alias: IMG
-    - image: local-skaffold/gardener-extension-auditing/charts/extension
+    - image: local-skaffold/gardener-extension-shoot-lakom-service/charts/extension
       custom:
         buildCommand: |
           bash "$GARDENER_HACK_DIR/push-helm.sh" ./charts/gardener-extension-shoot-lakom-service .image.ref
