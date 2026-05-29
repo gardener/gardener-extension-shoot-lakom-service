@@ -18,8 +18,9 @@ updates:
   - dependency-name: "github.com/google/go-containerregistry"
   - dependency-name: "github.com/google/go-containerregistry/pkg/authn/k8schain"
   - dependency-name: "github.com/google/go-containerregistry/pkg/authn/kubernetes"
-  - dependency-name: "github.com/sigstore/cosign/v3"
-  - dependency-name: "github.com/sigstore/sigstore"
+  - dependency-name: "github.com/sigstore/.*"
+  - dependency-name: "golang.org/x/.*"
+  - dependency-name: "github.com/onsi/.*"
   groups:
     gardener:
       patterns:
