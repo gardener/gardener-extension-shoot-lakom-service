@@ -844,7 +844,7 @@ spec:
     kind: Deployment
     name: extension-shoot-lakom-service
   updatePolicy:
-    updateMode: Recreate
+    updateMode: InPlaceOrRecreate
 status: {}
 `
 }
