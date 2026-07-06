@@ -21,9 +21,12 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/controller/extension"
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
 	v1beta1helper "github.com/gardener/gardener/pkg/api/core/v1beta1/helper"
+	extensionsv1alpha1helper "github.com/gardener/gardener/pkg/api/extensions/v1alpha1/helper"
+	operatorv1alpha1helper "github.com/gardener/gardener/pkg/api/operator/v1alpha1/helper"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
+	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
 	kubeapiserverconstants "github.com/gardener/gardener/pkg/component/kubernetes/apiserver/constants"
@@ -35,6 +38,7 @@ import (
 	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
 	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
+	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -49,6 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	vpaautoscalingv1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/version"
 	"k8s.io/utils/clock"
@@ -63,6 +68,9 @@ const (
 	ActuatorName = constants.ExtensionType + "-actuator"
 
 	kubernetesDashboardNamespaceName = "kubernetes-dashboard"
+
+	// virtualGardenPrefix is the prefix for virtual garden deployments
+	virtualGardenPrefix = "virtual-garden-"
 )
 
 // NewActuator returns an actuator responsible for Extension resources.
@@ -99,16 +107,34 @@ func getLakomReplicas(hibernated bool) *int32 {
 	return ptr.To[int32](3)
 }
 
-// Reconcile the Extension resource.
+// Reconcile the Extension resource
 func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
-	namespace := ex.GetNamespace()
+	var (
+		clusterCtx *clusterContext
+		err        error
+	)
 
-	cluster, err := controller.GetCluster(ctx, a.client, namespace)
-	if err != nil {
-		return err
+	extensionClass := extensionsv1alpha1helper.GetExtensionClassOrDefault(ex.Spec.GetExtensionClass())
+	switch extensionClass {
+	case extensionsv1alpha1.ExtensionClassShoot:
+		clusterCtx, err = a.buildShootClusterContext(ctx, logger, ex)
+		if err != nil {
+			return err
+		}
+		return a.reconcileShoot(ctx, logger, ex, clusterCtx)
+	case extensionsv1alpha1.ExtensionClassGarden:
+		clusterCtx, err = a.buildGardenClusterContext(ctx, logger, ex)
+		if err != nil {
+			return err
+		}
+		return a.reconcileGarden(ctx, logger, ex, clusterCtx)
+	default:
+		return fmt.Errorf("unsupported extension class: %s", extensionClass)
 	}
+}
 
-	lakomShootAccessSecret := gardenerutils.NewShootAccessSecret(gardenerutils.SecretNamePrefixShootAccess+constants.ApplicationName, namespace)
+func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension, clusterCtx *clusterContext) error {
+	lakomShootAccessSecret := gardenerutils.NewShootAccessSecret(gardenerutils.SecretNamePrefixShootAccess+constants.ApplicationName, clusterCtx.namespace)
 	lakomShootAccessSecret.Secret.SetLabels(utils.MergeStringMaps(
 		getLabels(),
 		lakomShootAccessSecret.Secret.GetLabels(),
@@ -116,7 +142,6 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	if err := lakomShootAccessSecret.Reconcile(ctx, a.client); err != nil {
 		return err
 	}
-
 	lakomProviderConfig := &lakom.LakomConfig{}
 	if ex.Spec.ProviderConfig != nil {
 		if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
@@ -129,26 +154,15 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	}
 	logger.Info("Extension is configured with admission scope", "scope", *lakomProviderConfig.Scope)
 
-	// initialize SecretsManager based on Cluster object
-	configs := secrets.ConfigsFor(namespace)
-
-	secretsManager, err := extensionssecretsmanager.SecretsManagerForCluster(ctx, logger.WithName("secretsmanager"), clock.RealClock{}, a.client, cluster, secrets.ManagerIdentity, configs)
+	configs := secrets.ConfigsFor(clusterCtx.namespace)
+	generatedSecrets, err := extensionssecretsmanager.GenerateAllSecrets(ctx, clusterCtx.secretsManager, configs)
 	if err != nil {
 		return err
 	}
 
-	generatedSecrets, err := extensionssecretsmanager.GenerateAllSecrets(ctx, secretsManager, configs)
-	if err != nil {
-		return err
-	}
-
-	caBundleSecret, found := secretsManager.Get(secrets.CAName)
+	caBundleSecret, found := clusterCtx.secretsManager.Get(secrets.CAName)
 	if !found {
 		return fmt.Errorf("secret %q not found", secrets.CAName)
-	}
-
-	if cluster.Seed == nil || cluster.Seed.Status.KubernetesVersion == nil || len(*cluster.Seed.Status.KubernetesVersion) == 0 {
-		return fmt.Errorf("missing or empty `cluster.seed.status.kubernetesVersion`")
 	}
 
 	image, err := imagevector.ImageVector().FindImage(constants.ImageName)
@@ -168,7 +182,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	var clientPublicKeys []byte
 	if lakomProviderConfig.TrustedKeysResourceName != nil {
 		var err error
-		clientPublicKeys, err = getClientKeys(ctx, a.client, cluster.Shoot.Spec.Resources, *lakomProviderConfig.TrustedKeysResourceName, namespace)
+		clientPublicKeys, err = getClientKeys(ctx, a.client, clusterCtx.shootResources, *lakomProviderConfig.TrustedKeysResourceName, clusterCtx.namespace)
 		if err != nil {
 			return fmt.Errorf("failed to get the additional keys: %w", err)
 		}
@@ -178,9 +192,9 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	lakomPublicKeys = append(lakomPublicKeys, clientPublicKeys...)
 
 	seedResources, err := getSeedResources(
-		getLakomReplicas(controller.IsHibernationEnabled(cluster)),
-		namespace,
-		extensions.GenericTokenKubeconfigSecretNameFromCluster(cluster),
+		getLakomReplicas(clusterCtx.hibernated),
+		clusterCtx.namespace,
+		clusterCtx.genericTokenKubeconfigName,
 		lakomShootAccessSecret.Secret.Name,
 		generatedSecrets[constants.WebhookTLSSecretName].Name,
 		string(lakomPublicKeys),
@@ -188,8 +202,8 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
 		a.serviceConfig.AllowInsecureRegistries,
-		v1beta1helper.IsTopologyAwareRoutingForShootControlPlaneEnabled(cluster.Seed, cluster.Shoot),
-		*cluster.Seed.Status.KubernetesVersion,
+		clusterCtx.topologyAwareRoutingEnabled,
+		clusterCtx.kubernetesVersion,
 	)
 	if err != nil {
 		return err
@@ -197,32 +211,38 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 
 	shootResources, err := getShootResources(
 		caBundleSecret.Data[secretsutils.DataKeyCertificateBundle],
-		namespace,
+		clusterCtx.namespace,
 		lakomShootAccessSecret.ServiceAccountName,
 		*lakomProviderConfig.Scope,
-		v1beta1helper.KubernetesDashboardEnabled(cluster.Shoot.Spec.Addons), //nolint:staticcheck
+		clusterCtx.dashboardEnabled,
 	)
 
 	if err != nil {
 		return err
 	}
 
-	if err := managedresources.CreateForSeed(ctx, a.client, namespace, constants.ManagedResourceNamesSeed, false, seedResources); err != nil {
+	if err := managedresources.CreateForSeed(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesSeed, false, seedResources); err != nil {
 		return err
 	}
 
-	if err := managedresources.CreateForShoot(ctx, a.client, namespace, constants.ManagedResourceNamesShoot, constants.GardenerExtensionName, false, shootResources); err != nil {
+	if err := managedresources.CreateForShoot(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesShoot, constants.GardenerExtensionName, false, shootResources); err != nil {
 		return err
 	}
 
 	twoMinutes := 2 * time.Minute
 	timeoutSeedCtx, cancelSeedCtx := context.WithTimeout(ctx, twoMinutes)
 	defer cancelSeedCtx()
-	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, a.client, namespace, constants.ManagedResourceNamesSeed); err != nil {
+	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesSeed); err != nil {
 		return err
 	}
 
-	return secretsManager.Cleanup(ctx)
+	return clusterCtx.secretsManager.Cleanup(ctx)
+
+}
+
+func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension, clusterCtx *clusterContext) error {
+	return nil
+
 }
 
 // Delete the Extension resource.
@@ -820,4 +840,123 @@ func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string
 	}
 
 	return roleBindings
+}
+
+// clusterContext contains cluster-specific settings extracted based on the extension class (shoot or garden).
+type clusterContext struct {
+	namespace                   string
+	genericTokenKubeconfigName  string
+	secretsManager              secretsmanager.Interface
+	kubernetesVersion           string
+	topologyAwareRoutingEnabled bool
+	hibernated                  bool
+	dashboardEnabled            bool
+	shootResources              []gardencorev1beta1.NamedResourceReference
+}
+
+// buildShootClusterContext extracts cluster info for extensions with shoot extension class
+func (a *actuator) buildShootClusterContext(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) (*clusterContext, error) {
+	namespace := ex.GetNamespace()
+
+	cluster, err := controller.GetCluster(ctx, a.client, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	if cluster.Seed == nil || cluster.Seed.Status.KubernetesVersion == nil || len(*cluster.Seed.Status.KubernetesVersion) == 0 {
+		return nil, fmt.Errorf("missing or empty `cluster.seed.status.kubernetesVersion`")
+	}
+
+	configs := secrets.ConfigsFor(namespace)
+	secretsManager, err := extensionssecretsmanager.SecretsManagerForCluster(
+		ctx,
+		log.WithName("secretsmanager"),
+		clock.RealClock{},
+		a.client,
+		cluster,
+		secrets.ManagerIdentity,
+		configs,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &clusterContext{
+		namespace:                   namespace,
+		genericTokenKubeconfigName:  extensions.GenericTokenKubeconfigSecretNameFromCluster(cluster),
+		secretsManager:              secretsManager,
+		kubernetesVersion:           *cluster.Seed.Status.KubernetesVersion,
+		topologyAwareRoutingEnabled: v1beta1helper.IsTopologyAwareRoutingForShootControlPlaneEnabled(cluster.Seed, cluster.Shoot),
+		hibernated:                  controller.IsHibernationEnabled(cluster),
+		dashboardEnabled:            v1beta1helper.KubernetesDashboardEnabled(cluster.Shoot.Spec.Addons), //nolint:staticcheck
+		shootResources:              cluster.Shoot.Spec.Resources,
+	}, nil
+}
+
+// buildGardenClusterContext extracts cluster info for extensions with garden extension class
+func (a *actuator) buildGardenClusterContext(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) (*clusterContext, error) {
+	namespace := ex.GetNamespace()
+
+	garden, err := a.getGarden(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get garden: %w", err)
+	}
+
+	genericTokenKubeconfigName, ok := garden.Annotations[v1beta1constants.AnnotationKeyGenericTokenKubeconfigSecretName]
+	if !ok || genericTokenKubeconfigName == "" {
+		return nil, fmt.Errorf("no generic token kubeconfig secret found in garden object annotations")
+	}
+
+	configs := secrets.ConfigsFor(namespace)
+	secretsManager, err := extensionssecretsmanager.SecretsManagerForGarden(
+		ctx,
+		log.WithName("secretsmanager"),
+		clock.RealClock{},
+		a.client,
+		garden,
+		secrets.ManagerIdentityRuntime,
+		configs,
+		namespace,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(a.config)
+	if err != nil {
+		return nil, fmt.Errorf("could not create discovery client: %w", err)
+	}
+	versionInfo, err := discoveryClient.ServerVersion()
+	if err != nil {
+		return nil, fmt.Errorf("could not get runtime cluster server version: %w", err)
+	}
+
+	if _, err := semver.NewVersion(versionInfo.GitVersion); err != nil {
+		return nil, fmt.Errorf("failed to parse runtime cluster Kubernetes version %q: %w", versionInfo.GitVersion, err)
+	}
+
+	return &clusterContext{
+		namespace:                   namespace,
+		genericTokenKubeconfigName:  genericTokenKubeconfigName,
+		secretsManager:              secretsManager,
+		kubernetesVersion:           versionInfo.GitVersion,
+		topologyAwareRoutingEnabled: operatorv1alpha1helper.TopologyAwareRoutingEnabled(garden.Spec.RuntimeCluster.Settings),
+	}, nil
+}
+
+func (a *actuator) getGarden(ctx context.Context) (*operatorv1alpha1.Garden, error) {
+	gardenList := &operatorv1alpha1.GardenList{}
+	if err := a.client.List(ctx, gardenList); err != nil {
+		return nil, err
+	}
+
+	if len(gardenList.Items) == 0 {
+		return nil, fmt.Errorf("no garden object found")
+	}
+
+	if len(gardenList.Items) > 1 {
+		return nil, fmt.Errorf("found more than one garden object")
+	}
+
+	return &gardenList.Items[0], nil
 }
