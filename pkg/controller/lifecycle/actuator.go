@@ -602,7 +602,7 @@ func getSeedResources(
 				Selector: metav1.LabelSelector{MatchLabels: getLabels()},
 				Endpoints: []monitoringv1.Endpoint{{
 					Port:                 "metrics",
-					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
+					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom_.*", "controller_runtime_webhook_.*"),
 				}},
 			},
 		},

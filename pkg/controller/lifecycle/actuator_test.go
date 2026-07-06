@@ -579,7 +579,7 @@ spec:
   endpoints:
   - metricRelabelings:
     - action: keep
-      regex: ^(lakom.*)$
+      regex: ^(lakom_.*|controller_runtime_webhook_.*)$
       sourceLabels:
       - __name__
     port: metrics
