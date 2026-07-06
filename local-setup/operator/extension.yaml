@@ -23,3 +23,7 @@ spec:
   resources:
   - kind: Extension
     type: shoot-lakom-service
+    clusterCompatibility:
+      - garden
+    # autoEnable:
+    # - garden
