@@ -15,10 +15,18 @@ const (
 	ExtensionServiceName = "extension-" + ExtensionType
 	// GardenerExtensionName is the extension name.
 	GardenerExtensionName = "gardener-extension-" + ExtensionType
+	// VirtualGardenExtensionServiceName is the name of the Lakom service for the virtual garden deployment.
+	VirtualGardenExtensionServiceName = ExtensionServiceName + "-virtual-garden"
 	// ManagedResourceNamesSeed is the name used to describe the managed seed resources.
 	ManagedResourceNamesSeed = ExtensionServiceName + "-seed"
 	// ManagedResourceNamesShoot is the name used to describe the managed shoot resources.
 	ManagedResourceNamesShoot = ExtensionServiceName + "-shoot"
+	// ManagedResourceNamesGardenRuntime is the name used to describe the managed resources deployed on the runtime cluster for the garden extension class.
+	ManagedResourceNamesGardenRuntime = ExtensionServiceName + "-garden-runtime"
+	// ManagedResourceNamesGardenVirtual is the name used to describe the managed resources deployed on the virtual garden cluster for the garden extension class.
+	ManagedResourceNamesGardenVirtual = ExtensionServiceName + "-garden-virtual"
+	// VirtualGardenWebhookTLSSecretName is the name of the TLS secret resource used by the virtual garden lakom webhook.
+	VirtualGardenWebhookTLSSecretName = VirtualGardenExtensionServiceName + "-tls"
 	// WebhookConfigurationName is the name of the webhook configuration(s) deployed in the shoot cluster.
 	WebhookConfigurationName = GardenerExtensionName + "-shoot"
 	// WebhookTLSSecretName is the name of the TLS secret resource used by the shoot lakom webhook.

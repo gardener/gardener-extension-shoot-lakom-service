@@ -7,7 +7,6 @@ package lifecycle
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
@@ -28,31 +27,17 @@ import (
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
-	"github.com/gardener/gardener/pkg/client/kubernetes"
-	kubeapiserverconstants "github.com/gardener/gardener/pkg/component/kubernetes/apiserver/constants"
-	monitoringutils "github.com/gardener/gardener/pkg/component/observability/monitoring/utils"
 	"github.com/gardener/gardener/pkg/extensions"
-	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils"
 	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
-	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
 	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
 	"github.com/go-logr/logr"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	vpaautoscalingv1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/version"
@@ -109,32 +94,29 @@ func getLakomReplicas(hibernated bool) *int32 {
 
 // Reconcile the Extension resource
 func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
-	var (
-		clusterCtx *clusterContext
-		err        error
-	)
-
 	extensionClass := extensionsv1alpha1helper.GetExtensionClassOrDefault(ex.Spec.GetExtensionClass())
+
+	logger.Info("!!!!!!!! Reconciling Extension resource", "extensionClass", extensionClass)
 	switch extensionClass {
 	case extensionsv1alpha1.ExtensionClassShoot:
-		clusterCtx, err = a.buildShootClusterContext(ctx, logger, ex)
-		if err != nil {
-			return err
-		}
-		return a.reconcileShoot(ctx, logger, ex, clusterCtx)
+		return a.reconcileShoot(ctx, logger, ex)
 	case extensionsv1alpha1.ExtensionClassGarden:
-		clusterCtx, err = a.buildGardenClusterContext(ctx, logger, ex)
-		if err != nil {
-			return err
-		}
-		return a.reconcileGarden(ctx, logger, ex, clusterCtx)
+		return a.reconcileGarden(ctx, logger, ex)
 	default:
 		return fmt.Errorf("unsupported extension class: %s", extensionClass)
 	}
 }
 
-func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension, clusterCtx *clusterContext) error {
-	lakomShootAccessSecret := gardenerutils.NewShootAccessSecret(gardenerutils.SecretNamePrefixShootAccess+constants.ApplicationName, clusterCtx.namespace)
+func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
+	clusterCtx, err := a.buildShootClusterContext(ctx, logger, ex)
+	if err != nil {
+		return err
+	}
+
+	lakomShootAccessSecret := gardenerutils.NewShootAccessSecret(
+		gardenerutils.SecretNamePrefixShootAccess+constants.ApplicationName,
+		clusterCtx.namespace,
+	)
 	lakomShootAccessSecret.Secret.SetLabels(utils.MergeStringMaps(
 		getLabels(),
 		lakomShootAccessSecret.Secret.GetLabels(),
@@ -142,54 +124,18 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 	if err := lakomShootAccessSecret.Reconcile(ctx, a.client); err != nil {
 		return err
 	}
-	lakomProviderConfig := &lakom.LakomConfig{}
-	if ex.Spec.ProviderConfig != nil {
-		if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
-			return fmt.Errorf("could not decode provider config, err: %w", err)
-		}
-	}
 
-	if lakomProviderConfig.Scope == nil {
-		lakomProviderConfig.Scope = getScope(a.serviceConfig.DefaultAdmissionScope)
-	}
-	logger.Info("Extension is configured with admission scope", "scope", *lakomProviderConfig.Scope)
-
-	configs := secrets.ConfigsFor(clusterCtx.namespace)
-	generatedSecrets, err := extensionssecretsmanager.GenerateAllSecrets(ctx, clusterCtx.secretsManager, configs)
+	generatedSecrets, caBundle, lakomPublicKeys, image, lakomProviderConfig, err := a.prepareAssets(
+		ctx,
+		logger,
+		ex,
+		clusterCtx,
+		secrets.ConfigsFor(clusterCtx.namespace),
+		true,
+	)
 	if err != nil {
 		return err
 	}
-
-	caBundleSecret, found := clusterCtx.secretsManager.Get(secrets.CAName)
-	if !found {
-		return fmt.Errorf("secret %q not found", secrets.CAName)
-	}
-
-	image, err := imagevector.ImageVector().FindImage(constants.ImageName)
-	if err != nil {
-		return fmt.Errorf("failed to find image version for %s: %v", constants.ImageName, err)
-	}
-
-	if image.Tag == nil {
-		image.Tag = ptr.To[string](version.Get().GitVersion)
-	}
-
-	gardenerPublicKeys, err := yaml.JSONToYAML(a.serviceConfig.CosignPublicKeys.Raw)
-	if err != nil {
-		return fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
-	}
-
-	var clientPublicKeys []byte
-	if lakomProviderConfig.TrustedKeysResourceName != nil {
-		var err error
-		clientPublicKeys, err = getClientKeys(ctx, a.client, clusterCtx.shootResources, *lakomProviderConfig.TrustedKeysResourceName, clusterCtx.namespace)
-		if err != nil {
-			return fmt.Errorf("failed to get the additional keys: %w", err)
-		}
-	}
-
-	lakomPublicKeys := gardenerPublicKeys
-	lakomPublicKeys = append(lakomPublicKeys, clientPublicKeys...)
 
 	seedResources, err := getSeedResources(
 		getLakomReplicas(clusterCtx.hibernated),
@@ -198,7 +144,7 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 		lakomShootAccessSecret.Secret.Name,
 		generatedSecrets[constants.WebhookTLSSecretName].Name,
 		string(lakomPublicKeys),
-		image.String(),
+		image,
 		a.serviceConfig.UseOnlyImagePullSecrets,
 		a.serviceConfig.AllowUntrustedImages,
 		a.serviceConfig.AllowInsecureRegistries,
@@ -209,14 +155,15 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 		return err
 	}
 
-	shootResources, err := getShootResources(
-		caBundleSecret.Data[secretsutils.DataKeyCertificateBundle],
+	shootResources, err := getWebhookResources(
+		caBundle,
+		shootWebhookRules,
+		constants.ExtensionServiceName,
 		clusterCtx.namespace,
 		lakomShootAccessSecret.ServiceAccountName,
 		*lakomProviderConfig.Scope,
 		clusterCtx.dashboardEnabled,
 	)
-
 	if err != nil {
 		return err
 	}
@@ -229,20 +176,215 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 		return err
 	}
 
-	twoMinutes := 2 * time.Minute
-	timeoutSeedCtx, cancelSeedCtx := context.WithTimeout(ctx, twoMinutes)
+	timeoutSeedCtx, cancelSeedCtx := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancelSeedCtx()
 	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesSeed); err != nil {
 		return err
 	}
 
 	return clusterCtx.secretsManager.Cleanup(ctx)
-
 }
 
-func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension, clusterCtx *clusterContext) error {
-	return nil
+func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
+	clusterCtx, err := a.buildGardenClusterContext(ctx, logger, ex)
+	if err != nil {
+		return err
+	}
 
+	gardenAccessSecret := gardenerutils.NewGardenAccessSecret(
+		gardenerutils.SecretNamePrefixShootAccess+constants.ApplicationName,
+		clusterCtx.namespace,
+	)
+	gardenAccessSecret.Secret.SetLabels(utils.MergeStringMaps(getLabels(), gardenAccessSecret.Secret.GetLabels()))
+	if err := gardenAccessSecret.Reconcile(ctx, a.client); err != nil {
+		return err
+	}
+
+	secretConfigs := append(
+		secrets.ConfigsFor(clusterCtx.namespace),
+		secrets.ConfigsForVirtualGarden(clusterCtx.namespace)[1:]...,
+	)
+
+	generatedSecrets, caBundle, lakomPublicKeys, image, lakomProviderConfig, err := a.prepareAssets(
+		ctx,
+		logger,
+		ex,
+		clusterCtx,
+		secretConfigs,
+		false,
+	)
+	if err != nil {
+		return err
+	}
+
+	runtimeResources, err := getGardenRuntimeResources(
+		getLakomReplicas(false),
+		clusterCtx.namespace,
+		generatedSecrets[constants.WebhookTLSSecretName].Name,
+		string(lakomPublicKeys),
+		image,
+		a.serviceConfig.UseOnlyImagePullSecrets,
+		a.serviceConfig.AllowUntrustedImages,
+		a.serviceConfig.AllowInsecureRegistries,
+		clusterCtx.topologyAwareRoutingEnabled,
+		clusterCtx.kubernetesVersion,
+	)
+	if err != nil {
+		return err
+	}
+
+	virtualResources, err := getGardenVirtualResources(
+		getLakomReplicas(false),
+		clusterCtx.namespace,
+		clusterCtx.genericTokenKubeconfigName,
+		gardenAccessSecret.Secret.Name,
+		generatedSecrets[constants.VirtualGardenWebhookTLSSecretName].Name,
+		string(lakomPublicKeys),
+		image,
+		a.serviceConfig.UseOnlyImagePullSecrets,
+		a.serviceConfig.AllowUntrustedImages,
+		a.serviceConfig.AllowInsecureRegistries,
+		clusterCtx.topologyAwareRoutingEnabled,
+		clusterCtx.kubernetesVersion,
+	)
+	if err != nil {
+		return err
+	}
+
+	gardenWebhookConfigResources, err := getWebhookResources(
+		caBundle,
+		gardenWebhookVirtualGardenRules,
+		constants.VirtualGardenExtensionServiceName,
+		clusterCtx.namespace,
+		gardenAccessSecret.ServiceAccountName,
+		*lakomProviderConfig.Scope,
+		clusterCtx.dashboardEnabled,
+	)
+	if err != nil {
+		return err
+	}
+
+	runtimeWebhookConfigResources, err := getWebhookResources(
+		caBundle,
+		gardenWebhookRuntimeRules,
+		constants.ExtensionServiceName,
+		clusterCtx.namespace,
+		gardenAccessSecret.ServiceAccountName,
+		*lakomProviderConfig.Scope,
+		clusterCtx.dashboardEnabled,
+	)
+	if err != nil {
+		return err
+	}
+
+	if err := managedresources.CreateForSeed(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesGardenRuntime, false, runtimeResources); err != nil {
+		return err
+	}
+
+	if err := managedresources.CreateForSeed(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesGardenVirtual, false, virtualResources); err != nil {
+		return err
+	}
+
+	if err := managedresources.CreateForShoot(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesShoot, constants.GardenerExtensionName, false, gardenWebhookConfigResources); err != nil {
+		return err
+	}
+
+	if err := managedresources.CreateForShoot(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesShoot, constants.GardenerExtensionName, false, runtimeWebhookConfigResources); err != nil {
+		return err
+	}
+
+	timeoutSeedCtx, cancelSeedCtx := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancelSeedCtx()
+	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesGardenRuntime); err != nil {
+		return err
+	}
+
+	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesGardenVirtual); err != nil {
+		return err
+	}
+	// Wait for both ManagedResources.
+	// Cleanup secrets manager after both are healthy.
+	return clusterCtx.secretsManager.Cleanup(ctx)
+}
+
+func (a *actuator) prepareAssets(
+	ctx context.Context,
+	logger logr.Logger,
+	ex *extensionsv1alpha1.Extension,
+	clusterCtx *clusterContext,
+	secretConfigs []extensionssecretsmanager.SecretConfigWithOptions,
+	allowTrustedKeys bool,
+) (
+	map[string]*corev1.Secret,
+	[]byte,
+	[]byte,
+	string,
+	*lakom.LakomConfig,
+	error,
+) {
+	lakomProviderConfig := &lakom.LakomConfig{}
+	if ex.Spec.ProviderConfig != nil {
+		if _, _, err := a.decoder.Decode(ex.Spec.ProviderConfig.Raw, nil, lakomProviderConfig); err != nil {
+			return nil, nil, nil, "", nil, fmt.Errorf("could not decode provider config, err: %w", err)
+		}
+	}
+
+	if lakomProviderConfig.Scope == nil {
+		lakomProviderConfig.Scope = getScope(a.serviceConfig.DefaultAdmissionScope)
+	}
+	logger.Info("Extension is configured with admission scope", "scope", *lakomProviderConfig.Scope)
+
+	generatedSecrets, err := extensionssecretsmanager.GenerateAllSecrets(
+		ctx,
+		clusterCtx.secretsManager,
+		secretConfigs,
+	)
+	if err != nil {
+		return nil, nil, nil, "", nil, err
+	}
+
+	caBundleSecret, found := clusterCtx.secretsManager.Get(secrets.CAName)
+	if !found {
+		return nil, nil, nil, "", nil, fmt.Errorf("secret %q not found", secrets.CAName)
+	}
+
+	image, err := imagevector.ImageVector().FindImage(constants.ImageName)
+	if err != nil {
+		return nil, nil, nil, "", nil, fmt.Errorf("failed to find image version for %s: %v", constants.ImageName, err)
+	}
+	if image.Tag == nil {
+		image.Tag = ptr.To[string](version.Get().GitVersion)
+	}
+
+	gardenerPublicKeys, err := yaml.JSONToYAML(a.serviceConfig.CosignPublicKeys.Raw)
+	if err != nil {
+		return nil, nil, nil, "", nil, fmt.Errorf("failed to convert lakom config from json to yaml, %w", err)
+	}
+
+	var clientPublicKeys []byte
+	if lakomProviderConfig.TrustedKeysResourceName != nil {
+		if !allowTrustedKeys {
+			return nil, nil, nil, "", nil, fmt.Errorf("trustedKeysResourceName is not supported for garden extension class")
+		}
+
+		clientPublicKeys, err = getClientKeys(
+			ctx,
+			a.client,
+			clusterCtx.shootResources,
+			*lakomProviderConfig.TrustedKeysResourceName,
+			clusterCtx.namespace,
+		)
+		if err != nil {
+			return nil, nil, nil, "", nil, fmt.Errorf("failed to get the additional keys: %w", err)
+		}
+	}
+
+	return generatedSecrets,
+		caBundleSecret.Data[secretsutils.DataKeyCertificateBundle],
+		append(gardenerPublicKeys, clientPublicKeys...),
+		image.String(),
+		lakomProviderConfig,
+		nil
 }
 
 // Delete the Extension resource.
@@ -328,313 +470,6 @@ func getLabels() map[string]string {
 	}
 }
 
-func getSeedResources(
-	lakomReplicas *int32,
-	namespace,
-	genericKubeconfigName,
-	shootAccessSecretName,
-	serverTLSSecretName,
-	lakomConfig,
-	image string,
-	useOnlyImagePullSecrets,
-	allowUntrustedImages,
-	allowInsecureRegistries,
-	topologyAwareRoutingEnabled bool,
-	seedK8SVersion string,
-) (map[string][]byte, error) {
-	var (
-		tcpProto                 = corev1.ProtocolTCP
-		serverPort               = intstr.FromInt32(10250)
-		metricsPort              = intstr.FromInt32(8080)
-		healthPort               = intstr.FromInt32(8081)
-		cacheTTL                 = time.Minute * 10
-		cacheRefreshInterval     = time.Second * 30
-		lakomConfigDir           = "/etc/lakom/config"
-		lakomConfigConfigMapName = constants.ExtensionServiceName + "-lakom-config"
-		webhookTLSCertDir        = "/etc/lakom/tls"
-		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestMemory            = resource.MustParse("25M")
-		vpaUpdateMode            = vpaautoscalingv1.UpdateModeInPlaceOrRecreate
-	)
-
-	lakomConfigConfigMap := corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      lakomConfigConfigMapName,
-			Namespace: namespace,
-			Labels:    getLabels(),
-		},
-		Data: map[string]string{
-			"config.yaml": lakomConfig,
-		},
-	}
-
-	if err := kubernetesutils.MakeUnique(&lakomConfigConfigMap); err != nil {
-		return nil, err
-	}
-
-	lakomDeployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
-			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
-				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
-			}),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas:             lakomReplicas,
-			RevisionHistoryLimit: ptr.To[int32](2),
-			Selector:             &metav1.LabelSelector{MatchLabels: getLabels()},
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
-					MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: utils.MergeStringMaps(getLabels(), map[string]string{
-						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
-						gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
-					}),
-				},
-				Spec: corev1.PodSpec{
-					Affinity: &corev1.Affinity{
-						PodAntiAffinity: &corev1.PodAntiAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
-								Weight: 100,
-								PodAffinityTerm: corev1.PodAffinityTerm{
-									TopologyKey:   corev1.LabelHostname,
-									LabelSelector: &metav1.LabelSelector{MatchLabels: getLabels()},
-								},
-							}},
-						},
-					},
-					AutomountServiceAccountToken: ptr.To[bool](false),
-					ServiceAccountName:           constants.ExtensionServiceName,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: ptr.To(true),
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-					Containers: []corev1.Container{{
-						Name:            constants.ApplicationName,
-						Image:           image,
-						ImagePullPolicy: corev1.PullIfNotPresent,
-						SecurityContext: &corev1.SecurityContext{
-							AllowPrivilegeEscalation: ptr.To(false),
-							Privileged:               ptr.To(false),
-						},
-						Args: []string{
-							"--cache-ttl=" + cacheTTL.String(),
-							"--cache-refresh-interval=" + cacheRefreshInterval.String(),
-							"--lakom-config-path=" + lakomConfigDir + "/config.yaml",
-							"--tls-cert-dir=" + webhookTLSCertDir,
-							"--health-bind-address=:" + healthPort.String(),
-							"--metrics-bind-address=:" + metricsPort.String(),
-							"--port=" + serverPort.String(),
-							"--kubeconfig=" + gardenerutils.PathGenericKubeconfig,
-							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
-							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
-							"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
-						},
-						Ports: []corev1.ContainerPort{
-							{
-								Name:          "https",
-								Protocol:      tcpProto,
-								ContainerPort: serverPort.IntVal,
-							},
-							{
-								Name:          "metrics",
-								Protocol:      tcpProto,
-								ContainerPort: metricsPort.IntVal,
-							},
-						},
-						LivenessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/healthz",
-									Port:   healthPort,
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: 10,
-						},
-						ReadinessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/readyz",
-									Port:   healthPort,
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: 5,
-						},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceMemory: requestMemory,
-							},
-						},
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "lakom-config",
-								MountPath: lakomConfigDir,
-								ReadOnly:  true,
-							},
-							{
-								Name:      "lakom-server-tls",
-								ReadOnly:  true,
-								MountPath: webhookTLSCertDir,
-							},
-						},
-					}},
-					PriorityClassName: v1beta1constants.PriorityClassNameShootControlPlane300,
-					Volumes: []corev1.Volume{
-						{
-							Name: "lakom-config",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: lakomConfigConfigMap.Name,
-									},
-								},
-							},
-						},
-						{
-							Name: "lakom-server-tls",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: serverTLSSecretName,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
-
-	if err := gardenerutils.InjectGenericKubeconfig(lakomDeployment, genericKubeconfigName, shootAccessSecretName); err != nil {
-		return nil, err
-	}
-
-	if err := references.InjectAnnotations(lakomDeployment); err != nil {
-		return nil, err
-	}
-
-	lakomService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
-			Labels:    getLabels(),
-			Annotations: map[string]string{
-				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
-				"networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports": `[{"protocol":"TCP","port":` + serverPort.String() + `}]`,
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeClusterIP,
-			Selector: getLabels(),
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "https",
-					Protocol:   tcpProto,
-					Port:       443,
-					TargetPort: serverPort,
-				},
-				{
-					Name:       "metrics",
-					Protocol:   tcpProto,
-					Port:       2718,
-					TargetPort: metricsPort,
-				},
-			},
-		},
-	}
-
-	version, err := semver.NewVersion(seedK8SVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse seed k8s version %q as semantic version: %w", seedK8SVersion, err)
-	}
-	gardenerutils.ReconcileTopologyAwareRoutingSettings(lakomService, topologyAwareRoutingEnabled, version)
-
-	pdb := &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
-			Labels:    getLabels(),
-		},
-		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable:             ptr.To(intstr.FromInt32(1)),
-			Selector:                   &metav1.LabelSelector{MatchLabels: getLabels()},
-			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
-		},
-	}
-
-	resources, err := registry.AddAllAndSerialize(
-		lakomDeployment,
-		pdb,
-		&lakomConfigConfigMap,
-		&corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
-				Namespace: namespace,
-				Labels:    getLabels(),
-			},
-			AutomountServiceAccountToken: ptr.To[bool](false),
-		},
-		lakomService,
-		&vpaautoscalingv1.VerticalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
-				Namespace: namespace,
-				Labels:    getLabels(),
-			},
-			Spec: vpaautoscalingv1.VerticalPodAutoscalerSpec{
-				ResourcePolicy: &vpaautoscalingv1.PodResourcePolicy{
-					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
-						{
-							ContainerName: constants.ApplicationName,
-							ControlledResources: &[]corev1.ResourceName{
-								corev1.ResourceMemory,
-							},
-						},
-					},
-				},
-				TargetRef: &autoscalingv1.CrossVersionObjectReference{
-					APIVersion: lakomDeployment.APIVersion,
-					Kind:       lakomDeployment.Kind,
-					Name:       lakomDeployment.Name,
-				},
-				UpdatePolicy: &vpaautoscalingv1.PodUpdatePolicy{
-					UpdateMode: &vpaUpdateMode,
-				},
-			},
-		},
-		&monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.ExtensionServiceName, namespace, "shoot"),
-			Spec: monitoringv1.ServiceMonitorSpec{
-				Selector: metav1.LabelSelector{MatchLabels: getLabels()},
-				Endpoints: []monitoringv1.Endpoint{{
-					Port:                 "metrics",
-					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom_.*", "controller_runtime_webhook_.*"),
-				}},
-			},
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return resources, nil
-}
-
 func scopeToObjectSelector(scope lakom.ScopeType) metav1.LabelSelector {
 	if scope == lakom.KubeSystemManagedByGardener {
 		return metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -670,94 +505,6 @@ func scopeToNamespaceSelector(scope lakom.ScopeType, dashboardEnabled bool) meta
 	}}
 }
 
-func getShootResources(webhookCaBundle []byte, extensionNamespace, shootAccessServiceAccountName string, scope lakom.ScopeType, dashboardEnabled bool) (map[string][]byte, error) {
-	var (
-		matchPolicy          = admissionregistrationv1.Equivalent
-		sideEffectClass      = admissionregistrationv1.SideEffectClassNone
-		failurePolicy        = admissionregistrationv1.Fail
-		timeOutSeconds       = ptr.To[int32](25)
-		webhookHost          = fmt.Sprintf("https://%s.%s", constants.ExtensionServiceName, extensionNamespace)
-		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
-		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
-		namespaceSelector    = scopeToNamespaceSelector(scope, dashboardEnabled)
-		objectSelector       = scopeToObjectSelector(scope)
-		rules                = []admissionregistrationv1.RuleWithOperations{{
-			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-			Rule: admissionregistrationv1.Rule{
-				APIGroups:   []string{""},
-				APIVersions: []string{"v1"},
-				Resources:   []string{"pods", "pods/ephemeralcontainers"},
-			},
-		}}
-	)
-
-	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
-	shootResources, err := shootRegistry.AddAllAndSerialize(append(
-		getRoleBindings(scope, shootAccessServiceAccountName, dashboardEnabled),
-		&admissionregistrationv1.MutatingWebhookConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   constants.WebhookConfigurationName,
-				Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
-			},
-			Webhooks: []admissionregistrationv1.MutatingWebhook{{
-				Name:                    "resolve-tag.lakom.service.extensions.gardener.cloud",
-				Rules:                   rules,
-				FailurePolicy:           &failurePolicy,
-				MatchPolicy:             &matchPolicy,
-				SideEffects:             &sideEffectClass,
-				TimeoutSeconds:          timeOutSeconds,
-				AdmissionReviewVersions: []string{"v1"},
-				ClientConfig: admissionregistrationv1.WebhookClientConfig{
-					URL:      &mutatingWebhookURL,
-					CABundle: webhookCaBundle,
-				},
-				NamespaceSelector: &namespaceSelector,
-				ObjectSelector:    &objectSelector,
-			}},
-		},
-		&admissionregistrationv1.ValidatingWebhookConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   constants.WebhookConfigurationName,
-				Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
-			},
-			Webhooks: []admissionregistrationv1.ValidatingWebhook{{
-				Name:                    "verify-signature.lakom.service.extensions.gardener.cloud",
-				Rules:                   rules,
-				FailurePolicy:           &failurePolicy,
-				MatchPolicy:             &matchPolicy,
-				SideEffects:             &sideEffectClass,
-				TimeoutSeconds:          timeOutSeconds,
-				AdmissionReviewVersions: []string{"v1"},
-				ClientConfig: admissionregistrationv1.WebhookClientConfig{
-					URL:      &validatingWebhookURL,
-					CABundle: webhookCaBundle,
-				},
-				NamespaceSelector: &namespaceSelector,
-				ObjectSelector:    &objectSelector,
-			}},
-		},
-		&rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   constants.LakomResourceReader,
-				Labels: getLabels(),
-			},
-			Rules: []rbacv1.PolicyRule{
-				{
-					APIGroups: []string{""},
-					Resources: []string{"secrets"},
-					Verbs:     []string{"get"},
-				},
-			},
-		},
-	)...)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return shootResources, nil
-}
-
 func getClientKeys(ctx context.Context, client client.Client, resources []gardencorev1beta1.NamedResourceReference, resourceName, namespace string) ([]byte, error) {
 	ref := v1beta1helper.GetResourceByName(resources, resourceName)
 	if ref == nil {
@@ -784,62 +531,6 @@ func getClientKeys(ctx context.Context, client client.Client, resources []garden
 	}
 
 	return clientKeys, nil
-}
-
-func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string, dashboardEnabled bool) []client.Object {
-	roleRef := rbacv1.RoleRef{
-		APIGroup: "rbac.authorization.k8s.io",
-		Kind:     "ClusterRole",
-		Name:     constants.LakomResourceReader,
-	}
-	subjects := []rbacv1.Subject{
-		{
-			Kind:      rbacv1.ServiceAccountKind,
-			Name:      shootAccessServiceAccountName,
-			Namespace: metav1.NamespaceSystem,
-		},
-	}
-	annotations := map[string]string{
-		resourcesv1alpha1.DeleteOnInvalidUpdate: "true",
-	}
-
-	if scope == lakom.Cluster {
-		return []client.Object{&rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        constants.LakomResourceReader,
-				Labels:      getLabels(),
-				Annotations: annotations,
-			},
-			RoleRef:  roleRef,
-			Subjects: subjects,
-		}}
-	}
-
-	roleBindings := []client.Object{&rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        constants.LakomResourceReader,
-			Namespace:   metav1.NamespaceSystem,
-			Labels:      getLabels(),
-			Annotations: annotations,
-		},
-		RoleRef:  roleRef,
-		Subjects: subjects,
-	}}
-
-	if dashboardEnabled {
-		roleBindings = append(roleBindings, &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        constants.LakomResourceReader,
-				Namespace:   kubernetesDashboardNamespaceName,
-				Labels:      getLabels(),
-				Annotations: annotations,
-			},
-			RoleRef:  roleRef,
-			Subjects: subjects,
-		})
-	}
-
-	return roleBindings
 }
 
 // clusterContext contains cluster-specific settings extracted based on the extension class (shoot or garden).

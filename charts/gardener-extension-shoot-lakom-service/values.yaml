@@ -63,6 +63,8 @@ controllers:
 
 # gardener values are set by gardenlet when the controllerinstallation is deployed.
 gardener:
+  runtimeCluster:
+    enabled: false
   seed:
     spec:
       settings:

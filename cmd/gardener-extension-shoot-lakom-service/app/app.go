@@ -23,6 +23,7 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/util"
 	"github.com/gardener/gardener/pkg/controllerutils/routes"
 	gardenerhealthz "github.com/gardener/gardener/pkg/healthz"
+	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -127,6 +128,9 @@ func (o *Options) run(ctx context.Context) error {
 	if err := apislakom.AddToScheme(mgr.GetScheme()); err != nil {
 		return fmt.Errorf("failed to add internal version of `lakom.extensions.gardener.cloud/v1alpha1` to manager scheme: %w", err)
 	}
+	if err := operatorv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+		return fmt.Errorf("failed to add `operator.gardener.cloud/v1alpha1` to manager scheme: %w", err)
+	}
 
 	ctrlConfig.ApplyHealthCheckConfig(&healthcheck.DefaultAddOptions.HealthCheckConfig)
 	ctrlConfig.Apply(&lifecycle.DefaultAddOptions.ServiceConfig)
@@ -137,6 +141,8 @@ func (o *Options) run(ctx context.Context) error {
 	o.heartbeatOptions.Completed().Apply(&heartbeat.DefaultAddOptions)
 
 	seed.DefaultAddOptions.SeedTopologyAwareRoutingEnabled = o.lakomOptions.SeedTopologyAwareRoutingEnabled
+	lifecycle.DefaultAddOptions.ExtensionClasses = o.generalOptions.Completed().ExtensionClasses
+	healthcheck.DefaultAddOptions.ExtensionClasses = o.generalOptions.Completed().ExtensionClasses
 
 	if err := o.controllerSwitches.Completed().AddToManager(ctx, mgr); err != nil {
 		return fmt.Errorf("could not add controllers to manager: %s", err)
