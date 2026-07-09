@@ -6,6 +6,7 @@ package lifecycle
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
@@ -45,6 +46,7 @@ type AddOptions struct {
 
 // AddToManager adds a Lakom Service Lifecycle controller to the given Controller Manager.
 func AddToManager(ctx context.Context, mgr manager.Manager) error {
+	fmt.Println("!!!!!!! Adding Lakom Service Lifecycle controller to manager")
 	return extension.Add(
 		mgr,
 		extension.AddArgs{
@@ -54,8 +56,8 @@ func AddToManager(ctx context.Context, mgr manager.Manager) error {
 			Name:              Name,
 			FinalizerSuffix:   FinalizerSuffix,
 			Resync:            60 * time.Minute,
-			Predicates:        extension.DefaultPredicates(ctx, mgr, DefaultAddOptions.IgnoreOperationAnnotation),
-			Type:              constants.ExtensionType,
+			// Predicates:        extension.DefaultPredicates(ctx, mgr, DefaultAddOptions.IgnoreOperationAnnotation),
+			Type: constants.ExtensionType,
 		},
 	)
 }

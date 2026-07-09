@@ -16,8 +16,10 @@ import (
 const (
 	// ManagerIdentity is the identity used for the secrets manager.
 	ManagerIdentity = "extension-" + constants.ExtensionType
-	// ManagerIdentityRuntime is the identity used for the secrets manager when extension is with class garden.
+	// ManagerIdentityRuntime is the identity used for the secrets manager when extension is deployed for garden runtime cluster.
 	ManagerIdentityRuntime = "extension-" + constants.ExtensionType + "-runtime"
+	// ManagerIdentityVirtualGarden is the identity used for the secrets manager when extension is deployed for virtual garden cluster.
+	ManagerIdentityVirtualGarden = "extension-" + constants.ExtensionType + "-virtual-garden"
 	// CAName is the name of the CA secret.
 	CAName = "ca-extension-" + constants.ExtensionType
 )
@@ -43,6 +45,29 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 			},
 			// use current CA for signing server cert to prevent mismatches when dropping the old CA from the webhook
 			// config in phase Completing
+			Options: []secretsmanager.GenerateOption{secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA)},
+		},
+	}
+}
+
+func ConfigsForVirtualGarden(namespace string) []extensionssecretsmanager.SecretConfigWithOptions {
+	return []extensionssecretsmanager.SecretConfigWithOptions{
+		{
+			Config: &secretsutils.CertificateSecretConfig{
+				Name:       CAName, // same CA — shared root of trust
+				CommonName: CAName,
+				CertType:   secretsutils.CACert,
+			},
+			Options: []secretsmanager.GenerateOption{secretsmanager.Persist()},
+		},
+		{
+			Config: &secretsutils.CertificateSecretConfig{
+				Name:                        constants.VirtualGardenWebhookTLSSecretName,
+				CommonName:                  constants.VirtualGardenExtensionServiceName,
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.VirtualGardenExtensionServiceName, namespace),
+				CertType:                    secretsutils.ServerCert,
+				SkipPublishingCACertificate: true,
+			},
 			Options: []secretsmanager.GenerateOption{secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA)},
 		},
 	}

@@ -84,6 +84,14 @@ spec:
         - --health-bind-address=:{{ .Values.controllers.healthPort }}
         - --metrics-bind-address=:{{ .Values.controllers.metricsPort }}
         - --seed-topology-aware-routing-enabled={{ .Values.gardener.seed.spec.settings.topologyAwareRouting.enabled }}
+        {{- if .Values.gardener.runtimeCluster.enabled }}
+        # Runtime deployments serve Garden-class Extension resources; 
+        #keep the legacy seed bootstrap controller only in seed deployments to avoid managing the same kube-system resources from two namespaces.
+        - --disable-controllers=shoot_lakom_service_seed_bootstrap_controller
+        - --extension-classes=garden
+        {{- else }}
+        - --extension-classes=shoot
+        {{- end }}
         ports:
         - containerPort: {{ .Values.controllers.metricsPort }}
           name: metrics
