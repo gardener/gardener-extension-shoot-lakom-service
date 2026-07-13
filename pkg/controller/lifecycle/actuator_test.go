@@ -123,7 +123,7 @@ var _ = Describe("Actuator", func() {
 
 		It("Should ensure the correct shoot resources are created", func() {
 
-			resources, err := getWebhookResources(caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, shootAccessServiceAccountName, scope, false)
+			resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, scope, false)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 			Expect(err).ToNot(HaveOccurred())
@@ -136,7 +136,7 @@ var _ = Describe("Actuator", func() {
 			))
 
 			By("Enable kubernetes dashboard addon")
-			resources, err = getWebhookResources(caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, shootAccessServiceAccountName, scope, true)
+			resources, err = getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, scope, true)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err = test.ExtractManifestsFromManagedResourceData(resources)
 			Expect(err).ToNot(HaveOccurred())
@@ -152,7 +152,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getWebhookResources(ca, shootWebhookRules, constants.ExtensionServiceName, ns, shootAccessServiceAccountName, scope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), ca, shootWebhookRules, constants.ExtensionServiceName, ns, scope, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -165,7 +165,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getWebhookResources(ca, shootWebhookRules, constants.ExtensionServiceName, ns, shootAccessServiceAccountName, scope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), ca, shootWebhookRules, constants.ExtensionServiceName, ns, scope, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -178,7 +178,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should return an empty object selector for the webhooks when scope is KubeSystem",
 			func(ca []byte, ns string) {
-				resources, err := getWebhookResources(ca, shootWebhookRules, constants.ExtensionServiceName, ns, shootAccessServiceAccountName, lakom.KubeSystem, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), ca, shootWebhookRules, constants.ExtensionServiceName, ns, lakom.KubeSystem, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -194,7 +194,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the rolebinding is correctly set",
 			func(saName string, lakomScope lakom.ScopeType, bindingNamespace string) {
-				resources, err := getWebhookResources(caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, saName, lakomScope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, saName), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, lakomScope, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -208,7 +208,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should return the correct object and namespace selectors based on scope",
 			func(scope lakom.ScopeType, objectSelector, namespaceSelector string) {
-				resources, err := getWebhookResources(caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, shootAccessServiceAccountName, scope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, scope, dashboardEnabled)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())

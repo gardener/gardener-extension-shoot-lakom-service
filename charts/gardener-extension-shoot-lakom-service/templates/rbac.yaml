@@ -19,6 +19,14 @@ rules:
   - list
   - watch
 - apiGroups:
+  - operator.gardener.cloud
+  resources:
+  - gardens
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - resources.gardener.cloud
   resources:
   - managedresources

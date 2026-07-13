@@ -8,6 +8,7 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
+	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
 	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
@@ -50,7 +51,7 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 	}
 }
 
-func ConfigsForVirtualGarden(namespace string) []extensionssecretsmanager.SecretConfigWithOptions {
+func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 	return []extensionssecretsmanager.SecretConfigWithOptions{
 		{
 			Config: &secretsutils.CertificateSecretConfig{
@@ -64,11 +65,26 @@ func ConfigsForVirtualGarden(namespace string) []extensionssecretsmanager.Secret
 			Config: &secretsutils.CertificateSecretConfig{
 				Name:                        constants.VirtualGardenWebhookTLSSecretName,
 				CommonName:                  constants.VirtualGardenExtensionServiceName,
-				DNSNames:                    kubernetesutils.DNSNamesForService(constants.VirtualGardenExtensionServiceName, namespace),
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.VirtualGardenExtensionServiceName, v1beta1constants.GardenNamespace),
 				CertType:                    secretsutils.ServerCert,
 				SkipPublishingCACertificate: true,
 			},
-			Options: []secretsmanager.GenerateOption{secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA)},
+			Options: []secretsmanager.GenerateOption{
+				secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA),
+			},
+		},
+		{
+			Config: &secretsutils.CertificateSecretConfig{
+				Name:                        constants.RuntimeGardenWebhookTLSSecretName,
+				CommonName:                  constants.RuntimeGardenExtensionServiceName,
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.RuntimeGardenExtensionServiceName, constants.LakomSystemNamespace),
+				CertType:                    secretsutils.ServerCert,
+				SkipPublishingCACertificate: true,
+			},
+			Options: []secretsmanager.GenerateOption{
+				secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA),
+				secretsmanager.Namespace(constants.LakomSystemNamespace),
+			},
 		},
 	}
 }

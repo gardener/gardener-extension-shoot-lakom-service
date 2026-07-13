@@ -83,85 +83,89 @@ var (
 )
 
 func getWebhookResources(
+	webhookVariant webhookVariant,
 	webhookCaBundle []byte,
 	webhookRRules []admissionregistrationv1.RuleWithOperations,
 	serviceName,
-	extensionNamespace,
-	shootAccessServiceAccountName string,
+	extensionNamespace string,
 	scope lakom.ScopeType,
 	dashboardEnabled bool,
 ) (map[string][]byte, error) {
+	clientConfigFor := func(path string) admissionregistrationv1.WebhookClientConfig {
+		if webhookVariant.useServiceClientConfig {
+			return serviceBasedWebhookClientConfig(webhookCaBundle, extensionNamespace, serviceName, path)
+		}
+		return urlBasedWebhookClientConfig(webhookCaBundle, fmt.Sprintf("%s.%s", serviceName, extensionNamespace), path)
+	}
+
 	var (
-		matchPolicy          = admissionregistrationv1.Equivalent
-		sideEffectClass      = admissionregistrationv1.SideEffectClassNone
-		failurePolicy        = admissionregistrationv1.Fail
-		timeOutSeconds       = ptr.To[int32](25)
-		webhookHost          = fmt.Sprintf("https://%s.%s", serviceName, extensionNamespace)
-		validatingWebhookURL = webhookHost + constants.LakomVerifyCosignSignaturePath
-		mutatingWebhookURL   = webhookHost + constants.LakomResolveTagPath
-		namespaceSelector    = scopeToNamespaceSelector(scope, dashboardEnabled)
-		objectSelector       = scopeToObjectSelector(scope)
+		matchPolicy       = admissionregistrationv1.Equivalent
+		sideEffectClass   = admissionregistrationv1.SideEffectClassNone
+		failurePolicy     = admissionregistrationv1.Fail
+		timeOutSeconds    = ptr.To[int32](25)
+		namespaceSelector = scopeToNamespaceSelector(scope, dashboardEnabled)
+		objectSelector    = scopeToObjectSelector(scope)
+		clientObjects     = []client.Object{
+			&admissionregistrationv1.MutatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   webhookVariant.configName,
+					Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
+				},
+				Webhooks: []admissionregistrationv1.MutatingWebhook{{
+					Name:                    "resolve-tag.lakom.service.extensions.gardener.cloud",
+					Rules:                   webhookRRules,
+					FailurePolicy:           &failurePolicy,
+					MatchPolicy:             &matchPolicy,
+					SideEffects:             &sideEffectClass,
+					TimeoutSeconds:          timeOutSeconds,
+					AdmissionReviewVersions: []string{"v1"},
+					ClientConfig:            clientConfigFor(constants.LakomResolveTagPath),
+					NamespaceSelector:       &namespaceSelector,
+					ObjectSelector:          &objectSelector,
+				}},
+			},
+			&admissionregistrationv1.ValidatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   webhookVariant.configName,
+					Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
+				},
+				Webhooks: []admissionregistrationv1.ValidatingWebhook{{
+					Name:                    "verify-signature.lakom.service.extensions.gardener.cloud",
+					Rules:                   webhookRRules,
+					FailurePolicy:           &failurePolicy,
+					MatchPolicy:             &matchPolicy,
+					SideEffects:             &sideEffectClass,
+					TimeoutSeconds:          timeOutSeconds,
+					AdmissionReviewVersions: []string{"v1"},
+					ClientConfig:            clientConfigFor(constants.LakomVerifyCosignSignaturePath),
+					NamespaceSelector:       &namespaceSelector,
+					ObjectSelector:          &objectSelector,
+				}},
+			},
+		}
 	)
 
-	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
-	shootResources, err := shootRegistry.AddAllAndSerialize(append(
-		getRoleBindings(scope, shootAccessServiceAccountName, dashboardEnabled),
-		&admissionregistrationv1.MutatingWebhookConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   constants.WebhookConfigurationName,
-				Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
-			},
-			Webhooks: []admissionregistrationv1.MutatingWebhook{{
-				Name:                    "resolve-tag.lakom.service.extensions.gardener.cloud",
-				Rules:                   webhookRRules,
-				FailurePolicy:           &failurePolicy,
-				MatchPolicy:             &matchPolicy,
-				SideEffects:             &sideEffectClass,
-				TimeoutSeconds:          timeOutSeconds,
-				AdmissionReviewVersions: []string{"v1"},
-				ClientConfig: admissionregistrationv1.WebhookClientConfig{
-					URL:      &mutatingWebhookURL,
-					CABundle: webhookCaBundle,
+	if webhookVariant.resourceReaderSA != "" {
+		clientObjects = append(clientObjects,
+			&rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   constants.LakomResourceReader,
+					Labels: getLabels(),
 				},
-				NamespaceSelector: &namespaceSelector,
-				ObjectSelector:    &objectSelector,
-			}},
-		},
-		&admissionregistrationv1.ValidatingWebhookConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   constants.WebhookConfigurationName,
-				Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
-			},
-			Webhooks: []admissionregistrationv1.ValidatingWebhook{{
-				Name:                    "verify-signature.lakom.service.extensions.gardener.cloud",
-				Rules:                   webhookRRules,
-				FailurePolicy:           &failurePolicy,
-				MatchPolicy:             &matchPolicy,
-				SideEffects:             &sideEffectClass,
-				TimeoutSeconds:          timeOutSeconds,
-				AdmissionReviewVersions: []string{"v1"},
-				ClientConfig: admissionregistrationv1.WebhookClientConfig{
-					URL:      &validatingWebhookURL,
-					CABundle: webhookCaBundle,
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{""},
+						Resources: []string{"secrets"},
+						Verbs:     []string{"get"},
+					},
 				},
-				NamespaceSelector: &namespaceSelector,
-				ObjectSelector:    &objectSelector,
-			}},
-		},
-		&rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   constants.LakomResourceReader,
-				Labels: getLabels(),
-			},
-			Rules: []rbacv1.PolicyRule{
-				{
-					APIGroups: []string{""},
-					Resources: []string{"secrets"},
-					Verbs:     []string{"get"},
-				},
-			},
-		},
-	)...)
+			})
+		clientObjects = append(clientObjects,
+			getRoleBindings(scope, webhookVariant.resourceReaderSA, dashboardEnabled)...)
+
+	}
+
+	shootResources, err := webhookVariant.registry.AddAllAndSerialize(clientObjects...)
 
 	if err != nil {
 		return nil, err
@@ -532,7 +536,7 @@ func getGardenVirtualResources(
 		Spec: appsv1.DeploymentSpec{
 			Replicas:             lakomReplicas,
 			RevisionHistoryLimit: ptr.To[int32](2),
-			Selector:             &metav1.LabelSelector{MatchLabels: getLabels()},
+			Selector:             &metav1.LabelSelector{MatchLabels: getGardenPodLabels(true)},
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDeployment{
@@ -542,7 +546,7 @@ func getGardenVirtualResources(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: utils.MergeStringMaps(getLabels(), map[string]string{
+					Labels: utils.MergeStringMaps(getGardenPodLabels(true), map[string]string{
 						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
@@ -557,7 +561,7 @@ func getGardenVirtualResources(
 								Weight: 100,
 								PodAffinityTerm: corev1.PodAffinityTerm{
 									TopologyKey:   corev1.LabelHostname,
-									LabelSelector: &metav1.LabelSelector{MatchLabels: getLabels()},
+									LabelSelector: &metav1.LabelSelector{MatchLabels: getGardenPodLabels(true)},
 								},
 							}},
 						},
@@ -586,7 +590,7 @@ func getGardenVirtualResources(
 							"--health-bind-address=:" + healthPort.String(),
 							"--metrics-bind-address=:" + metricsPort.String(),
 							"--port=" + serverPort.String(),
-							"--kubeconfig=" + gardenerutils.PathGenericGardenKubeconfig,
+							"--kubeconfig=" + gardenerutils.PathGenericKubeconfig,
 							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
 							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
 							"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
@@ -668,11 +672,10 @@ func getGardenVirtualResources(
 	}
 
 	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
-	if err := gardenerutils.InjectGenericGardenKubeconfig(
+	if err := gardenerutils.InjectGenericKubeconfig(
 		lakomDeployment,
 		genericKubeconfigName,
 		gardenAccessSecretName,
-		gardenerutils.VolumeMountPathGenericGardenKubeconfig,
 	); err != nil {
 		return nil, err
 	}
@@ -689,7 +692,7 @@ func getGardenVirtualResources(
 		},
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
-			Selector: getLabels(),
+			Selector: getGardenPodLabels(true),
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "https",
@@ -721,7 +724,7 @@ func getGardenVirtualResources(
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			MaxUnavailable:             ptr.To(intstr.FromInt32(1)),
-			Selector:                   &metav1.LabelSelector{MatchLabels: getLabels()},
+			Selector:                   &metav1.LabelSelector{MatchLabels: getGardenPodLabels(true)},
 			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
 		},
 	}
@@ -767,9 +770,9 @@ func getGardenVirtualResources(
 			},
 		},
 		&monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.VirtualGardenExtensionServiceName, namespace, "shoot"),
+			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.VirtualGardenExtensionServiceName, namespace, "virtual-garden"),
 			Spec: monitoringv1.ServiceMonitorSpec{
-				Selector: metav1.LabelSelector{MatchLabels: getLabels()},
+				Selector: metav1.LabelSelector{MatchLabels: getGardenPodLabels(true)},
 				Endpoints: []monitoringv1.Endpoint{{
 					Port:                 "metrics",
 					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
@@ -787,7 +790,6 @@ func getGardenVirtualResources(
 
 func getGardenRuntimeResources(
 	lakomReplicas *int32,
-	namespace,
 	serverTLSSecretName,
 	lakomConfig,
 	image string,
@@ -805,7 +807,7 @@ func getGardenRuntimeResources(
 		cacheTTL                 = time.Minute * 10
 		cacheRefreshInterval     = time.Second * 30
 		lakomConfigDir           = "/etc/lakom/config"
-		lakomConfigConfigMapName = constants.ExtensionServiceName + "-lakom-config"
+		lakomConfigConfigMapName = constants.RuntimeGardenExtensionServiceName + "-lakom-config"
 		webhookTLSCertDir        = "/etc/lakom/tls"
 		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
 		requestMemory            = resource.MustParse("25M")
@@ -815,7 +817,7 @@ func getGardenRuntimeResources(
 	lakomConfigConfigMap := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      lakomConfigConfigMapName,
-			Namespace: namespace,
+			Namespace: constants.LakomSystemNamespace,
 			Labels:    getLabels(),
 		},
 		Data: map[string]string{
@@ -827,10 +829,17 @@ func getGardenRuntimeResources(
 		return nil, err
 	}
 
+	lakomSystemNamespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constants.LakomSystemNamespace,
+			// Labels: getLabels(),
+		},
+	}
+
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
+			Name:      constants.RuntimeGardenExtensionServiceName,
+			Namespace: constants.LakomSystemNamespace,
 			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
 				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
 			}),
@@ -838,7 +847,7 @@ func getGardenRuntimeResources(
 		Spec: appsv1.DeploymentSpec{
 			Replicas:             lakomReplicas,
 			RevisionHistoryLimit: ptr.To[int32](2),
-			Selector:             &metav1.LabelSelector{MatchLabels: getLabels()},
+			Selector:             &metav1.LabelSelector{MatchLabels: getGardenPodLabels(false)},
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDeployment{
@@ -848,7 +857,7 @@ func getGardenRuntimeResources(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: utils.MergeStringMaps(getLabels(), map[string]string{
+					Labels: utils.MergeStringMaps(getGardenPodLabels(false), map[string]string{
 						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
@@ -863,13 +872,13 @@ func getGardenRuntimeResources(
 								Weight: 100,
 								PodAffinityTerm: corev1.PodAffinityTerm{
 									TopologyKey:   corev1.LabelHostname,
-									LabelSelector: &metav1.LabelSelector{MatchLabels: getLabels()},
+									LabelSelector: &metav1.LabelSelector{MatchLabels: getGardenPodLabels(false)},
 								},
 							}},
 						},
 					},
-					AutomountServiceAccountToken: ptr.To[bool](false),
-					ServiceAccountName:           constants.ExtensionServiceName,
+					AutomountServiceAccountToken: ptr.To[bool](true),
+					ServiceAccountName:           constants.RuntimeGardenExtensionServiceName,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &corev1.SeccompProfile{
@@ -980,8 +989,8 @@ func getGardenRuntimeResources(
 
 	lakomService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
+			Name:      constants.RuntimeGardenExtensionServiceName,
+			Namespace: constants.LakomSystemNamespace,
 			Labels:    getLabels(),
 			Annotations: map[string]string{
 				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
@@ -990,7 +999,7 @@ func getGardenRuntimeResources(
 		},
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
-			Selector: getLabels(),
+			Selector: getGardenPodLabels(false),
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "https",
@@ -1016,34 +1025,68 @@ func getGardenRuntimeResources(
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
+			Name:      constants.RuntimeGardenExtensionServiceName,
+			Namespace: constants.LakomSystemNamespace,
 			Labels:    getLabels(),
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			MaxUnavailable:             ptr.To(intstr.FromInt32(1)),
-			Selector:                   &metav1.LabelSelector{MatchLabels: getLabels()},
+			Selector:                   &metav1.LabelSelector{MatchLabels: getGardenPodLabels(false)},
 			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
 		},
 	}
 
 	resources, err := registry.AddAllAndSerialize(
+		lakomSystemNamespace,
 		lakomDeployment,
 		pdb,
 		&lakomConfigConfigMap,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
-				Namespace: namespace,
+				Name:      constants.RuntimeGardenExtensionServiceName,
+				Namespace: constants.LakomSystemNamespace,
 				Labels:    getLabels(),
 			},
-			AutomountServiceAccountToken: ptr.To[bool](false),
+			AutomountServiceAccountToken: ptr.To[bool](true),
+		},
+		&rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      constants.RuntimeGardenExtensionServiceName,
+				Namespace: constants.LakomSystemNamespace,
+				Labels:    getLabels(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"secrets"},
+					Verbs:     []string{"get", "list", "watch"},
+				},
+			},
+		},
+		&rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      constants.RuntimeGardenExtensionServiceName,
+				Namespace: constants.LakomSystemNamespace,
+				Labels:    getLabels(),
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "Role",
+				Name:     constants.RuntimeGardenExtensionServiceName,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      constants.RuntimeGardenExtensionServiceName,
+					Namespace: constants.LakomSystemNamespace,
+				},
+			},
 		},
 		lakomService,
 		&vpaautoscalingv1.VerticalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
-				Namespace: namespace,
+				Name:      constants.RuntimeGardenExtensionServiceName,
+				Namespace: constants.LakomSystemNamespace,
 				Labels:    getLabels(),
 			},
 			Spec: vpaautoscalingv1.VerticalPodAutoscalerSpec{
@@ -1068,9 +1111,9 @@ func getGardenRuntimeResources(
 			},
 		},
 		&monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.ExtensionServiceName, namespace, "shoot"),
+			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.RuntimeGardenExtensionServiceName, constants.LakomSystemNamespace, "garden-runtime"),
 			Spec: monitoringv1.ServiceMonitorSpec{
-				Selector: metav1.LabelSelector{MatchLabels: getLabels()},
+				Selector: metav1.LabelSelector{MatchLabels: getGardenPodLabels(false)},
 				Endpoints: []monitoringv1.Endpoint{{
 					Port:                 "metrics",
 					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
@@ -1140,4 +1183,48 @@ func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string
 	}
 
 	return roleBindings
+}
+
+type webhookVariant struct {
+	registry               *managedresources.Registry
+	configName             string
+	resourceReaderSA       string
+	useServiceClientConfig bool
+}
+
+// serviceBasedWebhookClientConfig builds a Service-based webhook client config
+func serviceBasedWebhookClientConfig(caBundle []byte, namespace, serviceName, path string) admissionregistrationv1.WebhookClientConfig {
+	return admissionregistrationv1.WebhookClientConfig{
+		Service: &admissionregistrationv1.ServiceReference{
+			Namespace: namespace,
+			Name:      serviceName,
+			Path:      ptr.To(path),
+		},
+		CABundle: caBundle,
+	}
+}
+
+// urlBasedWebhookClientConfig builds a URL-based webhook client config
+func urlBasedWebhookClientConfig(caBundle []byte, host, path string) admissionregistrationv1.WebhookClientConfig {
+	url := fmt.Sprintf("https://%s%s", host, path)
+	return admissionregistrationv1.WebhookClientConfig{
+		URL:      ptr.To(url),
+		CABundle: caBundle,
+	}
+}
+
+func shootWebhookVariant(configName, resourceReaderSA string) webhookVariant {
+	return webhookVariant{
+		registry:         managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
+		configName:       configName,
+		resourceReaderSA: resourceReaderSA,
+	}
+}
+
+func runtimeWebhookVariant() webhookVariant {
+	return webhookVariant{
+		registry:               managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer),
+		configName:             constants.RuntimeWebhookConfigurationName,
+		useServiceClientConfig: true,
+	}
 }

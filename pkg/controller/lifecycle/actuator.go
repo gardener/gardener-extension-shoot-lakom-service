@@ -53,9 +53,6 @@ const (
 	ActuatorName = constants.ExtensionType + "-actuator"
 
 	kubernetesDashboardNamespaceName = "kubernetes-dashboard"
-
-	// virtualGardenPrefix is the prefix for virtual garden deployments
-	virtualGardenPrefix = "virtual-garden-"
 )
 
 // NewActuator returns an actuator responsible for Extension resources.
@@ -130,8 +127,6 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 		logger,
 		ex,
 		clusterCtx,
-		secrets.ConfigsFor(clusterCtx.namespace),
-		true,
 	)
 	if err != nil {
 		return err
@@ -156,11 +151,11 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 	}
 
 	shootResources, err := getWebhookResources(
+		shootWebhookVariant(constants.WebhookConfigurationName, lakomShootAccessSecret.ServiceAccountName),
 		caBundle,
 		shootWebhookRules,
 		constants.ExtensionServiceName,
 		clusterCtx.namespace,
-		lakomShootAccessSecret.ServiceAccountName,
 		*lakomProviderConfig.Scope,
 		clusterCtx.dashboardEnabled,
 	)
@@ -195,23 +190,17 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		gardenerutils.SecretNamePrefixShootAccess+constants.ApplicationName,
 		clusterCtx.namespace,
 	)
+
 	gardenAccessSecret.Secret.SetLabels(utils.MergeStringMaps(getLabels(), gardenAccessSecret.Secret.GetLabels()))
 	if err := gardenAccessSecret.Reconcile(ctx, a.client); err != nil {
 		return err
 	}
-
-	secretConfigs := append(
-		secrets.ConfigsFor(clusterCtx.namespace),
-		secrets.ConfigsForVirtualGarden(clusterCtx.namespace)[1:]...,
-	)
 
 	generatedSecrets, caBundle, lakomPublicKeys, image, lakomProviderConfig, err := a.prepareAssets(
 		ctx,
 		logger,
 		ex,
 		clusterCtx,
-		secretConfigs,
-		false,
 	)
 	if err != nil {
 		return err
@@ -219,8 +208,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 
 	runtimeResources, err := getGardenRuntimeResources(
 		getLakomReplicas(false),
-		clusterCtx.namespace,
-		generatedSecrets[constants.WebhookTLSSecretName].Name,
+		generatedSecrets[constants.RuntimeGardenWebhookTLSSecretName].Name,
 		string(lakomPublicKeys),
 		image,
 		a.serviceConfig.UseOnlyImagePullSecrets,
@@ -251,12 +239,12 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	gardenWebhookConfigResources, err := getWebhookResources(
+	virtualGardenWebhookConfigResources, err := getWebhookResources(
+		shootWebhookVariant(constants.WebhookConfigurationName, gardenAccessSecret.ServiceAccountName),
 		caBundle,
 		gardenWebhookVirtualGardenRules,
 		constants.VirtualGardenExtensionServiceName,
 		clusterCtx.namespace,
-		gardenAccessSecret.ServiceAccountName,
 		*lakomProviderConfig.Scope,
 		clusterCtx.dashboardEnabled,
 	)
@@ -265,11 +253,11 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 	}
 
 	runtimeWebhookConfigResources, err := getWebhookResources(
+		runtimeWebhookVariant(),
 		caBundle,
 		gardenWebhookRuntimeRules,
-		constants.ExtensionServiceName,
-		clusterCtx.namespace,
-		gardenAccessSecret.ServiceAccountName,
+		constants.RuntimeGardenExtensionServiceName,
+		constants.LakomSystemNamespace,
 		*lakomProviderConfig.Scope,
 		clusterCtx.dashboardEnabled,
 	)
@@ -277,19 +265,38 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	if err := managedresources.CreateForSeed(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesGardenRuntime, false, runtimeResources); err != nil {
+	if err := managedresources.CreateForSeed(ctx,
+		a.client,
+		clusterCtx.namespace,
+		constants.ManagedResourceNamesGardenRuntime,
+		false,
+		runtimeResources); err != nil {
 		return err
 	}
 
-	if err := managedresources.CreateForSeed(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesGardenVirtual, false, virtualResources); err != nil {
+	if err := managedresources.CreateForSeed(ctx,
+		a.client,
+		clusterCtx.namespace,
+		constants.ManagedResourceNamesGardenVirtual,
+		false,
+		virtualResources); err != nil {
 		return err
 	}
 
-	if err := managedresources.CreateForShoot(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesShoot, constants.GardenerExtensionName, false, gardenWebhookConfigResources); err != nil {
+	if err := managedresources.CreateForShoot(ctx,
+		a.client,
+		clusterCtx.namespace,
+		constants.ManagedResourceNamesGardenVirtualShoot,
+		constants.VirtualGardenExtensionServiceName,
+		false,
+		virtualGardenWebhookConfigResources); err != nil {
 		return err
 	}
 
-	if err := managedresources.CreateForShoot(ctx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesShoot, constants.GardenerExtensionName, false, runtimeWebhookConfigResources); err != nil {
+	if err := managedresources.CreateForSeed(ctx, a.client, clusterCtx.namespace,
+		constants.ManagedResourceNamesGardenRuntimeWebhook,
+		false,
+		runtimeWebhookConfigResources); err != nil {
 		return err
 	}
 
@@ -302,8 +309,12 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesGardenVirtual); err != nil {
 		return err
 	}
-	// Wait for both ManagedResources.
-	// Cleanup secrets manager after both are healthy.
+
+	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesGardenRuntimeWebhook); err != nil {
+		return err
+	}
+	// Wait for the ManagedResources.
+	// Cleanup secrets manager after they are healthy.
 	return clusterCtx.secretsManager.Cleanup(ctx)
 }
 
@@ -312,8 +323,6 @@ func (a *actuator) prepareAssets(
 	logger logr.Logger,
 	ex *extensionsv1alpha1.Extension,
 	clusterCtx *clusterContext,
-	secretConfigs []extensionssecretsmanager.SecretConfigWithOptions,
-	allowTrustedKeys bool,
 ) (
 	map[string]*corev1.Secret,
 	[]byte,
@@ -337,7 +346,7 @@ func (a *actuator) prepareAssets(
 	generatedSecrets, err := extensionssecretsmanager.GenerateAllSecrets(
 		ctx,
 		clusterCtx.secretsManager,
-		secretConfigs,
+		clusterCtx.secretsConfigs,
 	)
 	if err != nil {
 		return nil, nil, nil, "", nil, err
@@ -363,14 +372,10 @@ func (a *actuator) prepareAssets(
 
 	var clientPublicKeys []byte
 	if lakomProviderConfig.TrustedKeysResourceName != nil {
-		if !allowTrustedKeys {
-			return nil, nil, nil, "", nil, fmt.Errorf("trustedKeysResourceName is not supported for garden extension class")
-		}
-
 		clientPublicKeys, err = getClientKeys(
 			ctx,
 			a.client,
-			clusterCtx.shootResources,
+			clusterCtx.namedResourceRef,
 			*lakomProviderConfig.TrustedKeysResourceName,
 			clusterCtx.namespace,
 		)
@@ -389,12 +394,20 @@ func (a *actuator) prepareAssets(
 
 // Delete the Extension resource.
 func (a *actuator) Delete(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
-	return a.delete(ctx, logger, ex, false)
+	extensionClass := extensionsv1alpha1helper.GetExtensionClassOrDefault(ex.Spec.GetExtensionClass())
+	switch extensionClass {
+	case extensionsv1alpha1.ExtensionClassShoot:
+		return a.deleteShoot(ctx, logger, ex, false)
+	case extensionsv1alpha1.ExtensionClassGarden:
+		return a.deleteGarden(ctx, logger, ex, false)
+	default:
+		return fmt.Errorf("unsupported extension class: %s", extensionClass)
+	}
 }
 
-// delete deletes the resources deployed for the extension.
+// delete deletes the resources deployed for the extension class shoot.
 // It can be configured to skip deletion of the secretes managed by the SecretsManager.
-func (a *actuator) delete(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension, skipSecretManagerSecrets bool) error {
+func (a *actuator) deleteShoot(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension, skipSecretManagerSecrets bool) error {
 	namespace := ex.GetNamespace()
 	twoMinutes := 2 * time.Minute
 
@@ -424,8 +437,68 @@ func (a *actuator) delete(ctx context.Context, logger logr.Logger, ex *extension
 		return err
 	}
 
+	if skipSecretManagerSecrets {
+		return nil
+	}
+
 	cluster, err := controller.GetCluster(ctx, a.client, namespace)
 	if err != nil {
+		return err
+	}
+
+	secretsManager, err := extensionssecretsmanager.SecretsManagerForCluster(ctx, logger.WithName("secretsmanager"), clock.RealClock{}, a.client, cluster, secrets.ManagerIdentity, nil)
+	if err != nil {
+		return err
+	}
+
+	return secretsManager.Cleanup(ctx)
+}
+
+// delete deletes the resources deployed for the extension class garden.
+// It can be configured to skip deletion of the secretes managed by the SecretsManager.
+func (a *actuator) deleteGarden(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension, skipSecretManagerSecrets bool) error {
+	twoMinutes := 2 * time.Minute
+	namespace := ex.GetNamespace()
+
+	timeoutShootCtx, cancelShootCtx := context.WithTimeout(ctx, twoMinutes)
+	defer cancelShootCtx()
+
+	if err := managedresources.DeleteForShoot(ctx, a.client, namespace, constants.ManagedResourceNamesGardenVirtualShoot); err != nil {
+		return err
+	}
+
+	if err := managedresources.WaitUntilDeleted(timeoutShootCtx, a.client, namespace, constants.ManagedResourceNamesGardenVirtualShoot); err != nil {
+		return err
+	}
+
+	timeoutSeedCtx, cancelSeedCtx := context.WithTimeout(ctx, twoMinutes)
+	defer cancelSeedCtx()
+
+	if err := managedresources.DeleteForSeed(ctx, a.client, namespace, constants.ManagedResourceNamesGardenRuntime); err != nil {
+		return err
+	}
+
+	if err := managedresources.WaitUntilDeleted(timeoutSeedCtx, a.client, namespace, constants.ManagedResourceNamesGardenRuntime); err != nil {
+		return err
+	}
+
+	if err := managedresources.DeleteForSeed(ctx, a.client, namespace, constants.ManagedResourceNamesGardenVirtual); err != nil {
+		return err
+	}
+
+	if err := managedresources.WaitUntilDeleted(timeoutSeedCtx, a.client, namespace, constants.ManagedResourceNamesGardenVirtual); err != nil {
+		return err
+	}
+
+	if err := managedresources.DeleteForSeed(ctx, a.client, namespace, constants.ManagedResourceNamesGardenRuntimeWebhook); err != nil {
+		return err
+	}
+
+	if err := managedresources.WaitUntilDeleted(timeoutSeedCtx, a.client, namespace, constants.ManagedResourceNamesGardenRuntimeWebhook); err != nil {
+		return err
+	}
+
+	if err := a.client.DeleteAllOf(ctx, &corev1.Secret{}, client.InNamespace(namespace), client.MatchingLabels(getLabels())); err != nil {
 		return err
 	}
 
@@ -433,7 +506,12 @@ func (a *actuator) delete(ctx context.Context, logger logr.Logger, ex *extension
 		return nil
 	}
 
-	secretsManager, err := extensionssecretsmanager.SecretsManagerForCluster(ctx, logger.WithName("secretsmanager"), clock.RealClock{}, a.client, cluster, secrets.ManagerIdentity, nil)
+	garden, err := a.getGarden(ctx)
+	if err != nil {
+		return err
+	}
+
+	secretsManager, err := extensionssecretsmanager.SecretsManagerForGarden(ctx, logger.WithName("secretsmanager"), clock.RealClock{}, a.client, garden, secrets.ManagerIdentityRuntime, nil, namespace)
 	if err != nil {
 		return err
 	}
@@ -453,14 +531,25 @@ func (a *actuator) Restore(ctx context.Context, logger logr.Logger, ex *extensio
 
 // Migrate the Extension resource.
 func (a *actuator) Migrate(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
-	// Keep objects for shoot managed resources so that they are not deleted from the shoot during the migration
-	if err := managedresources.SetKeepObjects(ctx, a.client, ex.GetNamespace(), constants.ManagedResourceNamesShoot, true); err != nil {
-		return err
-	}
-
 	// SecretsManager secrets should not be deleted during migration in order to have the required ones
 	// persisted in the shootstate resource.
-	return a.delete(ctx, logger, ex, true)
+	extensionClass := extensionsv1alpha1helper.GetExtensionClassOrDefault(ex.Spec.GetExtensionClass())
+	switch extensionClass {
+	case extensionsv1alpha1.ExtensionClassShoot:
+		// Keep objects for shoot managed resources so that they are not deleted from the shoot during the migration
+		if err := managedresources.SetKeepObjects(ctx, a.client, ex.GetNamespace(), constants.ManagedResourceNamesShoot, true); err != nil {
+			return err
+		}
+		return a.deleteShoot(ctx, logger, ex, true)
+	case extensionsv1alpha1.ExtensionClassGarden:
+		// Keep objects for shoot virtual garden managed resources so that they are not deleted during the migration -- Is this even necessary?
+		if err := managedresources.SetKeepObjects(ctx, a.client, ex.GetNamespace(), constants.ManagedResourceNamesGardenVirtualShoot, true); err != nil {
+			return err
+		}
+		return a.deleteGarden(ctx, logger, ex, true)
+	default:
+		return fmt.Errorf("unsupported extension class: %s", extensionClass)
+	}
 }
 
 func getLabels() map[string]string {
@@ -468,6 +557,18 @@ func getLabels() map[string]string {
 		"app.kubernetes.io/name":    constants.ApplicationName,
 		"app.kubernetes.io/part-of": constants.ExtensionType,
 	}
+}
+
+// getGardenPodLabels returns the pod selector/template labels for a garden deployment variant.
+func getGardenPodLabels(virtualGarden bool) map[string]string {
+	instance := constants.RuntimeGardenExtensionServiceName
+	if virtualGarden {
+		instance = constants.VirtualGardenExtensionServiceName
+	}
+
+	return utils.MergeStringMaps(getLabels(), map[string]string{
+		"app.kubernetes.io/instance": instance,
+	})
 }
 
 func scopeToObjectSelector(scope lakom.ScopeType) metav1.LabelSelector {
@@ -537,12 +638,13 @@ func getClientKeys(ctx context.Context, client client.Client, resources []garden
 type clusterContext struct {
 	namespace                   string
 	genericTokenKubeconfigName  string
+	secretsConfigs              []extensionssecretsmanager.SecretConfigWithOptions
 	secretsManager              secretsmanager.Interface
 	kubernetesVersion           string
 	topologyAwareRoutingEnabled bool
 	hibernated                  bool
 	dashboardEnabled            bool
-	shootResources              []gardencorev1beta1.NamedResourceReference
+	namedResourceRef            []gardencorev1beta1.NamedResourceReference
 }
 
 // buildShootClusterContext extracts cluster info for extensions with shoot extension class
@@ -575,19 +677,19 @@ func (a *actuator) buildShootClusterContext(ctx context.Context, log logr.Logger
 	return &clusterContext{
 		namespace:                   namespace,
 		genericTokenKubeconfigName:  extensions.GenericTokenKubeconfigSecretNameFromCluster(cluster),
+		secretsConfigs:              configs,
 		secretsManager:              secretsManager,
 		kubernetesVersion:           *cluster.Seed.Status.KubernetesVersion,
 		topologyAwareRoutingEnabled: v1beta1helper.IsTopologyAwareRoutingForShootControlPlaneEnabled(cluster.Seed, cluster.Shoot),
 		hibernated:                  controller.IsHibernationEnabled(cluster),
 		dashboardEnabled:            v1beta1helper.KubernetesDashboardEnabled(cluster.Shoot.Spec.Addons), //nolint:staticcheck
-		shootResources:              cluster.Shoot.Spec.Resources,
+		namedResourceRef:            cluster.Shoot.Spec.Resources,
 	}, nil
 }
 
 // buildGardenClusterContext extracts cluster info for extensions with garden extension class
 func (a *actuator) buildGardenClusterContext(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) (*clusterContext, error) {
 	namespace := ex.GetNamespace()
-
 	garden, err := a.getGarden(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get garden: %w", err)
@@ -598,7 +700,7 @@ func (a *actuator) buildGardenClusterContext(ctx context.Context, log logr.Logge
 		return nil, fmt.Errorf("no generic token kubeconfig secret found in garden object annotations")
 	}
 
-	configs := secrets.ConfigsFor(namespace)
+	configs := secrets.ConfigsForGarden()
 	secretsManager, err := extensionssecretsmanager.SecretsManagerForGarden(
 		ctx,
 		log.WithName("secretsmanager"),
@@ -608,6 +710,7 @@ func (a *actuator) buildGardenClusterContext(ctx context.Context, log logr.Logge
 		secrets.ManagerIdentityRuntime,
 		configs,
 		namespace,
+		constants.LakomSystemNamespace,
 	)
 	if err != nil {
 		return nil, err
@@ -629,9 +732,11 @@ func (a *actuator) buildGardenClusterContext(ctx context.Context, log logr.Logge
 	return &clusterContext{
 		namespace:                   namespace,
 		genericTokenKubeconfigName:  genericTokenKubeconfigName,
+		secretsConfigs:              configs,
 		secretsManager:              secretsManager,
 		kubernetesVersion:           versionInfo.GitVersion,
 		topologyAwareRoutingEnabled: operatorv1alpha1helper.TopologyAwareRoutingEnabled(garden.Spec.RuntimeCluster.Settings),
+		namedResourceRef:            garden.Spec.Resources,
 	}, nil
 }
 
