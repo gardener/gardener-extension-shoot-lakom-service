@@ -27,5 +27,5 @@ spec:
     type: shoot-lakom-service
     clusterCompatibility:
       - garden
-    # autoEnable:
-    # - garden
+    autoEnable:
+    - garden
