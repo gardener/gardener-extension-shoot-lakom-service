@@ -17,10 +17,8 @@ import (
 const (
 	// ManagerIdentity is the identity used for the secrets manager.
 	ManagerIdentity = "extension-" + constants.ExtensionType
-	// ManagerIdentityRuntime is the identity used for the secrets manager when extension is deployed for garden runtime cluster.
-	ManagerIdentityRuntime = "extension-" + constants.ExtensionType + "-runtime"
-	// ManagerIdentityVirtualGarden is the identity used for the secrets manager when extension is deployed for virtual garden cluster.
-	ManagerIdentityVirtualGarden = "extension-" + constants.ExtensionType + "-virtual-garden"
+	// ManagerIdentityGarden is the identity used for the secrets manager when extension is deployed for garden class extensions.
+	ManagerIdentityGarden = "extension-" + constants.ExtensionType + "-garden"
 	// CAName is the name of the CA secret.
 	CAName = "ca-extension-" + constants.ExtensionType
 )
