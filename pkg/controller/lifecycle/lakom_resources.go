@@ -172,8 +172,415 @@ func getWebhookResources(
 	return shootResources, nil
 }
 
+// lakomAuthMode selects how the lakom pod authenticates against the API server it validates.
+type lakomAuthMode int
+
+const (
+	// authInjectedKubeconfig injects a generic kubeconfig (shoot-access) into the deployment and points
+	// lakom at it via --kubeconfig.
+	authInjectedKubeconfig lakomAuthMode = iota
+	// authInClusterToken relies on the pod's mounted ServiceAccount token (in-cluster auth) and omits
+	// the --kubeconfig flag.
+	authInClusterToken
+)
+
+// lakomResourceOptions parameterizes getLakomResources across deployment flavours.
+type lakomResourceOptions struct {
+	replicas                    *int32
+	serverTLSSecretName         string
+	lakomConfig                 string
+	image                       string
+	useOnlyImagePullSecrets     bool
+	allowUntrustedImages        bool
+	allowInsecureRegistries     bool
+	topologyAwareRoutingEnabled bool
+	k8sVersion                  string
+
+	serviceName           string
+	namespace             string
+	podLabels             map[string]string
+	priorityClassName     string
+	serviceMonitorSuffix  string
+	authMode              lakomAuthMode
+	genericKubeconfigName string
+	accessSecretName      string
+	createNamespace       bool
+	createInClusterRBAC   bool
+	// tlsServerSecret, when set, is delivered into opts.namespace as part of the ManagedResource. This is
+	// used by the runtime-garden flavour: the secretsManager generates the cert in the extension namespace,
+	// but the pod runs in lakom-system, so gardener-resource-manager must copy the secret there. When nil,
+	// the server TLS secret is expected to already exist in opts.namespace (shoot/virtual flavours).
+	tlsServerSecret *corev1.Secret
+}
+
+// getLakomResources builds the full lakom workload for a single flavour and
+// returns the serialized ManagedResource data.
+func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
+	var (
+		tcpProto                     = corev1.ProtocolTCP
+		serverPort                   = intstr.FromInt32(10250)
+		metricsPort                  = intstr.FromInt32(8080)
+		healthPort                   = intstr.FromInt32(8081)
+		cacheTTL                     = time.Minute * 10
+		cacheRefreshInterval         = time.Second * 30
+		lakomConfigDir               = "/etc/lakom/config"
+		lakomConfigConfigMapName     = opts.serviceName + "-lakom-config"
+		webhookTLSCertDir            = "/etc/lakom/tls"
+		registry                     = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
+		requestMemory                = resource.MustParse("25M")
+		vpaUpdateMode                = vpaautoscalingv1.UpdateModeRecreate
+		automountServiceAccountToken = opts.authMode == authInClusterToken
+	)
+
+	lakomConfigConfigMap := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      lakomConfigConfigMapName,
+			Namespace: opts.namespace,
+			Labels:    getLabels(),
+		},
+		Data: map[string]string{
+			"config.yaml": opts.lakomConfig,
+		},
+	}
+
+	if err := kubernetesutils.MakeUnique(&lakomConfigConfigMap); err != nil {
+		return nil, err
+	}
+
+	args := []string{
+		"--cache-ttl=" + cacheTTL.String(),
+		"--cache-refresh-interval=" + cacheRefreshInterval.String(),
+		"--lakom-config-path=" + lakomConfigDir + "/config.yaml",
+		"--tls-cert-dir=" + webhookTLSCertDir,
+		"--health-bind-address=:" + healthPort.String(),
+		"--metrics-bind-address=:" + metricsPort.String(),
+		"--port=" + serverPort.String(),
+	}
+	if opts.authMode == authInjectedKubeconfig {
+		args = append(args, "--kubeconfig="+gardenerutils.PathGenericKubeconfig)
+	}
+	args = append(args,
+		"--use-only-image-pull-secrets="+strconv.FormatBool(opts.useOnlyImagePullSecrets),
+		"--insecure-allow-untrusted-images="+strconv.FormatBool(opts.allowUntrustedImages),
+		"--insecure-allow-insecure-registries="+strconv.FormatBool(opts.allowInsecureRegistries),
+	)
+
+	lakomDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opts.serviceName,
+			Namespace: opts.namespace,
+			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
+				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
+			}),
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas:             opts.replicas,
+			RevisionHistoryLimit: ptr.To[int32](2),
+			Selector:             &metav1.LabelSelector{MatchLabels: opts.podLabels},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+					MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: utils.MergeStringMaps(opts.podLabels, map[string]string{
+						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
+						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
+						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
+						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
+						gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
+					}),
+				},
+				Spec: corev1.PodSpec{
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
+								Weight: 100,
+								PodAffinityTerm: corev1.PodAffinityTerm{
+									TopologyKey:   corev1.LabelHostname,
+									LabelSelector: &metav1.LabelSelector{MatchLabels: opts.podLabels},
+								},
+							}},
+						},
+					},
+					AutomountServiceAccountToken: ptr.To(automountServiceAccountToken),
+					ServiceAccountName:           opts.serviceName,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: ptr.To(true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
+					Containers: []corev1.Container{{
+						Name:            constants.ApplicationName,
+						Image:           opts.image,
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: &corev1.SecurityContext{
+							AllowPrivilegeEscalation: ptr.To(false),
+							Privileged:               ptr.To(false),
+						},
+						Args: args,
+						Ports: []corev1.ContainerPort{
+							{
+								Name:          "https",
+								Protocol:      tcpProto,
+								ContainerPort: serverPort.IntVal,
+							},
+							{
+								Name:          "metrics",
+								Protocol:      tcpProto,
+								ContainerPort: metricsPort.IntVal,
+							},
+						},
+						LivenessProbe: &corev1.Probe{
+							ProbeHandler: corev1.ProbeHandler{
+								HTTPGet: &corev1.HTTPGetAction{
+									Path:   "/healthz",
+									Port:   healthPort,
+									Scheme: corev1.URISchemeHTTP,
+								},
+							},
+							InitialDelaySeconds: 10,
+						},
+						ReadinessProbe: &corev1.Probe{
+							ProbeHandler: corev1.ProbeHandler{
+								HTTPGet: &corev1.HTTPGetAction{
+									Path:   "/readyz",
+									Port:   healthPort,
+									Scheme: corev1.URISchemeHTTP,
+								},
+							},
+							InitialDelaySeconds: 5,
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: requestMemory,
+							},
+						},
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "lakom-config",
+								MountPath: lakomConfigDir,
+								ReadOnly:  true,
+							},
+							{
+								Name:      "lakom-server-tls",
+								ReadOnly:  true,
+								MountPath: webhookTLSCertDir,
+							},
+						},
+					}},
+					PriorityClassName: opts.priorityClassName,
+					Volumes: []corev1.Volume{
+						{
+							Name: "lakom-config",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: lakomConfigConfigMap.Name,
+									},
+								},
+							},
+						},
+						{
+							Name: "lakom-server-tls",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: opts.serverTLSSecretName,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
+
+	if opts.authMode == authInjectedKubeconfig {
+		if err := gardenerutils.InjectGenericKubeconfig(lakomDeployment, opts.genericKubeconfigName, opts.accessSecretName); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := references.InjectAnnotations(lakomDeployment); err != nil {
+		return nil, err
+	}
+
+	lakomService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opts.serviceName,
+			Namespace: opts.namespace,
+			Labels:    getLabels(),
+			Annotations: map[string]string{
+				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
+				"networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports": `[{"protocol":"TCP","port":` + serverPort.String() + `}]`,
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeClusterIP,
+			Selector: opts.podLabels,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "https",
+					Protocol:   tcpProto,
+					Port:       443,
+					TargetPort: serverPort,
+				},
+				{
+					Name:       "metrics",
+					Protocol:   tcpProto,
+					Port:       2718,
+					TargetPort: metricsPort,
+				},
+			},
+		},
+	}
+
+	version, err := semver.NewVersion(opts.k8sVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse k8s version %q as semantic version: %w", opts.k8sVersion, err)
+	}
+	gardenerutils.ReconcileTopologyAwareRoutingSettings(lakomService, opts.topologyAwareRoutingEnabled, version)
+
+	pdb := &policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opts.serviceName,
+			Namespace: opts.namespace,
+			Labels:    getLabels(),
+		},
+		Spec: policyv1.PodDisruptionBudgetSpec{
+			MaxUnavailable:             ptr.To(intstr.FromInt32(1)),
+			Selector:                   &metav1.LabelSelector{MatchLabels: opts.podLabels},
+			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
+		},
+	}
+
+	clientObjects := []client.Object{}
+	if opts.createNamespace {
+		clientObjects = append(clientObjects, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: opts.namespace,
+				// Labels: getLabels(),
+			},
+		})
+	}
+	if opts.tlsServerSecret != nil {
+		clientObjects = append(clientObjects, &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      opts.serverTLSSecretName,
+				Namespace: opts.namespace,
+				Labels:    getLabels(),
+			},
+			Type: opts.tlsServerSecret.Type,
+			Data: opts.tlsServerSecret.Data,
+		})
+	}
+	clientObjects = append(clientObjects,
+		lakomDeployment,
+		pdb,
+		&lakomConfigConfigMap,
+		&corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      opts.serviceName,
+				Namespace: opts.namespace,
+				Labels:    getLabels(),
+			},
+			AutomountServiceAccountToken: ptr.To(automountServiceAccountToken),
+		},
+	)
+	if opts.createInClusterRBAC {
+		clientObjects = append(clientObjects,
+			&rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      opts.serviceName,
+					Namespace: opts.namespace,
+					Labels:    getLabels(),
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{""},
+						Resources: []string{"secrets"},
+						Verbs:     []string{"get", "list", "watch"},
+					},
+				},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      opts.serviceName,
+					Namespace: opts.namespace,
+					Labels:    getLabels(),
+				},
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: "rbac.authorization.k8s.io",
+					Kind:     "Role",
+					Name:     opts.serviceName,
+				},
+				Subjects: []rbacv1.Subject{
+					{
+						Kind:      rbacv1.ServiceAccountKind,
+						Name:      opts.serviceName,
+						Namespace: opts.namespace,
+					},
+				},
+			},
+		)
+	}
+	clientObjects = append(clientObjects,
+		lakomService,
+		&vpaautoscalingv1.VerticalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      opts.serviceName,
+				Namespace: opts.namespace,
+				Labels:    getLabels(),
+			},
+			Spec: vpaautoscalingv1.VerticalPodAutoscalerSpec{
+				ResourcePolicy: &vpaautoscalingv1.PodResourcePolicy{
+					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
+						{
+							ContainerName: constants.ApplicationName,
+							ControlledResources: &[]corev1.ResourceName{
+								corev1.ResourceMemory,
+							},
+						},
+					},
+				},
+				TargetRef: &autoscalingv1.CrossVersionObjectReference{
+					APIVersion: lakomDeployment.APIVersion,
+					Kind:       lakomDeployment.Kind,
+					Name:       lakomDeployment.Name,
+				},
+				UpdatePolicy: &vpaautoscalingv1.PodUpdatePolicy{
+					UpdateMode: &vpaUpdateMode,
+				},
+			},
+		},
+		&monitoringv1.ServiceMonitor{
+			ObjectMeta: monitoringutils.ConfigObjectMeta(opts.serviceName, opts.namespace, opts.serviceMonitorSuffix),
+			Spec: monitoringv1.ServiceMonitorSpec{
+				Selector: metav1.LabelSelector{MatchLabels: opts.podLabels},
+				Endpoints: []monitoringv1.Endpoint{{
+					Port:                 "metrics",
+					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
+				}},
+			},
+		},
+	)
+
+	resources, err := registry.AddAllAndSerialize(clientObjects...)
+	if err != nil {
+		return nil, err
+	}
+
+	return resources, nil
+}
+
 func getSeedResources(
 	lakomReplicas *int32,
+	serviceName,
 	namespace,
 	genericKubeconfigName,
 	shootAccessSecretName,
@@ -186,304 +593,32 @@ func getSeedResources(
 	topologyAwareRoutingEnabled bool,
 	seedK8SVersion string,
 ) (map[string][]byte, error) {
-	var (
-		tcpProto                 = corev1.ProtocolTCP
-		serverPort               = intstr.FromInt32(10250)
-		metricsPort              = intstr.FromInt32(8080)
-		healthPort               = intstr.FromInt32(8081)
-		cacheTTL                 = time.Minute * 10
-		cacheRefreshInterval     = time.Second * 30
-		lakomConfigDir           = "/etc/lakom/config"
-		lakomConfigConfigMapName = constants.ExtensionServiceName + "-lakom-config"
-		webhookTLSCertDir        = "/etc/lakom/tls"
-		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestMemory            = resource.MustParse("25M")
-		vpaUpdateMode            = vpaautoscalingv1.UpdateModeRecreate
-	)
-
-	lakomConfigConfigMap := corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      lakomConfigConfigMapName,
-			Namespace: namespace,
-			Labels:    getLabels(),
-		},
-		Data: map[string]string{
-			"config.yaml": lakomConfig,
-		},
-	}
-
-	if err := kubernetesutils.MakeUnique(&lakomConfigConfigMap); err != nil {
-		return nil, err
-	}
-
-	lakomDeployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
-			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
-				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
-			}),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas:             lakomReplicas,
-			RevisionHistoryLimit: ptr.To[int32](2),
-			Selector:             &metav1.LabelSelector{MatchLabels: getLabels()},
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
-					MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: utils.MergeStringMaps(getLabels(), map[string]string{
-						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
-						gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
-					}),
-				},
-				Spec: corev1.PodSpec{
-					Affinity: &corev1.Affinity{
-						PodAntiAffinity: &corev1.PodAntiAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
-								Weight: 100,
-								PodAffinityTerm: corev1.PodAffinityTerm{
-									TopologyKey:   corev1.LabelHostname,
-									LabelSelector: &metav1.LabelSelector{MatchLabels: getLabels()},
-								},
-							}},
-						},
-					},
-					AutomountServiceAccountToken: ptr.To[bool](false),
-					ServiceAccountName:           constants.ExtensionServiceName,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: ptr.To(true),
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-					Containers: []corev1.Container{{
-						Name:            constants.ApplicationName,
-						Image:           image,
-						ImagePullPolicy: corev1.PullIfNotPresent,
-						SecurityContext: &corev1.SecurityContext{
-							AllowPrivilegeEscalation: ptr.To(false),
-							Privileged:               ptr.To(false),
-						},
-						Args: []string{
-							"--cache-ttl=" + cacheTTL.String(),
-							"--cache-refresh-interval=" + cacheRefreshInterval.String(),
-							"--lakom-config-path=" + lakomConfigDir + "/config.yaml",
-							"--tls-cert-dir=" + webhookTLSCertDir,
-							"--health-bind-address=:" + healthPort.String(),
-							"--metrics-bind-address=:" + metricsPort.String(),
-							"--port=" + serverPort.String(),
-							"--kubeconfig=" + gardenerutils.PathGenericKubeconfig,
-							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
-							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
-							"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
-						},
-						Ports: []corev1.ContainerPort{
-							{
-								Name:          "https",
-								Protocol:      tcpProto,
-								ContainerPort: serverPort.IntVal,
-							},
-							{
-								Name:          "metrics",
-								Protocol:      tcpProto,
-								ContainerPort: metricsPort.IntVal,
-							},
-						},
-						LivenessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/healthz",
-									Port:   healthPort,
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: 10,
-						},
-						ReadinessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/readyz",
-									Port:   healthPort,
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: 5,
-						},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceMemory: requestMemory,
-							},
-						},
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "lakom-config",
-								MountPath: lakomConfigDir,
-								ReadOnly:  true,
-							},
-							{
-								Name:      "lakom-server-tls",
-								ReadOnly:  true,
-								MountPath: webhookTLSCertDir,
-							},
-						},
-					}},
-					PriorityClassName: v1beta1constants.PriorityClassNameShootControlPlane300,
-					Volumes: []corev1.Volume{
-						{
-							Name: "lakom-config",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: lakomConfigConfigMap.Name,
-									},
-								},
-							},
-						},
-						{
-							Name: "lakom-server-tls",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: serverTLSSecretName,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
-
-	if err := gardenerutils.InjectGenericKubeconfig(lakomDeployment, genericKubeconfigName, shootAccessSecretName); err != nil {
-		return nil, err
-	}
-
-	if err := references.InjectAnnotations(lakomDeployment); err != nil {
-		return nil, err
-	}
-
-	lakomService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
-			Labels:    getLabels(),
-			Annotations: map[string]string{
-				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
-				"networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports": `[{"protocol":"TCP","port":` + serverPort.String() + `}]`,
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeClusterIP,
-			Selector: getLabels(),
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "https",
-					Protocol:   tcpProto,
-					Port:       443,
-					TargetPort: serverPort,
-				},
-				{
-					Name:       "metrics",
-					Protocol:   tcpProto,
-					Port:       2718,
-					TargetPort: metricsPort,
-				},
-			},
-		},
-	}
-
-	version, err := semver.NewVersion(seedK8SVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse seed k8s version %q as semantic version: %w", seedK8SVersion, err)
-	}
-	gardenerutils.ReconcileTopologyAwareRoutingSettings(lakomService, topologyAwareRoutingEnabled, version)
-
-	pdb := &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
-			Labels:    getLabels(),
-		},
-		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable:             ptr.To(intstr.FromInt32(1)),
-			Selector:                   &metav1.LabelSelector{MatchLabels: getLabels()},
-			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
-		},
-	}
-
-	resources, err := registry.AddAllAndSerialize(
-		lakomDeployment,
-		pdb,
-		&lakomConfigConfigMap,
-		&corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
-				Namespace: namespace,
-				Labels:    getLabels(),
-			},
-			AutomountServiceAccountToken: ptr.To[bool](false),
-		},
-		lakomService,
-		&vpaautoscalingv1.VerticalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.ExtensionServiceName,
-				Namespace: namespace,
-				Labels:    getLabels(),
-			},
-			Spec: vpaautoscalingv1.VerticalPodAutoscalerSpec{
-				ResourcePolicy: &vpaautoscalingv1.PodResourcePolicy{
-					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
-						{
-							ContainerName: constants.ApplicationName,
-							ControlledResources: &[]corev1.ResourceName{
-								corev1.ResourceMemory,
-							},
-						},
-					},
-				},
-				TargetRef: &autoscalingv1.CrossVersionObjectReference{
-					APIVersion: lakomDeployment.APIVersion,
-					Kind:       lakomDeployment.Kind,
-					Name:       lakomDeployment.Name,
-				},
-				UpdatePolicy: &vpaautoscalingv1.PodUpdatePolicy{
-					UpdateMode: &vpaUpdateMode,
-				},
-			},
-		},
-		&monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.ExtensionServiceName, namespace, "shoot"),
-			Spec: monitoringv1.ServiceMonitorSpec{
-				Selector: metav1.LabelSelector{MatchLabels: getLabels()},
-				Endpoints: []monitoringv1.Endpoint{{
-					Port:                 "metrics",
-					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
-				}},
-			},
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return resources, nil
+	return getLakomResources(lakomResourceOptions{
+		replicas:                    lakomReplicas,
+		serverTLSSecretName:         serverTLSSecretName,
+		lakomConfig:                 lakomConfig,
+		image:                       image,
+		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
+		allowUntrustedImages:        allowUntrustedImages,
+		allowInsecureRegistries:     allowInsecureRegistries,
+		topologyAwareRoutingEnabled: topologyAwareRoutingEnabled,
+		k8sVersion:                  seedK8SVersion,
+		serviceName:                 serviceName,
+		namespace:                   namespace,
+		podLabels:                   getLabels(),
+		priorityClassName:           v1beta1constants.PriorityClassNameShootControlPlane300,
+		serviceMonitorSuffix:        "shoot",
+		authMode:                    authInjectedKubeconfig,
+		genericKubeconfigName:       genericKubeconfigName,
+		accessSecretName:            shootAccessSecretName,
+	})
 }
 
 func getGardenVirtualResources(
 	lakomReplicas *int32,
 	namespace,
-	genericKubeconfigName, // ← new param, caller passes clusterCtx.genericTokenKubeconfigName
-	gardenAccessSecretName, // ← new param, caller passes lakomGardenAccessSecret.Secret.Name
+	genericKubeconfigName,
+	gardenAccessSecretName,
 	serverTLSSecretName,
 	lakomConfig,
 	image string,
@@ -493,302 +628,30 @@ func getGardenVirtualResources(
 	topologyAwareRoutingEnabled bool,
 	seedK8SVersion string,
 ) (map[string][]byte, error) {
-	var (
-		tcpProto                 = corev1.ProtocolTCP
-		serverPort               = intstr.FromInt32(10250)
-		metricsPort              = intstr.FromInt32(8080)
-		healthPort               = intstr.FromInt32(8081)
-		cacheTTL                 = time.Minute * 10
-		cacheRefreshInterval     = time.Second * 30
-		lakomConfigDir           = "/etc/lakom/config"
-		lakomConfigConfigMapName = constants.GardenVirtualExtensionServiceName + "-lakom-config"
-		webhookTLSCertDir        = "/etc/lakom/tls"
-		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestMemory            = resource.MustParse("25M")
-		vpaUpdateMode            = vpaautoscalingv1.UpdateModeRecreate
-	)
-
-	lakomConfigConfigMap := corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      lakomConfigConfigMapName,
-			Namespace: namespace,
-			Labels:    getLabels(),
-		},
-		Data: map[string]string{
-			"config.yaml": lakomConfig,
-		},
-	}
-
-	if err := kubernetesutils.MakeUnique(&lakomConfigConfigMap); err != nil {
-		return nil, err
-	}
-
-	lakomDeployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GardenVirtualExtensionServiceName,
-			Namespace: namespace,
-			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
-				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
-			}),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas:             lakomReplicas,
-			RevisionHistoryLimit: ptr.To[int32](2),
-			Selector:             &metav1.LabelSelector{MatchLabels: getGardenPodLabels(true)},
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
-					MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: utils.MergeStringMaps(getGardenPodLabels(true), map[string]string{
-						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
-						gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
-					}),
-				},
-				Spec: corev1.PodSpec{
-					Affinity: &corev1.Affinity{
-						PodAntiAffinity: &corev1.PodAntiAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
-								Weight: 100,
-								PodAffinityTerm: corev1.PodAffinityTerm{
-									TopologyKey:   corev1.LabelHostname,
-									LabelSelector: &metav1.LabelSelector{MatchLabels: getGardenPodLabels(true)},
-								},
-							}},
-						},
-					},
-					AutomountServiceAccountToken: ptr.To[bool](false),
-					ServiceAccountName:           constants.GardenVirtualExtensionServiceName,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: ptr.To(true),
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-					Containers: []corev1.Container{{
-						Name:            constants.ApplicationName,
-						Image:           image,
-						ImagePullPolicy: corev1.PullIfNotPresent,
-						SecurityContext: &corev1.SecurityContext{
-							AllowPrivilegeEscalation: ptr.To(false),
-							Privileged:               ptr.To(false),
-						},
-						Args: []string{
-							"--cache-ttl=" + cacheTTL.String(),
-							"--cache-refresh-interval=" + cacheRefreshInterval.String(),
-							"--lakom-config-path=" + lakomConfigDir + "/config.yaml",
-							"--tls-cert-dir=" + webhookTLSCertDir,
-							"--health-bind-address=:" + healthPort.String(),
-							"--metrics-bind-address=:" + metricsPort.String(),
-							"--port=" + serverPort.String(),
-							"--kubeconfig=" + gardenerutils.PathGenericKubeconfig,
-							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
-							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
-							"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
-						},
-						Ports: []corev1.ContainerPort{
-							{
-								Name:          "https",
-								Protocol:      tcpProto,
-								ContainerPort: serverPort.IntVal,
-							},
-							{
-								Name:          "metrics",
-								Protocol:      tcpProto,
-								ContainerPort: metricsPort.IntVal,
-							},
-						},
-						LivenessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/healthz",
-									Port:   healthPort,
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: 10,
-						},
-						ReadinessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/readyz",
-									Port:   healthPort,
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: 5,
-						},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceMemory: requestMemory,
-							},
-						},
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "lakom-config",
-								MountPath: lakomConfigDir,
-								ReadOnly:  true,
-							},
-							{
-								Name:      "lakom-server-tls",
-								ReadOnly:  true,
-								MountPath: webhookTLSCertDir,
-							},
-						},
-					}},
-					PriorityClassName: v1beta1constants.PriorityClassNameGardenSystem200,
-					Volumes: []corev1.Volume{
-						{
-							Name: "lakom-config",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: lakomConfigConfigMap.Name,
-									},
-								},
-							},
-						},
-						{
-							Name: "lakom-server-tls",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: serverTLSSecretName,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
-	if err := gardenerutils.InjectGenericKubeconfig(
-		lakomDeployment,
-		genericKubeconfigName,
-		gardenAccessSecretName,
-	); err != nil {
-		return nil, err
-	}
-
-	lakomService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GardenVirtualExtensionServiceName,
-			Namespace: namespace,
-			Labels:    getLabels(),
-			Annotations: map[string]string{
-				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
-				"networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports": `[{"protocol":"TCP","port":` + serverPort.String() + `}]`,
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeClusterIP,
-			Selector: getGardenPodLabels(true),
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "https",
-					Protocol:   tcpProto,
-					Port:       443,
-					TargetPort: serverPort,
-				},
-				{
-					Name:       "metrics",
-					Protocol:   tcpProto,
-					Port:       2718,
-					TargetPort: metricsPort,
-				},
-			},
-		},
-	}
-
-	version, err := semver.NewVersion(seedK8SVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse seed k8s version %q as semantic version: %w", seedK8SVersion, err)
-	}
-	gardenerutils.ReconcileTopologyAwareRoutingSettings(lakomService, topologyAwareRoutingEnabled, version)
-
-	pdb := &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GardenVirtualExtensionServiceName,
-			Namespace: namespace,
-			Labels:    getLabels(),
-		},
-		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable:             ptr.To(intstr.FromInt32(1)),
-			Selector:                   &metav1.LabelSelector{MatchLabels: getGardenPodLabels(true)},
-			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
-		},
-	}
-
-	resources, err := registry.AddAllAndSerialize(
-		lakomDeployment,
-		pdb,
-		&lakomConfigConfigMap,
-		&corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.GardenVirtualExtensionServiceName,
-				Namespace: namespace,
-				Labels:    getLabels(),
-			},
-			AutomountServiceAccountToken: ptr.To[bool](false),
-		},
-		lakomService,
-		&vpaautoscalingv1.VerticalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.GardenVirtualExtensionServiceName,
-				Namespace: namespace,
-				Labels:    getLabels(),
-			},
-			Spec: vpaautoscalingv1.VerticalPodAutoscalerSpec{
-				ResourcePolicy: &vpaautoscalingv1.PodResourcePolicy{
-					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
-						{
-							ContainerName: constants.ApplicationName,
-							ControlledResources: &[]corev1.ResourceName{
-								corev1.ResourceMemory,
-							},
-						},
-					},
-				},
-				TargetRef: &autoscalingv1.CrossVersionObjectReference{
-					APIVersion: lakomDeployment.APIVersion,
-					Kind:       lakomDeployment.Kind,
-					Name:       lakomDeployment.Name,
-				},
-				UpdatePolicy: &vpaautoscalingv1.PodUpdatePolicy{
-					UpdateMode: &vpaUpdateMode,
-				},
-			},
-		},
-		&monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.GardenVirtualExtensionServiceName, namespace, "garden-virtual"),
-			Spec: monitoringv1.ServiceMonitorSpec{
-				Selector: metav1.LabelSelector{MatchLabels: getGardenPodLabels(true)},
-				Endpoints: []monitoringv1.Endpoint{{
-					Port:                 "metrics",
-					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
-				}},
-			},
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return resources, nil
+	return getLakomResources(lakomResourceOptions{
+		replicas:                    lakomReplicas,
+		serverTLSSecretName:         serverTLSSecretName,
+		lakomConfig:                 lakomConfig,
+		image:                       image,
+		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
+		allowUntrustedImages:        allowUntrustedImages,
+		allowInsecureRegistries:     allowInsecureRegistries,
+		topologyAwareRoutingEnabled: topologyAwareRoutingEnabled,
+		k8sVersion:                  seedK8SVersion,
+		serviceName:                 constants.GardenVirtualExtensionServiceName,
+		namespace:                   namespace,
+		podLabels:                   getGardenPodLabels(true),
+		priorityClassName:           v1beta1constants.PriorityClassNameGardenSystem200,
+		serviceMonitorSuffix:        "garden-virtual",
+		authMode:                    authInjectedKubeconfig,
+		genericKubeconfigName:       genericKubeconfigName,
+		accessSecretName:            gardenAccessSecretName,
+	})
 }
 
 func getGardenRuntimeResources(
 	lakomReplicas *int32,
-	serverTLSSecretName,
+	serverTLSSecret *corev1.Secret,
 	lakomConfig,
 	image string,
 	useOnlyImagePullSecrets,
@@ -797,334 +660,28 @@ func getGardenRuntimeResources(
 	topologyAwareRoutingEnabled bool,
 	seedK8SVersion string,
 ) (map[string][]byte, error) {
-	var (
-		tcpProto                 = corev1.ProtocolTCP
-		serverPort               = intstr.FromInt32(10250)
-		metricsPort              = intstr.FromInt32(8080)
-		healthPort               = intstr.FromInt32(8081)
-		cacheTTL                 = time.Minute * 10
-		cacheRefreshInterval     = time.Second * 30
-		lakomConfigDir           = "/etc/lakom/config"
-		lakomConfigConfigMapName = constants.GardenRuntimeExtensionServiceName + "-lakom-config"
-		webhookTLSCertDir        = "/etc/lakom/tls"
-		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestMemory            = resource.MustParse("25M")
-		vpaUpdateMode            = vpaautoscalingv1.UpdateModeRecreate
-	)
-
-	lakomConfigConfigMap := corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      lakomConfigConfigMapName,
-			Namespace: constants.LakomSystemNamespace,
-			Labels:    getLabels(),
-		},
-		Data: map[string]string{
-			"config.yaml": lakomConfig,
-		},
-	}
-
-	if err := kubernetesutils.MakeUnique(&lakomConfigConfigMap); err != nil {
-		return nil, err
-	}
-
-	lakomSystemNamespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: constants.LakomSystemNamespace,
-			// Labels: getLabels(),
-		},
-	}
-
-	lakomDeployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GardenRuntimeExtensionServiceName,
-			Namespace: constants.LakomSystemNamespace,
-			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
-				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
-			}),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas:             lakomReplicas,
-			RevisionHistoryLimit: ptr.To[int32](2),
-			Selector:             &metav1.LabelSelector{MatchLabels: getGardenPodLabels(false)},
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
-					MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: utils.MergeStringMaps(getGardenPodLabels(false), map[string]string{
-						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
-						gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
-					}),
-				},
-				Spec: corev1.PodSpec{
-					Affinity: &corev1.Affinity{
-						PodAntiAffinity: &corev1.PodAntiAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
-								Weight: 100,
-								PodAffinityTerm: corev1.PodAffinityTerm{
-									TopologyKey:   corev1.LabelHostname,
-									LabelSelector: &metav1.LabelSelector{MatchLabels: getGardenPodLabels(false)},
-								},
-							}},
-						},
-					},
-					AutomountServiceAccountToken: ptr.To[bool](true),
-					ServiceAccountName:           constants.GardenRuntimeExtensionServiceName,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: ptr.To(true),
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-					Containers: []corev1.Container{{
-						Name:            constants.ApplicationName,
-						Image:           image,
-						ImagePullPolicy: corev1.PullIfNotPresent,
-						SecurityContext: &corev1.SecurityContext{
-							AllowPrivilegeEscalation: ptr.To(false),
-							Privileged:               ptr.To(false),
-						},
-						Args: []string{
-							"--cache-ttl=" + cacheTTL.String(),
-							"--cache-refresh-interval=" + cacheRefreshInterval.String(),
-							"--lakom-config-path=" + lakomConfigDir + "/config.yaml",
-							"--tls-cert-dir=" + webhookTLSCertDir,
-							"--health-bind-address=:" + healthPort.String(),
-							"--metrics-bind-address=:" + metricsPort.String(),
-							"--port=" + serverPort.String(),
-							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
-							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
-							"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
-						},
-						Ports: []corev1.ContainerPort{
-							{
-								Name:          "https",
-								Protocol:      tcpProto,
-								ContainerPort: serverPort.IntVal,
-							},
-							{
-								Name:          "metrics",
-								Protocol:      tcpProto,
-								ContainerPort: metricsPort.IntVal,
-							},
-						},
-						LivenessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/healthz",
-									Port:   healthPort,
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: 10,
-						},
-						ReadinessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/readyz",
-									Port:   healthPort,
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: 5,
-						},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceMemory: requestMemory,
-							},
-						},
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "lakom-config",
-								MountPath: lakomConfigDir,
-								ReadOnly:  true,
-							},
-							{
-								Name:      "lakom-server-tls",
-								ReadOnly:  true,
-								MountPath: webhookTLSCertDir,
-							},
-						},
-					}},
-					PriorityClassName: v1beta1constants.PriorityClassNameGardenSystem200,
-					Volumes: []corev1.Volume{
-						{
-							Name: "lakom-config",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: lakomConfigConfigMap.Name,
-									},
-								},
-							},
-						},
-						{
-							Name: "lakom-server-tls",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: serverTLSSecretName,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
-
-	if err := references.InjectAnnotations(lakomDeployment); err != nil {
-		return nil, err
-	}
-
-	lakomService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GardenRuntimeExtensionServiceName,
-			Namespace: constants.LakomSystemNamespace,
-			Labels:    getLabels(),
-			Annotations: map[string]string{
-				"networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports":  `[{"protocol":"TCP","port":` + metricsPort.String() + `}]`,
-				"networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports": `[{"protocol":"TCP","port":` + serverPort.String() + `}]`,
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeClusterIP,
-			Selector: getGardenPodLabels(false),
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "https",
-					Protocol:   tcpProto,
-					Port:       443,
-					TargetPort: serverPort,
-				},
-				{
-					Name:       "metrics",
-					Protocol:   tcpProto,
-					Port:       2718,
-					TargetPort: metricsPort,
-				},
-			},
-		},
-	}
-
-	version, err := semver.NewVersion(seedK8SVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse seed k8s version %q as semantic version: %w", seedK8SVersion, err)
-	}
-	gardenerutils.ReconcileTopologyAwareRoutingSettings(lakomService, topologyAwareRoutingEnabled, version)
-
-	pdb := &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GardenRuntimeExtensionServiceName,
-			Namespace: constants.LakomSystemNamespace,
-			Labels:    getLabels(),
-		},
-		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable:             ptr.To(intstr.FromInt32(1)),
-			Selector:                   &metav1.LabelSelector{MatchLabels: getGardenPodLabels(false)},
-			UnhealthyPodEvictionPolicy: ptr.To(policyv1.AlwaysAllow),
-		},
-	}
-
-	resources, err := registry.AddAllAndSerialize(
-		lakomSystemNamespace,
-		lakomDeployment,
-		pdb,
-		&lakomConfigConfigMap,
-		&corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.GardenRuntimeExtensionServiceName,
-				Namespace: constants.LakomSystemNamespace,
-				Labels:    getLabels(),
-			},
-			AutomountServiceAccountToken: ptr.To[bool](true),
-		},
-		&rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.GardenRuntimeExtensionServiceName,
-				Namespace: constants.LakomSystemNamespace,
-				Labels:    getLabels(),
-			},
-			Rules: []rbacv1.PolicyRule{
-				{
-					APIGroups: []string{""},
-					Resources: []string{"secrets"},
-					Verbs:     []string{"get", "list", "watch"},
-				},
-			},
-		},
-		&rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.GardenRuntimeExtensionServiceName,
-				Namespace: constants.LakomSystemNamespace,
-				Labels:    getLabels(),
-			},
-			RoleRef: rbacv1.RoleRef{
-				APIGroup: "rbac.authorization.k8s.io",
-				Kind:     "Role",
-				Name:     constants.GardenRuntimeExtensionServiceName,
-			},
-			Subjects: []rbacv1.Subject{
-				{
-					Kind:      rbacv1.ServiceAccountKind,
-					Name:      constants.GardenRuntimeExtensionServiceName,
-					Namespace: constants.LakomSystemNamespace,
-				},
-			},
-		},
-		lakomService,
-		&vpaautoscalingv1.VerticalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.GardenRuntimeExtensionServiceName,
-				Namespace: constants.LakomSystemNamespace,
-				Labels:    getLabels(),
-			},
-			Spec: vpaautoscalingv1.VerticalPodAutoscalerSpec{
-				ResourcePolicy: &vpaautoscalingv1.PodResourcePolicy{
-					ContainerPolicies: []vpaautoscalingv1.ContainerResourcePolicy{
-						{
-							ContainerName: constants.ApplicationName,
-							ControlledResources: &[]corev1.ResourceName{
-								corev1.ResourceMemory,
-							},
-						},
-					},
-				},
-				TargetRef: &autoscalingv1.CrossVersionObjectReference{
-					APIVersion: lakomDeployment.APIVersion,
-					Kind:       lakomDeployment.Kind,
-					Name:       lakomDeployment.Name,
-				},
-				UpdatePolicy: &vpaautoscalingv1.PodUpdatePolicy{
-					UpdateMode: &vpaUpdateMode,
-				},
-			},
-		},
-		&monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.GardenRuntimeExtensionServiceName, constants.LakomSystemNamespace, "garden-runtime"),
-			Spec: monitoringv1.ServiceMonitorSpec{
-				Selector: metav1.LabelSelector{MatchLabels: getGardenPodLabels(false)},
-				Endpoints: []monitoringv1.Endpoint{{
-					Port:                 "metrics",
-					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
-				}},
-			},
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return resources, nil
+	return getLakomResources(lakomResourceOptions{
+		replicas:                    lakomReplicas,
+		serverTLSSecretName:         serverTLSSecret.Name,
+		lakomConfig:                 lakomConfig,
+		image:                       image,
+		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
+		allowUntrustedImages:        allowUntrustedImages,
+		allowInsecureRegistries:     allowInsecureRegistries,
+		topologyAwareRoutingEnabled: topologyAwareRoutingEnabled,
+		k8sVersion:                  seedK8SVersion,
+		serviceName:                 constants.GardenRuntimeExtensionServiceName,
+		namespace:                   constants.LakomSystemNamespace,
+		podLabels:                   getGardenPodLabels(false),
+		priorityClassName:           v1beta1constants.PriorityClassNameGardenSystem200,
+		serviceMonitorSuffix:        "garden-runtime",
+		authMode:                    authInClusterToken,
+		createNamespace:             true,
+		createInClusterRBAC:         true,
+		// The runtime pod lives in lakom-system but the secretsManager generated the cert in the extension
+		// namespace, so deliver a copy of the secret into lakom-system via the ManagedResource.
+		tlsServerSecret: serverTLSSecret,
+	})
 }
 
 func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string, dashboardEnabled bool) []client.Object {
@@ -1190,10 +747,8 @@ type webhookVariant struct {
 	useServiceClientConfig bool
 	namespaceSelector      metav1.LabelSelector
 	objectSelector         metav1.LabelSelector
-	// scope and dashboardEnabled are only used to build the resource-reader RoleBindings for variants that
-	// set resourceReaderSA (shoot/virtual).
-	scope            lakom.ScopeType
-	dashboardEnabled bool
+	scope                  lakom.ScopeType
+	dashboardEnabled       bool
 }
 
 func shootWebhookVariant(configName, resourceReaderSA string, scope lakom.ScopeType, dashboardEnabled bool) webhookVariant {

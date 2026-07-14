@@ -92,7 +92,6 @@ func getLakomReplicas(hibernated bool) *int32 {
 func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
 	extensionClass := extensionsv1alpha1helper.GetExtensionClassOrDefault(ex.Spec.GetExtensionClass())
 
-	logger.Info("!!!!!!!! Reconciling Extension resource", "extensionClass", extensionClass)
 	switch extensionClass {
 	case extensionsv1alpha1.ExtensionClassShoot:
 		return a.reconcileShoot(ctx, logger, ex)
@@ -133,6 +132,7 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 
 	seedResources, err := getSeedResources(
 		getLakomReplicas(clusterCtx.hibernated),
+		constants.ExtensionServiceName,
 		clusterCtx.namespace,
 		clusterCtx.genericTokenKubeconfigName,
 		lakomShootAccessSecret.Secret.Name,
@@ -205,7 +205,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 
 	runtimeResources, err := getGardenRuntimeResources(
 		getLakomReplicas(false),
-		generatedSecrets[constants.GardenRuntimeWebhookTLSSecretName].Name,
+		generatedSecrets[constants.GardenRuntimeWebhookTLSSecretName],
 		string(lakomPublicKeys),
 		image,
 		a.serviceConfig.UseOnlyImagePullSecrets,

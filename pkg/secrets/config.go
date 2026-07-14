@@ -79,9 +79,10 @@ func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 				CertType:                    secretsutils.ServerCert,
 				SkipPublishingCACertificate: true,
 			},
+			// The cert is generated into the extension namespace where the secretsManager operates
+			// runtime ManagedResource then delivers a copy into lakom-system
 			Options: []secretsmanager.GenerateOption{
 				secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA),
-				secretsmanager.Namespace(constants.LakomSystemNamespace),
 			},
 		},
 	}
