@@ -25,6 +25,8 @@ const (
 	KubeSystemManagedByGardener ScopeType = "KubeSystemManagedByGardener"
 	// Cluster scope configured lakom admission for all pods in all namespaces.
 	Cluster ScopeType = "Cluster"
+	// ExcludeLakomSystem scope is used to exclude the `lakom-system` namespace from the configured scope of lakom admission.
+	ExcludeLakomSystem ScopeType = "ExcludeLakomSystem"
 )
 
 // AllowedScopes lists the scopes that can be chosen for lakom.

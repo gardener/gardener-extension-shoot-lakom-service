@@ -26,7 +26,6 @@ import (
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
-	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
 	"github.com/gardener/gardener/pkg/extensions"
 	"github.com/gardener/gardener/pkg/utils"
 	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
@@ -151,13 +150,11 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 	}
 
 	shootResources, err := getWebhookResources(
-		shootWebhookVariant(constants.WebhookConfigurationName, lakomShootAccessSecret.ServiceAccountName),
+		shootWebhookVariant(constants.WebhookConfigurationName, lakomShootAccessSecret.ServiceAccountName, *lakomProviderConfig.Scope, clusterCtx.dashboardEnabled),
 		caBundle,
 		shootWebhookRules,
 		constants.ExtensionServiceName,
 		clusterCtx.namespace,
-		*lakomProviderConfig.Scope,
-		clusterCtx.dashboardEnabled,
 	)
 	if err != nil {
 		return err
@@ -208,7 +205,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 
 	runtimeResources, err := getGardenRuntimeResources(
 		getLakomReplicas(false),
-		generatedSecrets[constants.RuntimeGardenWebhookTLSSecretName].Name,
+		generatedSecrets[constants.GardenRuntimeWebhookTLSSecretName].Name,
 		string(lakomPublicKeys),
 		image,
 		a.serviceConfig.UseOnlyImagePullSecrets,
@@ -226,7 +223,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		clusterCtx.namespace,
 		clusterCtx.genericTokenKubeconfigName,
 		gardenAccessSecret.Secret.Name,
-		generatedSecrets[constants.VirtualGardenWebhookTLSSecretName].Name,
+		generatedSecrets[constants.GardenVirtualWebhookTLSSecretName].Name,
 		string(lakomPublicKeys),
 		image,
 		a.serviceConfig.UseOnlyImagePullSecrets,
@@ -240,26 +237,22 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 	}
 
 	virtualGardenWebhookConfigResources, err := getWebhookResources(
-		shootWebhookVariant(constants.WebhookConfigurationName, gardenAccessSecret.ServiceAccountName),
+		gardenVirtualWebhookVariant(gardenAccessSecret.ServiceAccountName, *lakomProviderConfig.Scope, clusterCtx.dashboardEnabled),
 		caBundle,
 		gardenWebhookVirtualGardenRules,
-		constants.VirtualGardenExtensionServiceName,
+		constants.GardenVirtualExtensionServiceName,
 		clusterCtx.namespace,
-		*lakomProviderConfig.Scope,
-		clusterCtx.dashboardEnabled,
 	)
 	if err != nil {
 		return err
 	}
 
 	runtimeWebhookConfigResources, err := getWebhookResources(
-		runtimeWebhookVariant(),
+		gardenRuntimeWebhookVariant(),
 		caBundle,
 		gardenWebhookRuntimeRules,
-		constants.RuntimeGardenExtensionServiceName,
+		constants.GardenRuntimeExtensionServiceName,
 		constants.LakomSystemNamespace,
-		*lakomProviderConfig.Scope,
-		clusterCtx.dashboardEnabled,
 	)
 	if err != nil {
 		return err
@@ -287,7 +280,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		a.client,
 		clusterCtx.namespace,
 		constants.ManagedResourceNamesGardenVirtualShoot,
-		constants.VirtualGardenExtensionServiceName,
+		constants.GardenVirtualExtensionServiceName,
 		false,
 		virtualGardenWebhookConfigResources); err != nil {
 		return err
@@ -561,49 +554,14 @@ func getLabels() map[string]string {
 
 // getGardenPodLabels returns the pod selector/template labels for a garden deployment variant.
 func getGardenPodLabels(virtualGarden bool) map[string]string {
-	instance := constants.RuntimeGardenExtensionServiceName
+	instance := constants.GardenRuntimeExtensionServiceName
 	if virtualGarden {
-		instance = constants.VirtualGardenExtensionServiceName
+		instance = constants.GardenVirtualExtensionServiceName
 	}
 
 	return utils.MergeStringMaps(getLabels(), map[string]string{
 		"app.kubernetes.io/instance": instance,
 	})
-}
-
-func scopeToObjectSelector(scope lakom.ScopeType) metav1.LabelSelector {
-	if scope == lakom.KubeSystemManagedByGardener {
-		return metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key:      resourcesv1alpha1.ManagedBy,
-				Operator: metav1.LabelSelectorOpIn,
-				Values:   []string{"gardener"},
-			},
-		}}
-	}
-
-	return metav1.LabelSelector{}
-}
-
-func scopeToNamespaceSelector(scope lakom.ScopeType, dashboardEnabled bool) metav1.LabelSelector {
-	if scope == lakom.Cluster {
-		return metav1.LabelSelector{}
-	}
-
-	namespaces := []string{metav1.NamespaceSystem}
-	if dashboardEnabled {
-		// TODO(vpnachev): Remove after support for shoots using kubernetes version <v1.35.0 is dropped,
-		// i.e. the support for the kubernetes dashboard addon is removed.
-		namespaces = append(namespaces, kubernetesDashboardNamespaceName)
-	}
-
-	return metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
-		{
-			Key:      corev1.LabelMetadataName,
-			Operator: metav1.LabelSelectorOpIn,
-			Values:   namespaces,
-		},
-	}}
 }
 
 func getClientKeys(ctx context.Context, client client.Client, resources []gardencorev1beta1.NamedResourceReference, resourceName, namespace string) ([]byte, error) {
