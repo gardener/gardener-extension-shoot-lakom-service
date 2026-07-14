@@ -88,8 +88,6 @@ func getWebhookResources(
 	webhookRRules []admissionregistrationv1.RuleWithOperations,
 	serviceName,
 	extensionNamespace string,
-	scope lakom.ScopeType,
-	dashboardEnabled bool,
 ) (map[string][]byte, error) {
 	clientConfigFor := func(path string) admissionregistrationv1.WebhookClientConfig {
 		if webhookVariant.useServiceClientConfig {
@@ -103,8 +101,8 @@ func getWebhookResources(
 		sideEffectClass   = admissionregistrationv1.SideEffectClassNone
 		failurePolicy     = admissionregistrationv1.Fail
 		timeOutSeconds    = ptr.To[int32](25)
-		namespaceSelector = scopeToNamespaceSelector(scope, dashboardEnabled)
-		objectSelector    = scopeToObjectSelector(scope)
+		namespaceSelector = webhookVariant.namespaceSelector
+		objectSelector    = webhookVariant.objectSelector
 		clientObjects     = []client.Object{
 			&admissionregistrationv1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
@@ -161,7 +159,7 @@ func getWebhookResources(
 				},
 			})
 		clientObjects = append(clientObjects,
-			getRoleBindings(scope, webhookVariant.resourceReaderSA, dashboardEnabled)...)
+			getRoleBindings(webhookVariant.scope, webhookVariant.resourceReaderSA, webhookVariant.dashboardEnabled)...)
 
 	}
 
@@ -503,7 +501,7 @@ func getGardenVirtualResources(
 		cacheTTL                 = time.Minute * 10
 		cacheRefreshInterval     = time.Second * 30
 		lakomConfigDir           = "/etc/lakom/config"
-		lakomConfigConfigMapName = constants.VirtualGardenExtensionServiceName + "-lakom-config"
+		lakomConfigConfigMapName = constants.GardenVirtualExtensionServiceName + "-lakom-config"
 		webhookTLSCertDir        = "/etc/lakom/tls"
 		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
 		requestMemory            = resource.MustParse("25M")
@@ -527,7 +525,7 @@ func getGardenVirtualResources(
 
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.VirtualGardenExtensionServiceName,
+			Name:      constants.GardenVirtualExtensionServiceName,
 			Namespace: namespace,
 			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
 				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
@@ -567,7 +565,7 @@ func getGardenVirtualResources(
 						},
 					},
 					AutomountServiceAccountToken: ptr.To[bool](false),
-					ServiceAccountName:           constants.VirtualGardenExtensionServiceName,
+					ServiceAccountName:           constants.GardenVirtualExtensionServiceName,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &corev1.SeccompProfile{
@@ -682,7 +680,7 @@ func getGardenVirtualResources(
 
 	lakomService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.VirtualGardenExtensionServiceName,
+			Name:      constants.GardenVirtualExtensionServiceName,
 			Namespace: namespace,
 			Labels:    getLabels(),
 			Annotations: map[string]string{
@@ -718,7 +716,7 @@ func getGardenVirtualResources(
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.VirtualGardenExtensionServiceName,
+			Name:      constants.GardenVirtualExtensionServiceName,
 			Namespace: namespace,
 			Labels:    getLabels(),
 		},
@@ -735,7 +733,7 @@ func getGardenVirtualResources(
 		&lakomConfigConfigMap,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.VirtualGardenExtensionServiceName,
+				Name:      constants.GardenVirtualExtensionServiceName,
 				Namespace: namespace,
 				Labels:    getLabels(),
 			},
@@ -744,7 +742,7 @@ func getGardenVirtualResources(
 		lakomService,
 		&vpaautoscalingv1.VerticalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.VirtualGardenExtensionServiceName,
+				Name:      constants.GardenVirtualExtensionServiceName,
 				Namespace: namespace,
 				Labels:    getLabels(),
 			},
@@ -770,7 +768,7 @@ func getGardenVirtualResources(
 			},
 		},
 		&monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.VirtualGardenExtensionServiceName, namespace, "virtual-garden"),
+			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.GardenVirtualExtensionServiceName, namespace, "garden-virtual"),
 			Spec: monitoringv1.ServiceMonitorSpec{
 				Selector: metav1.LabelSelector{MatchLabels: getGardenPodLabels(true)},
 				Endpoints: []monitoringv1.Endpoint{{
@@ -807,7 +805,7 @@ func getGardenRuntimeResources(
 		cacheTTL                 = time.Minute * 10
 		cacheRefreshInterval     = time.Second * 30
 		lakomConfigDir           = "/etc/lakom/config"
-		lakomConfigConfigMapName = constants.RuntimeGardenExtensionServiceName + "-lakom-config"
+		lakomConfigConfigMapName = constants.GardenRuntimeExtensionServiceName + "-lakom-config"
 		webhookTLSCertDir        = "/etc/lakom/tls"
 		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
 		requestMemory            = resource.MustParse("25M")
@@ -838,7 +836,7 @@ func getGardenRuntimeResources(
 
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.RuntimeGardenExtensionServiceName,
+			Name:      constants.GardenRuntimeExtensionServiceName,
 			Namespace: constants.LakomSystemNamespace,
 			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
 				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
@@ -878,7 +876,7 @@ func getGardenRuntimeResources(
 						},
 					},
 					AutomountServiceAccountToken: ptr.To[bool](true),
-					ServiceAccountName:           constants.RuntimeGardenExtensionServiceName,
+					ServiceAccountName:           constants.GardenRuntimeExtensionServiceName,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &corev1.SeccompProfile{
@@ -989,7 +987,7 @@ func getGardenRuntimeResources(
 
 	lakomService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.RuntimeGardenExtensionServiceName,
+			Name:      constants.GardenRuntimeExtensionServiceName,
 			Namespace: constants.LakomSystemNamespace,
 			Labels:    getLabels(),
 			Annotations: map[string]string{
@@ -1025,7 +1023,7 @@ func getGardenRuntimeResources(
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.RuntimeGardenExtensionServiceName,
+			Name:      constants.GardenRuntimeExtensionServiceName,
 			Namespace: constants.LakomSystemNamespace,
 			Labels:    getLabels(),
 		},
@@ -1043,7 +1041,7 @@ func getGardenRuntimeResources(
 		&lakomConfigConfigMap,
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.RuntimeGardenExtensionServiceName,
+				Name:      constants.GardenRuntimeExtensionServiceName,
 				Namespace: constants.LakomSystemNamespace,
 				Labels:    getLabels(),
 			},
@@ -1051,7 +1049,7 @@ func getGardenRuntimeResources(
 		},
 		&rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.RuntimeGardenExtensionServiceName,
+				Name:      constants.GardenRuntimeExtensionServiceName,
 				Namespace: constants.LakomSystemNamespace,
 				Labels:    getLabels(),
 			},
@@ -1065,19 +1063,19 @@ func getGardenRuntimeResources(
 		},
 		&rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.RuntimeGardenExtensionServiceName,
+				Name:      constants.GardenRuntimeExtensionServiceName,
 				Namespace: constants.LakomSystemNamespace,
 				Labels:    getLabels(),
 			},
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: "rbac.authorization.k8s.io",
 				Kind:     "Role",
-				Name:     constants.RuntimeGardenExtensionServiceName,
+				Name:     constants.GardenRuntimeExtensionServiceName,
 			},
 			Subjects: []rbacv1.Subject{
 				{
 					Kind:      rbacv1.ServiceAccountKind,
-					Name:      constants.RuntimeGardenExtensionServiceName,
+					Name:      constants.GardenRuntimeExtensionServiceName,
 					Namespace: constants.LakomSystemNamespace,
 				},
 			},
@@ -1085,7 +1083,7 @@ func getGardenRuntimeResources(
 		lakomService,
 		&vpaautoscalingv1.VerticalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.RuntimeGardenExtensionServiceName,
+				Name:      constants.GardenRuntimeExtensionServiceName,
 				Namespace: constants.LakomSystemNamespace,
 				Labels:    getLabels(),
 			},
@@ -1111,7 +1109,7 @@ func getGardenRuntimeResources(
 			},
 		},
 		&monitoringv1.ServiceMonitor{
-			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.RuntimeGardenExtensionServiceName, constants.LakomSystemNamespace, "garden-runtime"),
+			ObjectMeta: monitoringutils.ConfigObjectMeta(constants.GardenRuntimeExtensionServiceName, constants.LakomSystemNamespace, "garden-runtime"),
 			Spec: monitoringv1.ServiceMonitorSpec{
 				Selector: metav1.LabelSelector{MatchLabels: getGardenPodLabels(false)},
 				Endpoints: []monitoringv1.Endpoint{{
@@ -1190,6 +1188,51 @@ type webhookVariant struct {
 	configName             string
 	resourceReaderSA       string
 	useServiceClientConfig bool
+	namespaceSelector      metav1.LabelSelector
+	objectSelector         metav1.LabelSelector
+	// scope and dashboardEnabled are only used to build the resource-reader RoleBindings for variants that
+	// set resourceReaderSA (shoot/virtual).
+	scope            lakom.ScopeType
+	dashboardEnabled bool
+}
+
+func shootWebhookVariant(configName, resourceReaderSA string, scope lakom.ScopeType, dashboardEnabled bool) webhookVariant {
+	return webhookVariant{
+		registry:          managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
+		configName:        configName,
+		resourceReaderSA:  resourceReaderSA,
+		namespaceSelector: scopeToNamespaceSelector(scope, dashboardEnabled),
+		objectSelector:    scopeToObjectSelector(scope),
+		scope:             scope,
+		dashboardEnabled:  dashboardEnabled,
+	}
+}
+
+func gardenRuntimeWebhookVariant() webhookVariant {
+	return webhookVariant{
+		registry:               managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer),
+		configName:             constants.GardenRuntimeWebhookConfigurationName,
+		useServiceClientConfig: true,
+		namespaceSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      corev1.LabelMetadataName,
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{constants.LakomSystemNamespace},
+			},
+		}},
+	}
+}
+
+func gardenVirtualWebhookVariant(resourceReaderSA string, scope lakom.ScopeType, dashboardEnabled bool) webhookVariant {
+	return webhookVariant{
+		registry:          managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
+		configName:        constants.GardenVirtualWebhookConfigurationName,
+		resourceReaderSA:  resourceReaderSA,
+		namespaceSelector: scopeToNamespaceSelector(scope, dashboardEnabled),
+		objectSelector:    scopeToObjectSelector(scope),
+		scope:             scope,
+		dashboardEnabled:  dashboardEnabled,
+	}
 }
 
 // serviceBasedWebhookClientConfig builds a Service-based webhook client config
@@ -1213,18 +1256,37 @@ func urlBasedWebhookClientConfig(caBundle []byte, host, path string) admissionre
 	}
 }
 
-func shootWebhookVariant(configName, resourceReaderSA string) webhookVariant {
-	return webhookVariant{
-		registry:         managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
-		configName:       configName,
-		resourceReaderSA: resourceReaderSA,
+func scopeToObjectSelector(scope lakom.ScopeType) metav1.LabelSelector {
+	if scope == lakom.KubeSystemManagedByGardener {
+		return metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      resourcesv1alpha1.ManagedBy,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"gardener"},
+			},
+		}}
 	}
+
+	return metav1.LabelSelector{}
 }
 
-func runtimeWebhookVariant() webhookVariant {
-	return webhookVariant{
-		registry:               managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer),
-		configName:             constants.RuntimeWebhookConfigurationName,
-		useServiceClientConfig: true,
+func scopeToNamespaceSelector(scope lakom.ScopeType, dashboardEnabled bool) metav1.LabelSelector {
+	if scope == lakom.Cluster {
+		return metav1.LabelSelector{}
 	}
+
+	namespaces := []string{metav1.NamespaceSystem}
+	if dashboardEnabled {
+		// TODO(vpnachev): Remove after support for shoots using kubernetes version <v1.35.0 is dropped,
+		// i.e. the support for the kubernetes dashboard addon is removed.
+		namespaces = append(namespaces, kubernetesDashboardNamespaceName)
+	}
+
+	return metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+		{
+			Key:      corev1.LabelMetadataName,
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   namespaces,
+		},
+	}}
 }

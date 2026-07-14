@@ -63,9 +63,9 @@ func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 		},
 		{
 			Config: &secretsutils.CertificateSecretConfig{
-				Name:                        constants.VirtualGardenWebhookTLSSecretName,
-				CommonName:                  constants.VirtualGardenExtensionServiceName,
-				DNSNames:                    kubernetesutils.DNSNamesForService(constants.VirtualGardenExtensionServiceName, v1beta1constants.GardenNamespace),
+				Name:                        constants.GardenVirtualWebhookTLSSecretName,
+				CommonName:                  constants.GardenVirtualExtensionServiceName,
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.GardenVirtualExtensionServiceName, v1beta1constants.GardenNamespace),
 				CertType:                    secretsutils.ServerCert,
 				SkipPublishingCACertificate: true,
 			},
@@ -75,9 +75,9 @@ func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 		},
 		{
 			Config: &secretsutils.CertificateSecretConfig{
-				Name:                        constants.RuntimeGardenWebhookTLSSecretName,
-				CommonName:                  constants.RuntimeGardenExtensionServiceName,
-				DNSNames:                    kubernetesutils.DNSNamesForService(constants.RuntimeGardenExtensionServiceName, constants.LakomSystemNamespace),
+				Name:                        constants.GardenRuntimeWebhookTLSSecretName,
+				CommonName:                  constants.GardenRuntimeExtensionServiceName,
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.GardenRuntimeExtensionServiceName, constants.LakomSystemNamespace),
 				CertType:                    secretsutils.ServerCert,
 				SkipPublishingCACertificate: true,
 			},

@@ -15,10 +15,10 @@ const (
 	ExtensionServiceName = "extension-" + ExtensionType
 	// GardenerExtensionName is the extension name.
 	GardenerExtensionName = "gardener-extension-" + ExtensionType
-	// RuntimeGardenExtensionServiceName is the name of the Lakom service for the runtime garden deployment.
-	RuntimeGardenExtensionServiceName = ExtensionServiceName + "-runtime-garden"
-	// VirtualGardenExtensionServiceName is the name of the Lakom service for the virtual garden deployment.
-	VirtualGardenExtensionServiceName = ExtensionServiceName + "-virtual-garden"
+	// GardenRuntimeExtensionServiceName is the name of the Lakom service for the runtime garden deployment.
+	GardenRuntimeExtensionServiceName = ExtensionServiceName + "-garden-runtime"
+	// GardenVirtualExtensionServiceName is the name of the Lakom service for the virtual garden deployment.
+	GardenVirtualExtensionServiceName = ExtensionServiceName + "-garden-virtual"
 	// ManagedResourceNamesSeed is the name used to describe the managed seed resources.
 	ManagedResourceNamesSeed = ExtensionServiceName + "-seed"
 	// ManagedResourceNamesShoot is the name used to describe the managed shoot resources.
@@ -31,14 +31,16 @@ const (
 	ManagedResourceNamesGardenRuntimeWebhook = ExtensionServiceName + "-garden-runtime-webhook"
 	// ManagedResourceNamesGardenVirtualShoot is the name of the shoot ManagedResource carrying the virtual garden webhook configs (registered in the virtual garden).
 	ManagedResourceNamesGardenVirtualShoot = ExtensionServiceName + "-garden-virtual-shoot"
-	// VirtualGardenWebhookTLSSecretName is the name of the TLS secret resource used by the virtual garden lakom webhook.
-	VirtualGardenWebhookTLSSecretName = VirtualGardenExtensionServiceName + "-tls"
-	// RuntimeGardenWebhookTLSSecretName is the name of the TLS secret resource used by the runtime garden lakom webhook.
-	RuntimeGardenWebhookTLSSecretName = RuntimeGardenExtensionServiceName + "-tls"
+	// GardenVirtualWebhookTLSSecretName is the name of the TLS secret resource used by the virtual garden lakom webhook.
+	GardenVirtualWebhookTLSSecretName = GardenVirtualExtensionServiceName + "-tls"
+	// GardenRuntimeWebhookTLSSecretName is the name of the TLS secret resource used by the runtime garden lakom webhook.
+	GardenRuntimeWebhookTLSSecretName = GardenRuntimeExtensionServiceName + "-tls"
 	// WebhookConfigurationName is the name of the webhook configuration(s) deployed in the shoot cluster.
 	WebhookConfigurationName = GardenerExtensionName + "-shoot"
-	// RuntimeWebhookConfigurationName is the name of the webhook configuration(s) registered in the runtime garden cluster.
-	RuntimeWebhookConfigurationName = GardenerExtensionName + "-runtime-garden"
+	// GardenVirtualWebhookConfigurationName is the name of the webhook configuration(s) registered in the virtual garden cluster.
+	GardenVirtualWebhookConfigurationName = GardenerExtensionName + "-virtual-garden"
+	// GardenRuntimeWebhookConfigurationName is the name of the webhook configuration(s) registered in the runtime garden cluster.
+	GardenRuntimeWebhookConfigurationName = GardenerExtensionName + "-runtime-garden"
 	// WebhookTLSSecretName is the name of the TLS secret resource used by the shoot lakom webhook.
 	WebhookTLSSecretName = ExtensionServiceName + "-tls"
 	// SeedApplicationName is the name for resource describing the components bootstrapping the seed by the extension controller.

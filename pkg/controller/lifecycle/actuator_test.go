@@ -56,6 +56,26 @@ var _ = Describe("Actuator", func() {
 		Expect(appPartOf).To(Equal("shoot-lakom-service"))
 	})
 
+	DescribeTable("Should get the garden pod labels with a variant-specific instance label",
+		func(virtualGarden bool, expectedInstance string) {
+			labels := getGardenPodLabels(virtualGarden)
+
+			// The common labels must always be present ...
+			Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/name", "lakom"))
+			Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "shoot-lakom-service"))
+			// ... plus the variant-specific instance label used to give the runtime and
+			// virtual garden deployments disjoint selectors.
+			Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/instance", expectedInstance))
+			Expect(labels).To(HaveLen(3))
+		},
+		Entry("Runtime garden variant", false, constants.GardenRuntimeExtensionServiceName),
+		Entry("Virtual garden variant", true, constants.GardenVirtualExtensionServiceName),
+	)
+
+	It("Should give the runtime and virtual garden variants disjoint selectors", func() {
+		Expect(getGardenPodLabels(false)).ToNot(Equal(getGardenPodLabels(true)))
+	})
+
 	DescribeTable("Should get the expected scope", func(configurableScope lakom.ScopeType, expected string) {
 		Expect(getScope(lakom.ScopeType(configurableScope))).To(BeEquivalentTo(&expected))
 	},
@@ -123,7 +143,7 @@ var _ = Describe("Actuator", func() {
 
 		It("Should ensure the correct shoot resources are created", func() {
 
-			resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, scope, false)
+			resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, false), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 			Expect(err).ToNot(HaveOccurred())
@@ -136,7 +156,7 @@ var _ = Describe("Actuator", func() {
 			))
 
 			By("Enable kubernetes dashboard addon")
-			resources, err = getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, scope, true)
+			resources, err = getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, true), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err = test.ExtractManifestsFromManagedResourceData(resources)
 			Expect(err).ToNot(HaveOccurred())
@@ -152,7 +172,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), ca, shootWebhookRules, constants.ExtensionServiceName, ns, scope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled), ca, shootWebhookRules, constants.ExtensionServiceName, ns)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -165,7 +185,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), ca, shootWebhookRules, constants.ExtensionServiceName, ns, scope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled), ca, shootWebhookRules, constants.ExtensionServiceName, ns)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -178,7 +198,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should return an empty object selector for the webhooks when scope is KubeSystem",
 			func(ca []byte, ns string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), ca, shootWebhookRules, constants.ExtensionServiceName, ns, lakom.KubeSystem, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, lakom.KubeSystem, dashboardEnabled), ca, shootWebhookRules, constants.ExtensionServiceName, ns)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -194,7 +214,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the rolebinding is correctly set",
 			func(saName string, lakomScope lakom.ScopeType, bindingNamespace string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, saName), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, lakomScope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, saName, lakomScope, dashboardEnabled), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -208,7 +228,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should return the correct object and namespace selectors based on scope",
 			func(scope lakom.ScopeType, objectSelector, namespaceSelector string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace, scope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -223,6 +243,73 @@ var _ = Describe("Actuator", func() {
 			Entry("Cluster scope", lakom.Cluster, emptyObjectSelector, emptyNamespaceSelector),
 		)
 
+	})
+
+	Context("webhookVariant constructors", func() {
+		It("Should build a shoot webhook variant that is URL-based and carries a resource-reader ServiceAccount", func() {
+			v := shootWebhookVariant(constants.WebhookConfigurationName, "some-sa", lakom.KubeSystemManagedByGardener, false)
+
+			Expect(v.configName).To(Equal(constants.WebhookConfigurationName))
+			Expect(v.resourceReaderSA).To(Equal("some-sa"))
+			Expect(v.useServiceClientConfig).To(BeFalse())
+			Expect(v.registry).ToNot(BeNil())
+		})
+
+		It("Should build a runtime webhook variant that is Service-based and has no resource-reader ServiceAccount", func() {
+			v := gardenRuntimeWebhookVariant()
+
+			Expect(v.configName).To(Equal(constants.GardenRuntimeWebhookConfigurationName))
+			// The runtime lakom runs in the same (runtime) cluster it validates, so it is reached
+			// via a Service reference rather than a URL, and it reads secrets in-cluster instead of
+			// through a shoot-access ServiceAccount.
+			Expect(v.resourceReaderSA).To(BeEmpty())
+			Expect(v.useServiceClientConfig).To(BeTrue())
+			Expect(v.registry).ToNot(BeNil())
+		})
+	})
+
+	Context("getWebhookResources for the garden extension class", func() {
+		var (
+			caBundle = []byte("caBundle")
+		)
+
+		It("Should create Service-based runtime garden webhook configs without any RBAC resources", func() {
+			resources, err := getWebhookResources(
+				gardenRuntimeWebhookVariant(),
+				caBundle,
+				gardenWebhookRuntimeRules,
+				constants.GardenRuntimeExtensionServiceName,
+				constants.LakomSystemNamespace,
+			)
+			Expect(err).ToNot(HaveOccurred())
+			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+			Expect(err).ToNot(HaveOccurred())
+
+			// The runtime variant has no resourceReaderSA, so only the two webhook configs are
+			// rendered - no ClusterRole and no (Cluster)RoleBinding.
+			Expect(manifests).To(ConsistOf(
+				expectedRuntimeGardenMutatingWebhook(caBundle),
+				expectedRuntimeGardenValidatingWebhook(caBundle),
+			))
+		})
+
+		It("Should create URL-based virtual garden webhook configs targeting the virtual garden resources", func() {
+			resources, err := getWebhookResources(
+				gardenVirtualWebhookVariant("gardenAccessSA", lakom.Cluster, false),
+				caBundle,
+				gardenWebhookVirtualGardenRules,
+				constants.GardenVirtualExtensionServiceName,
+				"garden",
+			)
+			Expect(err).ToNot(HaveOccurred())
+			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(manifests).To(ContainElements(
+				expectedVirtualGardenMutatingWebhook(caBundle, "garden"),
+				expectedVirtualGardenValidatingWebhook(caBundle, "garden"),
+			))
+		})
 	})
 
 	Context("getClientKeys", func() {
@@ -502,6 +589,208 @@ webhooks:
     resources:
     - pods
     - pods/ephemeralcontainers
+  sideEffects: None
+  timeoutSeconds: 25
+`
+}
+
+func expectedRuntimeGardenMutatingWebhook(caBundle []byte) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	return `apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+  name: gardener-extension-shoot-lakom-service-runtime-garden
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ` + caBundleEncoded + `
+    service:
+      name: extension-shoot-lakom-service-garden-runtime
+      namespace: lakom-system
+      path: /lakom/resolve-tag-to-digest
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: resolve-tag.lakom.service.extensions.gardener.cloud
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - lakom-system
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+    - pods/ephemeralcontainers
+  - apiGroups:
+    - operator.gardener.cloud
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - extensions
+  sideEffects: None
+  timeoutSeconds: 25
+`
+}
+
+func expectedRuntimeGardenValidatingWebhook(caBundle []byte) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	return `apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+  name: gardener-extension-shoot-lakom-service-runtime-garden
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ` + caBundleEncoded + `
+    service:
+      name: extension-shoot-lakom-service-garden-runtime
+      namespace: lakom-system
+      path: /lakom/verify-cosign-signature
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: verify-signature.lakom.service.extensions.gardener.cloud
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - lakom-system
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+    - pods/ephemeralcontainers
+  - apiGroups:
+    - operator.gardener.cloud
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - extensions
+  sideEffects: None
+  timeoutSeconds: 25
+`
+}
+
+func expectedVirtualGardenMutatingWebhook(caBundle []byte, namespace string) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	return `apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+  name: gardener-extension-shoot-lakom-service-virtual-garden
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ` + caBundleEncoded + `
+    url: https://extension-shoot-lakom-service-garden-virtual.` + namespace + `/lakom/resolve-tag-to-digest
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: resolve-tag.lakom.service.extensions.gardener.cloud
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - core.gardener.cloud
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - controllerdeployments
+  - apiGroups:
+    - seedmanagement.gardener.cloud
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - gardenlets
+  sideEffects: None
+  timeoutSeconds: 25
+`
+}
+
+func expectedVirtualGardenValidatingWebhook(caBundle []byte, namespace string) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	return `apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+  name: gardener-extension-shoot-lakom-service-virtual-garden
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ` + caBundleEncoded + `
+    url: https://extension-shoot-lakom-service-garden-virtual.` + namespace + `/lakom/verify-cosign-signature
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: verify-signature.lakom.service.extensions.gardener.cloud
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - core.gardener.cloud
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - controllerdeployments
+  - apiGroups:
+    - seedmanagement.gardener.cloud
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - gardenlets
   sideEffects: None
   timeoutSeconds: 25
 `
