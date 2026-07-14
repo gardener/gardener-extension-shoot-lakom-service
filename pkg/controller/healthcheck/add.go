@@ -61,27 +61,6 @@ func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) 
 		sets.New[gardencorev1beta1.ConditionType]())
 }
 
-// func managedResourceHealthChecks(extensionClasses []extensionsv1alpha1.ExtensionClass) []healthcheck.ConditionTypeToHealthCheck {
-// 	managedResourceNames := []string{constants.ManagedResourceNamesSeed}
-
-// 	if len(extensionClasses) == 1 && extensionClasses[0] == extensionsv1alpha1.ExtensionClassGarden {
-// 		managedResourceNames = []string{
-// 			constants.ManagedResourceNamesGardenRuntime,
-// 			constants.ManagedResourceNamesGardenVirtual,
-// 		}
-// 	}
-
-// 	healthChecks := make([]healthcheck.ConditionTypeToHealthCheck, 0, len(managedResourceNames))
-// 	for _, managedResourceName := range managedResourceNames {
-// 		healthChecks = append(healthChecks, healthcheck.ConditionTypeToHealthCheck{
-// 			ConditionType: string(gardencorev1beta1.ShootControlPlaneHealthy),
-// 			HealthCheck:   general.CheckManagedResource(managedResourceName),
-// 		})
-// 	}
-
-// 	return healthChecks
-// }
-
 // AddToManager adds a controller with the default Options.
 func AddToManager(_ context.Context, mgr manager.Manager) error {
 	return RegisterHealthChecks(mgr, DefaultAddOptions)
