@@ -473,6 +473,7 @@ var _ = Describe("Actuator", func() {
 			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
 				resources, err := getSeedResources(
 					&replicas,
+					constants.ExtensionServiceName,
 					namespace,
 					genericKubeconfigName,
 					shootAccessServiceAccountName,
@@ -508,6 +509,181 @@ var _ = Describe("Actuator", func() {
 					expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
 					expectedSeedVPA(namespace),
 					expectedSeedServiceMonitor(namespace),
+				))
+			},
+			Entry("Default config", false, false, false),
+			Entry("Use only image pull secrets", true, false, false),
+			Entry("Allow untrusted images", false, true, false),
+			Entry("Allow insecure registries", false, false, true),
+		)
+	})
+
+	Context("getGardenVirtualResources", func() {
+		const (
+			namespace                = "garden"
+			genericKubeconfigName    = "generic-kubeconfig"
+			gardenAccessSecretName   = "garden-access-sa"
+			serverTLSSecretName      = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
+			image                    = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
+			lakomConfigConfigMapName = "extension-shoot-lakom-service-garden-virtual-lakom-config-5ccba116"
+		)
+
+		var (
+			replicas    int32
+			lakomConfig string
+		)
+
+		BeforeEach(func() {
+			replicas = int32(3)
+
+			lakomConfig = `publicKeys:
+- name: test-01
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
+    On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
+    -----END PUBLIC KEY-----
+- name: test-02
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
+    hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
+    -----END PUBLIC KEY-----
+`
+		})
+
+		DescribeTable("Should ensure resources are correctly created",
+			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
+				resources, err := getGardenVirtualResources(
+					&replicas,
+					namespace,
+					genericKubeconfigName,
+					gardenAccessSecretName,
+					serverTLSSecretName,
+					lakomConfig,
+					image,
+					useOnlyImagePullSecrets,
+					allowUntrustedImages,
+					allowInsecureRegistries,
+					true,
+					"v1.34.0",
+				)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resources).To(HaveKey("data.yaml.br"))
+				compressedData := resources["data.yaml.br"]
+				data, err := test.BrotliDecompression(compressedData)
+				Expect(err).NotTo(HaveOccurred())
+
+				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
+				Expect(manifests).To(HaveLen(7))
+
+				for i := range manifests { // Re-add the trailing '\n' removed during the split from the separator above
+					if i < len(manifests)-1 {
+						manifests[i] += "\n"
+					}
+				}
+
+				Expect(manifests).To(ConsistOf(
+					expectedGardenVirtualDeployment(replicas, namespace, genericKubeconfigName, gardenAccessSecretName, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
+					expectedGardenVirtualPDB(namespace),
+					expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					expectedGardenVirtualService(namespace),
+					expectedGardenVirtualServiceAccount(namespace),
+					expectedGardenVirtualVPA(namespace),
+					expectedGardenVirtualServiceMonitor(namespace),
+				))
+			},
+			Entry("Default config", false, false, false),
+			Entry("Use only image pull secrets", true, false, false),
+			Entry("Allow untrusted images", false, true, false),
+			Entry("Allow insecure registries", false, false, true),
+		)
+	})
+
+	Context("getGardenRuntimeResources", func() {
+		const (
+			namespace                = "lakom-system"
+			serverTLSSecretName      = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
+			image                    = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
+			lakomConfigConfigMapName = "extension-shoot-lakom-service-garden-runtime-lakom-config-5ccba116"
+		)
+
+		var (
+			replicas    int32
+			lakomConfig string
+		)
+
+		BeforeEach(func() {
+			replicas = int32(3)
+
+			lakomConfig = `publicKeys:
+- name: test-01
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
+    On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
+    -----END PUBLIC KEY-----
+- name: test-02
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
+    hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
+    -----END PUBLIC KEY-----
+`
+		})
+
+		DescribeTable("Should ensure resources are correctly created",
+			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
+				serverTLSSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: serverTLSSecretName},
+					Type:       corev1.SecretTypeTLS,
+					Data: map[string][]byte{
+						"tls.crt": []byte("test-cert"),
+						"tls.key": []byte("test-key"),
+					},
+				}
+				resources, err := getGardenRuntimeResources(
+					&replicas,
+					serverTLSSecret,
+					lakomConfig,
+					image,
+					useOnlyImagePullSecrets,
+					allowUntrustedImages,
+					allowInsecureRegistries,
+					true,
+					"v1.34.0",
+				)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resources).To(HaveKey("data.yaml.br"))
+				compressedData := resources["data.yaml.br"]
+				data, err := test.BrotliDecompression(compressedData)
+				Expect(err).NotTo(HaveOccurred())
+
+				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
+				Expect(manifests).To(HaveLen(11))
+
+				for i := range manifests { // Re-add the trailing '\n' removed during the split from the separator above
+					if i < len(manifests)-1 {
+						manifests[i] += "\n"
+					}
+				}
+
+				Expect(manifests).To(ConsistOf(
+					expectedGardenRuntimeDeployment(replicas, namespace, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
+					expectedGardenRuntimeNamespace(namespace),
+					expectedGardenRuntimeTLSSecret(namespace, serverTLSSecretName),
+					expectedGardenRuntimePDB(namespace),
+					expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					expectedGardenRuntimeService(namespace),
+					expectedGardenRuntimeServiceAccount(namespace),
+					expectedGardenRuntimeRole(namespace),
+					expectedGardenRuntimeRoleBinding(namespace),
+					expectedGardenRuntimeVPA(namespace),
+					expectedGardenRuntimeServiceMonitor(namespace),
 				))
 			},
 			Entry("Default config", false, false, false),
@@ -1136,5 +1312,588 @@ spec:
   updatePolicy:
     updateMode: InPlaceOrRecreate
 status: {}
+`
+}
+
+func expectedGardenVirtualDeployment(replicas int32, namespace, genericKubeconfigSecretName, gardenAccessSecretName, image, lakomConfigConfigMapName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
+	var (
+		genericKubeconfigSecretNameAnnotationKey = references.AnnotationKey("secret", genericKubeconfigSecretName)
+		gardenAccessSecretNameAnnotationKey      = references.AnnotationKey("secret", gardenAccessSecretName)
+		serverTLSSecretNameAnnotationKey         = references.AnnotationKey("secret", serverTLSSecretName)
+		lakomConfigConfigMapNameAnnotationKey    = references.AnnotationKey("configmap", lakomConfigConfigMapName)
+
+		annotations = []string{
+			lakomConfigConfigMapNameAnnotationKey + ": " + lakomConfigConfigMapName,
+			genericKubeconfigSecretNameAnnotationKey + ": " + genericKubeconfigSecretName,
+			gardenAccessSecretNameAnnotationKey + ": " + gardenAccessSecretName,
+			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
+		}
+	)
+
+	return `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    ` + strings.Join(annotations, "\n    ") + `
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    high-availability-config.resources.gardener.cloud/type: server
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  replicas: ` + fmt.Sprintf("%d", replicas) + `
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        ` + strings.Join(annotations, "\n        ") + `
+      labels:
+        app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+        app.kubernetes.io/name: lakom
+        app.kubernetes.io/part-of: shoot-lakom-service
+        networking.gardener.cloud/to-blocked-cidrs: allowed
+        networking.gardener.cloud/to-dns: allowed
+        networking.gardener.cloud/to-private-networks: allowed
+        networking.gardener.cloud/to-public-networks: allowed
+        networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+                  app.kubernetes.io/name: lakom
+                  app.kubernetes.io/part-of: shoot-lakom-service
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      automountServiceAccountToken: false
+      containers:
+      - args:
+        - --cache-ttl=10m0s
+        - --cache-refresh-interval=30s
+        - --lakom-config-path=/etc/lakom/config/config.yaml
+        - --tls-cert-dir=/etc/lakom/tls
+        - --health-bind-address=:8081
+        - --metrics-bind-address=:8080
+        - --port=10250
+        - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
+        - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
+        - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
+        - --insecure-allow-insecure-registries=` + allowInsecureRegistries + `
+        image: ` + image + `
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 10
+        name: lakom
+        ports:
+        - containerPort: 10250
+          name: https
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+        resources:
+          requests:
+            memory: 25M
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+        volumeMounts:
+        - mountPath: /etc/lakom/config
+          name: lakom-config
+          readOnly: true
+        - mountPath: /etc/lakom/tls
+          name: lakom-server-tls
+          readOnly: true
+        - mountPath: /var/run/secrets/gardener.cloud/shoot/generic-kubeconfig
+          name: kubeconfig
+          readOnly: true
+      priorityClassName: gardener-garden-system-200
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: extension-shoot-lakom-service-garden-virtual
+      volumes:
+      - configMap:
+          name: ` + lakomConfigConfigMapName + `
+        name: lakom-config
+      - name: lakom-server-tls
+        secret:
+          secretName: ` + serverTLSSecretName + `
+      - name: kubeconfig
+        projected:
+          defaultMode: 420
+          sources:
+          - secret:
+              items:
+              - key: kubeconfig
+                path: kubeconfig
+              name: ` + genericKubeconfigSecretName + `
+              optional: false
+          - secret:
+              items:
+              - key: token
+                path: token
+              name: ` + gardenAccessSecretName + `
+              optional: false
+status: {}
+`
+}
+
+func expectedGardenVirtualPDB(namespace string) string {
+	return `apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+  unhealthyPodEvictionPolicy: AlwaysAllow
+status:
+  currentHealthy: 0
+  desiredHealthy: 0
+  disruptionsAllowed: 0
+  expectedPods: 0
+`
+}
+
+func expectedGardenVirtualService(namespace string) string {
+	return `apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports: '[{"protocol":"TCP","port":8080}]'
+    networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports: '[{"protocol":"TCP","port":10250}]'
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 10250
+  - name: metrics
+    port: 2718
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  trafficDistribution: PreferSameZone
+  type: ClusterIP
+status:
+  loadBalancer: {}
+`
+}
+
+func expectedGardenVirtualServiceAccount(namespace string) string {
+	return `apiVersion: v1
+automountServiceAccountToken: false
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+`
+}
+
+func expectedGardenVirtualVPA(namespace string) string {
+	return `apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  resourcePolicy:
+    containerPolicies:
+    - containerName: lakom
+      controlledResources:
+      - memory
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: extension-shoot-lakom-service-garden-virtual
+  updatePolicy:
+    updateMode: Recreate
+status: {}
+`
+}
+
+func expectedGardenVirtualServiceMonitor(namespace string) string {
+	return `apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    prometheus: garden-virtual
+  name: garden-virtual-extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  endpoints:
+  - metricRelabelings:
+    - action: keep
+      regex: ^(lakom.*)$
+      sourceLabels:
+      - __name__
+    port: metrics
+  namespaceSelector: {}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+`
+}
+
+func expectedGardenRuntimeDeployment(replicas int32, namespace, image, lakomConfigConfigMapName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
+	var (
+		serverTLSSecretNameAnnotationKey      = references.AnnotationKey("secret", serverTLSSecretName)
+		lakomConfigConfigMapNameAnnotationKey = references.AnnotationKey("configmap", lakomConfigConfigMapName)
+
+		annotations = []string{
+			lakomConfigConfigMapNameAnnotationKey + ": " + lakomConfigConfigMapName,
+			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
+		}
+	)
+
+	return `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    ` + strings.Join(annotations, "\n    ") + `
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    high-availability-config.resources.gardener.cloud/type: server
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  replicas: ` + fmt.Sprintf("%d", replicas) + `
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        ` + strings.Join(annotations, "\n        ") + `
+      labels:
+        app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+        app.kubernetes.io/name: lakom
+        app.kubernetes.io/part-of: shoot-lakom-service
+        networking.gardener.cloud/to-blocked-cidrs: allowed
+        networking.gardener.cloud/to-dns: allowed
+        networking.gardener.cloud/to-private-networks: allowed
+        networking.gardener.cloud/to-public-networks: allowed
+        networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+                  app.kubernetes.io/name: lakom
+                  app.kubernetes.io/part-of: shoot-lakom-service
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      automountServiceAccountToken: true
+      containers:
+      - args:
+        - --cache-ttl=10m0s
+        - --cache-refresh-interval=30s
+        - --lakom-config-path=/etc/lakom/config/config.yaml
+        - --tls-cert-dir=/etc/lakom/tls
+        - --health-bind-address=:8081
+        - --metrics-bind-address=:8080
+        - --port=10250
+        - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
+        - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
+        - --insecure-allow-insecure-registries=` + allowInsecureRegistries + `
+        image: ` + image + `
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 10
+        name: lakom
+        ports:
+        - containerPort: 10250
+          name: https
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+        resources:
+          requests:
+            memory: 25M
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+        volumeMounts:
+        - mountPath: /etc/lakom/config
+          name: lakom-config
+          readOnly: true
+        - mountPath: /etc/lakom/tls
+          name: lakom-server-tls
+          readOnly: true
+      priorityClassName: gardener-garden-system-200
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: extension-shoot-lakom-service-garden-runtime
+      volumes:
+      - configMap:
+          name: ` + lakomConfigConfigMapName + `
+        name: lakom-config
+      - name: lakom-server-tls
+        secret:
+          secretName: ` + serverTLSSecretName + `
+status: {}
+`
+}
+
+func expectedGardenRuntimeNamespace(namespace string) string {
+	return `apiVersion: v1
+kind: Namespace
+metadata:
+  name: ` + namespace + `
+spec: {}
+status: {}
+`
+}
+
+func expectedGardenRuntimePDB(namespace string) string {
+	return `apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+  unhealthyPodEvictionPolicy: AlwaysAllow
+status:
+  currentHealthy: 0
+  desiredHealthy: 0
+  disruptionsAllowed: 0
+  expectedPods: 0
+`
+}
+
+func expectedGardenRuntimeService(namespace string) string {
+	return `apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports: '[{"protocol":"TCP","port":8080}]'
+    networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports: '[{"protocol":"TCP","port":10250}]'
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 10250
+  - name: metrics
+    port: 2718
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  trafficDistribution: PreferSameZone
+  type: ClusterIP
+status:
+  loadBalancer: {}
+`
+}
+
+func expectedGardenRuntimeServiceAccount(namespace string) string {
+	return `apiVersion: v1
+automountServiceAccountToken: true
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+`
+}
+
+func expectedGardenRuntimeRole(namespace string) string {
+	return `apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+`
+}
+
+func expectedGardenRuntimeRoleBinding(namespace string) string {
+	return `apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-shoot-lakom-service-garden-runtime
+subjects:
+- kind: ServiceAccount
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+`
+}
+
+func expectedGardenRuntimeVPA(namespace string) string {
+	return `apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  resourcePolicy:
+    containerPolicies:
+    - containerName: lakom
+      controlledResources:
+      - memory
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: extension-shoot-lakom-service-garden-runtime
+  updatePolicy:
+    updateMode: Recreate
+status: {}
+`
+}
+
+func expectedGardenRuntimeServiceMonitor(namespace string) string {
+	return `apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    prometheus: garden-runtime
+  name: garden-runtime-extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  endpoints:
+  - metricRelabelings:
+    - action: keep
+      regex: ^(lakom.*)$
+      sourceLabels:
+      - __name__
+    port: metrics
+  namespaceSelector: {}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+`
+}
+
+func expectedGardenRuntimeTLSSecret(namespace, name string) string {
+	return `apiVersion: v1
+data:
+  tls.crt: dGVzdC1jZXJ0
+  tls.key: dGVzdC1rZXk=
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: ` + name + `
+  namespace: ` + namespace + `
+type: kubernetes.io/tls
 `
 }
