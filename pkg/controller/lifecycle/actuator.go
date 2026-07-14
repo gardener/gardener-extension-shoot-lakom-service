@@ -467,6 +467,14 @@ func (a *actuator) deleteGarden(ctx context.Context, logger logr.Logger, ex *ext
 	timeoutSeedCtx, cancelSeedCtx := context.WithTimeout(ctx, twoMinutes)
 	defer cancelSeedCtx()
 
+	if err := managedresources.DeleteForSeed(ctx, a.client, namespace, constants.ManagedResourceNamesGardenRuntimeWebhook); err != nil {
+		return err
+	}
+
+	if err := managedresources.WaitUntilDeleted(timeoutSeedCtx, a.client, namespace, constants.ManagedResourceNamesGardenRuntimeWebhook); err != nil {
+		return err
+	}
+
 	if err := managedresources.DeleteForSeed(ctx, a.client, namespace, constants.ManagedResourceNamesGardenRuntime); err != nil {
 		return err
 	}
@@ -483,14 +491,6 @@ func (a *actuator) deleteGarden(ctx context.Context, logger logr.Logger, ex *ext
 		return err
 	}
 
-	if err := managedresources.DeleteForSeed(ctx, a.client, namespace, constants.ManagedResourceNamesGardenRuntimeWebhook); err != nil {
-		return err
-	}
-
-	if err := managedresources.WaitUntilDeleted(timeoutSeedCtx, a.client, namespace, constants.ManagedResourceNamesGardenRuntimeWebhook); err != nil {
-		return err
-	}
-
 	if err := a.client.DeleteAllOf(ctx, &corev1.Secret{}, client.InNamespace(namespace), client.MatchingLabels(getLabels())); err != nil {
 		return err
 	}
@@ -504,7 +504,7 @@ func (a *actuator) deleteGarden(ctx context.Context, logger logr.Logger, ex *ext
 		return err
 	}
 
-	secretsManager, err := extensionssecretsmanager.SecretsManagerForGarden(ctx, logger.WithName("secretsmanager"), clock.RealClock{}, a.client, garden, secrets.ManagerIdentityRuntime, nil, namespace)
+	secretsManager, err := extensionssecretsmanager.SecretsManagerForGarden(ctx, logger.WithName("secretsmanager"), clock.RealClock{}, a.client, garden, secrets.ManagerIdentityGarden, nil, namespace)
 	if err != nil {
 		return err
 	}
@@ -665,7 +665,7 @@ func (a *actuator) buildGardenClusterContext(ctx context.Context, log logr.Logge
 		clock.RealClock{},
 		a.client,
 		garden,
-		secrets.ManagerIdentityRuntime,
+		secrets.ManagerIdentityGarden,
 		configs,
 		namespace,
 		constants.LakomSystemNamespace,
