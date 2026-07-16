@@ -193,7 +193,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	generatedSecrets, caBundle, lakomPublicKeys, image, lakomProviderConfig, err := a.prepareAssets(
+	generatedSecrets, caBundle, lakomPublicKeys, image, _, err := a.prepareAssets(
 		ctx,
 		logger,
 		ex,
@@ -203,22 +203,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	runtimeResources, err := getGardenRuntimeResources(
-		getLakomReplicas(false),
-		generatedSecrets[constants.GardenRuntimeWebhookTLSSecretName],
-		string(lakomPublicKeys),
-		image,
-		a.serviceConfig.UseOnlyImagePullSecrets,
-		a.serviceConfig.AllowUntrustedImages,
-		a.serviceConfig.AllowInsecureRegistries,
-		clusterCtx.topologyAwareRoutingEnabled,
-		clusterCtx.kubernetesVersion,
-	)
-	if err != nil {
-		return err
-	}
-
-	virtualResources, err := getGardenVirtualResources(
+	gardenVirtualResources, err := getGardenVirtualResources(
 		getLakomReplicas(false),
 		clusterCtx.namespace,
 		clusterCtx.genericTokenKubeconfigName,
@@ -236,8 +221,23 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	virtualGardenWebhookConfigResources, err := getWebhookResources(
-		gardenVirtualWebhookVariant(gardenAccessSecret.ServiceAccountName, *lakomProviderConfig.Scope, clusterCtx.dashboardEnabled),
+	gardenRuntimeResources, err := getGardenRuntimeResources(
+		getLakomReplicas(false),
+		generatedSecrets[constants.GardenRuntimeWebhookTLSSecretName],
+		string(lakomPublicKeys),
+		image,
+		a.serviceConfig.UseOnlyImagePullSecrets,
+		a.serviceConfig.AllowUntrustedImages,
+		a.serviceConfig.AllowInsecureRegistries,
+		clusterCtx.topologyAwareRoutingEnabled,
+		clusterCtx.kubernetesVersion,
+	)
+	if err != nil {
+		return err
+	}
+
+	gardenVirtualWebhookConfigResources, err := getWebhookResources(
+		gardenVirtualWebhookVariant(gardenAccessSecret.ServiceAccountName),
 		caBundle,
 		gardenWebhookVirtualGardenRules,
 		constants.GardenVirtualExtensionServiceName,
@@ -247,7 +247,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	runtimeWebhookConfigResources, err := getWebhookResources(
+	gardenRuntimeWebhookConfigResources, err := getWebhookResources(
 		gardenRuntimeWebhookVariant(),
 		caBundle,
 		gardenWebhookRuntimeRules,
@@ -263,7 +263,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		clusterCtx.namespace,
 		constants.ManagedResourceNamesGardenRuntime,
 		false,
-		runtimeResources); err != nil {
+		gardenRuntimeResources); err != nil {
 		return err
 	}
 
@@ -272,7 +272,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		clusterCtx.namespace,
 		constants.ManagedResourceNamesGardenVirtual,
 		false,
-		virtualResources); err != nil {
+		gardenVirtualResources); err != nil {
 		return err
 	}
 
@@ -282,14 +282,14 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		constants.ManagedResourceNamesGardenVirtualShoot,
 		constants.GardenVirtualExtensionServiceName,
 		false,
-		virtualGardenWebhookConfigResources); err != nil {
+		gardenVirtualWebhookConfigResources); err != nil {
 		return err
 	}
 
 	if err := managedresources.CreateForSeed(ctx, a.client, clusterCtx.namespace,
 		constants.ManagedResourceNamesGardenRuntimeWebhook,
 		false,
-		runtimeWebhookConfigResources); err != nil {
+		gardenRuntimeWebhookConfigResources); err != nil {
 		return err
 	}
 
