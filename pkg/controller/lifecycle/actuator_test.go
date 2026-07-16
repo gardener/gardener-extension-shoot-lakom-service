@@ -295,7 +295,7 @@ var _ = Describe("Actuator", func() {
 
 		It("Should create URL-based virtual garden webhook configs targeting the virtual garden resources", func() {
 			resources, err := getWebhookResources(
-				gardenVirtualWebhookVariant("gardenAccessSA", lakom.Cluster, false),
+				gardenVirtualWebhookVariant("gardenAccessSA"),
 				caBundle,
 				gardenWebhookVirtualGardenRules,
 				constants.GardenVirtualExtensionServiceName,

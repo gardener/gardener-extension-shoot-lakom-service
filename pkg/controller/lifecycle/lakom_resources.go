@@ -778,15 +778,11 @@ func gardenRuntimeWebhookVariant() webhookVariant {
 	}
 }
 
-func gardenVirtualWebhookVariant(resourceReaderSA string, scope lakom.ScopeType, dashboardEnabled bool) webhookVariant {
+func gardenVirtualWebhookVariant(resourceReaderSA string) webhookVariant {
 	return webhookVariant{
-		registry:          managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
-		configName:        constants.GardenVirtualWebhookConfigurationName,
-		resourceReaderSA:  resourceReaderSA,
-		namespaceSelector: scopeToNamespaceSelector(scope, dashboardEnabled),
-		objectSelector:    scopeToObjectSelector(scope),
-		scope:             scope,
-		dashboardEnabled:  dashboardEnabled,
+		registry:         managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
+		configName:       constants.GardenVirtualWebhookConfigurationName,
+		resourceReaderSA: resourceReaderSA,
 	}
 }
 
