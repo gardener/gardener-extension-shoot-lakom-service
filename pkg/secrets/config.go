@@ -21,6 +21,8 @@ const (
 	ManagerIdentityGarden = "extension-" + constants.ExtensionType + "-garden"
 	// CAName is the name of the CA secret.
 	CAName = "ca-extension-" + constants.ExtensionType
+	// CANameGarden is the name of the CA secret for garden class extensions.
+	CANameGarden = "ca-extension-" + constants.ExtensionType + "-garden"
 )
 
 // ConfigsFor returns configurations for the secrets manager for the given namespace.
@@ -53,8 +55,8 @@ func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 	return []extensionssecretsmanager.SecretConfigWithOptions{
 		{
 			Config: &secretsutils.CertificateSecretConfig{
-				Name:       CAName, // same CA — shared root of trust
-				CommonName: CAName,
+				Name:       CANameGarden,
+				CommonName: CANameGarden,
 				CertType:   secretsutils.CACert,
 			},
 			Options: []secretsmanager.GenerateOption{secretsmanager.Persist()},
@@ -68,7 +70,7 @@ func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 				SkipPublishingCACertificate: true,
 			},
 			Options: []secretsmanager.GenerateOption{
-				secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA),
+				secretsmanager.SignedByCA(CANameGarden, secretsmanager.UseCurrentCA),
 			},
 		},
 		{
@@ -82,7 +84,7 @@ func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 			// The cert is generated into the extension namespace where the secretsManager operates
 			// runtime ManagedResource then delivers a copy into lakom-system
 			Options: []secretsmanager.GenerateOption{
-				secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA),
+				secretsmanager.SignedByCA(CANameGarden, secretsmanager.UseCurrentCA),
 			},
 		},
 	}
