@@ -775,6 +775,14 @@ func gardenRuntimeWebhookVariant() webhookVariant {
 				Values:   []string{constants.LakomSystemNamespace},
 			},
 		}},
+		// Exclude Lakom runtime pods (part-of=shoot-lakom-service) to avoid Fail-policy self-deadlock
+		objectSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "app.kubernetes.io/part-of",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{constants.ExtensionType},
+			},
+		}},
 	}
 }
 

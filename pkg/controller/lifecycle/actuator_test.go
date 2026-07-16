@@ -265,6 +265,12 @@ var _ = Describe("Actuator", func() {
 			Expect(v.resourceReaderSA).To(BeEmpty())
 			Expect(v.useServiceClientConfig).To(BeTrue())
 			Expect(v.registry).ToNot(BeNil())
+			// The runtime webhook must exclude Lakom's own to prevent self-deadlock in virtual-garden
+			Expect(v.objectSelector.MatchExpressions).To(ContainElement(metav1.LabelSelectorRequirement{
+				Key:      "app.kubernetes.io/part-of",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{constants.ExtensionType},
+			}))
 		})
 	})
 
@@ -799,7 +805,12 @@ webhooks:
       operator: NotIn
       values:
       - lakom-system
-  objectSelector: {}
+  objectSelector:
+    matchExpressions:
+    - key: app.kubernetes.io/part-of
+      operator: NotIn
+      values:
+      - shoot-lakom-service
   rules:
   - apiGroups:
     - ""
@@ -854,7 +865,12 @@ webhooks:
       operator: NotIn
       values:
       - lakom-system
-  objectSelector: {}
+  objectSelector:
+    matchExpressions:
+    - key: app.kubernetes.io/part-of
+      operator: NotIn
+      values:
+      - shoot-lakom-service
   rules:
   - apiGroups:
     - ""

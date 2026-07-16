@@ -29,8 +29,8 @@ const (
 	ManagedResourceNamesGardenVirtual = ExtensionServiceName + "-garden-virtual"
 	// ManagedResourceNamesGardenRuntimeWebhook is the name of the seed ManagedResource carrying the runtime garden webhook configs (registered in the runtime cluster).
 	ManagedResourceNamesGardenRuntimeWebhook = ExtensionServiceName + "-garden-runtime-webhook"
-	// ManagedResourceNamesGardenVirtualShoot is the name of the shoot ManagedResource carrying the virtual garden webhook configs (registered in the virtual garden).
-	ManagedResourceNamesGardenVirtualShoot = ExtensionServiceName + "-garden-virtual-shoot"
+	// ManagedResourceNamesGardenVirtualWebhook is the name of the shoot ManagedResource carrying the virtual garden webhook configs (registered in the virtual garden).
+	ManagedResourceNamesGardenVirtualWebhook = ExtensionServiceName + "-garden-virtual-webhook"
 	// GardenVirtualWebhookTLSSecretName is the name of the TLS secret resource used by the virtual garden lakom webhook.
 	GardenVirtualWebhookTLSSecretName = GardenVirtualExtensionServiceName + "-tls"
 	// GardenRuntimeWebhookTLSSecretName is the name of the TLS secret resource used by the runtime garden lakom webhook.
