@@ -93,10 +93,7 @@ func getWebhookResources(
 	extensionNamespace string,
 ) (map[string][]byte, error) {
 	clientConfigFor := func(path string) admissionregistrationv1.WebhookClientConfig {
-		if webhookOptions.useServiceClientConfig {
-			return serviceBasedWebhookClientConfig(webhookOptions.caBundle, extensionNamespace, serviceName, path)
-		}
-		return urlBasedWebhookClientConfig(webhookOptions.caBundle, fmt.Sprintf("%s.%s", serviceName, extensionNamespace), path)
+		return getWebhookClientConfig(webhookOptions.useServiceClientConfig, webhookOptions.caBundle, extensionNamespace, serviceName, path)
 	}
 
 	var (
@@ -725,21 +722,20 @@ func gardenVirtualWebhookOptions(resourceReaderSvcAccName string, caBundle []byt
 	}
 }
 
-// serviceBasedWebhookClientConfig builds a Service-based webhook client config
-func serviceBasedWebhookClientConfig(caBundle []byte, namespace, serviceName, path string) admissionregistrationv1.WebhookClientConfig {
-	return admissionregistrationv1.WebhookClientConfig{
-		Service: &admissionregistrationv1.ServiceReference{
-			Namespace: namespace,
-			Name:      serviceName,
-			Path:      &path,
-		},
-		CABundle: caBundle,
+// getClientConfig builds a webhook client config
+func getWebhookClientConfig(useServiceClientConfig bool, caBundle []byte, namespace, serviceName, path string) admissionregistrationv1.WebhookClientConfig {
+	if useServiceClientConfig {
+		return admissionregistrationv1.WebhookClientConfig{
+			Service: &admissionregistrationv1.ServiceReference{
+				Namespace: namespace,
+				Name:      serviceName,
+				Path:      &path,
+			},
+			CABundle: caBundle,
+		}
 	}
-}
 
-// urlBasedWebhookClientConfig builds a URL-based webhook client config
-func urlBasedWebhookClientConfig(caBundle []byte, host, path string) admissionregistrationv1.WebhookClientConfig {
-	url := fmt.Sprintf("https://%s%s", host, path)
+	url := fmt.Sprintf("https://%s.%s%s", serviceName, namespace, path)
 	return admissionregistrationv1.WebhookClientConfig{
 		URL:      &url,
 		CABundle: caBundle,

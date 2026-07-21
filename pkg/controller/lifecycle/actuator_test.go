@@ -57,8 +57,12 @@ var _ = Describe("Actuator", func() {
 	})
 
 	DescribeTable("Should get the garden pod labels with a variant-specific instance label",
-		func(virtualGarden bool, expectedInstance string) {
+		func(virtualGarden bool) {
 			labels := getGardenPodLabels(virtualGarden)
+			expectedInstance := constants.GardenRuntimeExtensionServiceName
+			if virtualGarden {
+				expectedInstance = constants.GardenVirtualExtensionServiceName
+			}
 
 			// The common labels must always be present ...
 			Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/name", "lakom"))
