@@ -51,6 +51,7 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 	}
 }
 
+// ConfigsFor returns specific configurations for the secrets manager when Lakom is deployed as extension class garden.
 func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 	return []extensionssecretsmanager.SecretConfigWithOptions{
 		{
@@ -77,14 +78,13 @@ func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 			Config: &secretsutils.CertificateSecretConfig{
 				Name:                        constants.GardenRuntimeWebhookTLSSecretName,
 				CommonName:                  constants.GardenRuntimeExtensionServiceName,
-				DNSNames:                    kubernetesutils.DNSNamesForService(constants.GardenRuntimeExtensionServiceName, constants.LakomSystemNamespace),
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.GardenRuntimeExtensionServiceName, constants.LakomSystemNamespaceName),
 				CertType:                    secretsutils.ServerCert,
 				SkipPublishingCACertificate: true,
 			},
-			// The cert is generated into the extension namespace where the secretsManager operates
-			// runtime ManagedResource then delivers a copy into lakom-system
 			Options: []secretsmanager.GenerateOption{
 				secretsmanager.SignedByCA(CANameGarden, secretsmanager.UseCurrentCA),
+				secretsmanager.Namespace(constants.LakomSystemNamespaceName),
 			},
 		},
 	}

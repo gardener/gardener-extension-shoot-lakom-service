@@ -143,7 +143,7 @@ var _ = Describe("Actuator", func() {
 
 		It("Should ensure the correct shoot resources are created", func() {
 
-			resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, false), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
+			resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, false, caBundle), shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 			Expect(err).ToNot(HaveOccurred())
@@ -156,7 +156,7 @@ var _ = Describe("Actuator", func() {
 			))
 
 			By("Enable kubernetes dashboard addon")
-			resources, err = getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, true), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
+			resources, err = getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, true, caBundle), shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err = test.ExtractManifestsFromManagedResourceData(resources)
 			Expect(err).ToNot(HaveOccurred())
@@ -172,7 +172,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled), ca, shootWebhookRules, constants.ExtensionServiceName, ns)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled, ca), shootWebhookRules, constants.ExtensionServiceName, ns)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -185,7 +185,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled), ca, shootWebhookRules, constants.ExtensionServiceName, ns)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled, ca), shootWebhookRules, constants.ExtensionServiceName, ns)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -198,7 +198,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should return an empty object selector for the webhooks when scope is KubeSystem",
 			func(ca []byte, ns string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, lakom.KubeSystem, dashboardEnabled), ca, shootWebhookRules, constants.ExtensionServiceName, ns)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, lakom.KubeSystem, dashboardEnabled, ca), shootWebhookRules, constants.ExtensionServiceName, ns)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -214,7 +214,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the rolebinding is correctly set",
 			func(saName string, lakomScope lakom.ScopeType, bindingNamespace string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, saName, lakomScope, dashboardEnabled), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, saName, lakomScope, dashboardEnabled, caBundle), shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -228,7 +228,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should return the correct object and namespace selectors based on scope",
 			func(scope lakom.ScopeType, objectSelector, namespaceSelector string) {
-				resources, err := getWebhookResources(shootWebhookVariant(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled), caBundle, shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled, caBundle), shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -246,30 +246,33 @@ var _ = Describe("Actuator", func() {
 	})
 
 	Context("webhookVariant constructors", func() {
+		var (
+			caBundle = []byte("caBundle")
+		)
 		It("Should build a shoot webhook variant that is URL-based and carries a resource-reader ServiceAccount", func() {
-			v := shootWebhookVariant(constants.WebhookConfigurationName, "some-sa", lakom.KubeSystemManagedByGardener, false)
+			v := shootWebhookOptions(constants.WebhookConfigurationName, "some-sa", lakom.KubeSystemManagedByGardener, false, []byte("caBundle"))
 
 			Expect(v.configName).To(Equal(constants.WebhookConfigurationName))
-			Expect(v.resourceReaderSA).To(Equal("some-sa"))
+			Expect(v.resourceReaderSvcAccName).To(Equal("some-sa"))
 			Expect(v.useServiceClientConfig).To(BeFalse())
 			Expect(v.registry).ToNot(BeNil())
 		})
 
 		It("Should build a runtime webhook variant that is Service-based and has no resource-reader ServiceAccount", func() {
-			v := gardenRuntimeWebhookVariant()
+			v := gardenRuntimeWebhookOptions(caBundle)
 
 			Expect(v.configName).To(Equal(constants.GardenRuntimeWebhookConfigurationName))
 			// The runtime lakom runs in the same (runtime) cluster it validates, so it is reached
 			// via a Service reference rather than a URL, and it reads secrets in-cluster instead of
 			// through a shoot-access ServiceAccount.
-			Expect(v.resourceReaderSA).To(BeEmpty())
+			Expect(v.resourceReaderSvcAccName).To(BeEmpty())
 			Expect(v.useServiceClientConfig).To(BeTrue())
 			Expect(v.registry).ToNot(BeNil())
-			// The runtime webhook must exclude Lakom's own to prevent self-deadlock in virtual-garden
-			Expect(v.objectSelector.MatchExpressions).To(ContainElement(metav1.LabelSelectorRequirement{
-				Key:      "app.kubernetes.io/part-of",
+			Expect(v.objectSelector.MatchExpressions).To(BeEmpty())
+			Expect(v.namespaceSelector.MatchExpressions).To(ContainElement(metav1.LabelSelectorRequirement{
+				Key:      corev1.LabelMetadataName,
 				Operator: metav1.LabelSelectorOpNotIn,
-				Values:   []string{constants.ExtensionType},
+				Values:   []string{constants.LakomSystemNamespaceName, metav1.NamespaceSystem},
 			}))
 		})
 	})
@@ -281,11 +284,10 @@ var _ = Describe("Actuator", func() {
 
 		It("Should create Service-based runtime garden webhook configs without any RBAC resources", func() {
 			resources, err := getWebhookResources(
-				gardenRuntimeWebhookVariant(),
-				caBundle,
-				gardenWebhookRuntimeRules,
+				gardenRuntimeWebhookOptions(caBundle),
+				gardenRuntimeWebhookRules,
 				constants.GardenRuntimeExtensionServiceName,
-				constants.LakomSystemNamespace,
+				constants.LakomSystemNamespaceName,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -301,9 +303,8 @@ var _ = Describe("Actuator", func() {
 
 		It("Should create URL-based virtual garden webhook configs targeting the virtual garden resources", func() {
 			resources, err := getWebhookResources(
-				gardenVirtualWebhookVariant("gardenAccessSA"),
-				caBundle,
-				gardenWebhookVirtualGardenRules,
+				gardenVirtualWebhookOptions("gardenAccessSA", caBundle),
+				gardenVirtualWebhookRules,
 				constants.GardenVirtualExtensionServiceName,
 				"garden",
 			)
@@ -477,20 +478,26 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure resources are correctly created",
 			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
+				ctx := &clusterContext{
+					namespace:                   namespace,
+					genericTokenKubeconfigName:  genericKubeconfigName,
+					lakomPublicKeysConfig:       []byte(lakomConfig),
+					image:                       image,
+					topologyAwareRoutingEnabled: true,
+					kubernetesVersion:           "v1.34.0",
+					generatedSecrets: map[string]*corev1.Secret{
+						constants.WebhookTLSSecretName: {ObjectMeta: metav1.ObjectMeta{Name: serverTLSSecretName}},
+					},
+				}
 				resources, err := getSeedResources(
+					ctx,
 					&replicas,
 					constants.ExtensionServiceName,
-					namespace,
-					genericKubeconfigName,
 					shootAccessServiceAccountName,
 					serverTLSSecretName,
-					lakomConfig,
-					image,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					allowInsecureRegistries,
-					true,
-					"v1.34.0",
 				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveKey("data.yaml.br"))
@@ -562,19 +569,24 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure resources are correctly created",
 			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
+				ctx := &clusterContext{
+					namespace:                   namespace,
+					genericTokenKubeconfigName:  genericKubeconfigName,
+					lakomPublicKeysConfig:       []byte(lakomConfig),
+					image:                       image,
+					topologyAwareRoutingEnabled: true,
+					kubernetesVersion:           "v1.34.0",
+					generatedSecrets: map[string]*corev1.Secret{
+						constants.GardenVirtualWebhookTLSSecretName: {ObjectMeta: metav1.ObjectMeta{Name: serverTLSSecretName}},
+					},
+				}
 				resources, err := getGardenVirtualResources(
+					ctx,
 					&replicas,
-					namespace,
-					genericKubeconfigName,
 					gardenAccessSecretName,
-					serverTLSSecretName,
-					lakomConfig,
-					image,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					allowInsecureRegistries,
-					true,
-					"v1.34.0",
 				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveKey("data.yaml.br"))
@@ -644,24 +656,19 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure resources are correctly created",
 			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
-				serverTLSSecret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{Name: serverTLSSecretName},
-					Type:       corev1.SecretTypeTLS,
-					Data: map[string][]byte{
-						"tls.crt": []byte("test-cert"),
-						"tls.key": []byte("test-key"),
-					},
+				ctx := &clusterContext{
+					lakomPublicKeysConfig:       []byte(lakomConfig),
+					image:                       image,
+					topologyAwareRoutingEnabled: true,
+					kubernetesVersion:           "v1.34.0",
 				}
 				resources, err := getGardenRuntimeResources(
+					ctx,
 					&replicas,
-					serverTLSSecret,
-					lakomConfig,
-					image,
+					serverTLSSecretName,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					allowInsecureRegistries,
-					true,
-					"v1.34.0",
 				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveKey("data.yaml.br"))
@@ -670,7 +677,7 @@ var _ = Describe("Actuator", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
-				Expect(manifests).To(HaveLen(11))
+				Expect(manifests).To(HaveLen(9))
 
 				for i := range manifests { // Re-add the trailing '\n' removed during the split from the separator above
 					if i < len(manifests)-1 {
@@ -680,8 +687,6 @@ var _ = Describe("Actuator", func() {
 
 				Expect(manifests).To(ConsistOf(
 					expectedGardenRuntimeDeployment(replicas, namespace, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
-					expectedGardenRuntimeNamespace(namespace),
-					expectedGardenRuntimeTLSSecret(namespace, serverTLSSecretName),
 					expectedGardenRuntimePDB(namespace),
 					expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
 					expectedGardenRuntimeService(namespace),
@@ -805,12 +810,8 @@ webhooks:
       operator: NotIn
       values:
       - lakom-system
-  objectSelector:
-    matchExpressions:
-    - key: app.kubernetes.io/part-of
-      operator: NotIn
-      values:
-      - shoot-lakom-service
+      - kube-system
+  objectSelector: {}
   rules:
   - apiGroups:
     - ""
@@ -865,12 +866,8 @@ webhooks:
       operator: NotIn
       values:
       - lakom-system
-  objectSelector:
-    matchExpressions:
-    - key: app.kubernetes.io/part-of
-      operator: NotIn
-      values:
-      - shoot-lakom-service
+      - kube-system
+  objectSelector: {}
   rules:
   - apiGroups:
     - ""
@@ -1144,10 +1141,10 @@ spec:
         - --health-bind-address=:8081
         - --metrics-bind-address=:8080
         - --port=10250
-        - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
         - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
         - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
         - --insecure-allow-insecure-registries=` + allowInsecureRegistries + `
+        - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -1405,10 +1402,10 @@ spec:
         - --health-bind-address=:8081
         - --metrics-bind-address=:8080
         - --port=10250
-        - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
         - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
         - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
         - --insecure-allow-insecure-registries=` + allowInsecureRegistries + `
+        - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -1726,16 +1723,6 @@ status: {}
 `
 }
 
-func expectedGardenRuntimeNamespace(namespace string) string {
-	return `apiVersion: v1
-kind: Namespace
-metadata:
-  name: ` + namespace + `
-spec: {}
-status: {}
-`
-}
-
 func expectedGardenRuntimePDB(namespace string) string {
 	return `apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -1895,21 +1882,5 @@ spec:
       app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
       app.kubernetes.io/name: lakom
       app.kubernetes.io/part-of: shoot-lakom-service
-`
-}
-
-func expectedGardenRuntimeTLSSecret(namespace, name string) string {
-	return `apiVersion: v1
-data:
-  tls.crt: dGVzdC1jZXJ0
-  tls.key: dGVzdC1rZXk=
-kind: Secret
-metadata:
-  labels:
-    app.kubernetes.io/name: lakom
-    app.kubernetes.io/part-of: shoot-lakom-service
-  name: ` + name + `
-  namespace: ` + namespace + `
-type: kubernetes.io/tls
 `
 }
