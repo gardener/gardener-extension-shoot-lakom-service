@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+//
+// SPDX-License-Identifier: Apache-2.0
+
 package lifecycle
 
 import (
@@ -43,7 +47,7 @@ var (
 		},
 	}}
 
-	gardenWebhookRuntimeRules []admissionregistrationv1.RuleWithOperations = []admissionregistrationv1.RuleWithOperations{
+	gardenRuntimeWebhookRules []admissionregistrationv1.RuleWithOperations = []admissionregistrationv1.RuleWithOperations{
 		{
 			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
 			Rule: admissionregistrationv1.Rule{
@@ -62,7 +66,7 @@ var (
 		},
 	}
 
-	gardenWebhookVirtualGardenRules []admissionregistrationv1.RuleWithOperations = []admissionregistrationv1.RuleWithOperations{
+	gardenVirtualWebhookRules []admissionregistrationv1.RuleWithOperations = []admissionregistrationv1.RuleWithOperations{
 		{
 			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
 			Rule: admissionregistrationv1.Rule{
@@ -83,17 +87,16 @@ var (
 )
 
 func getWebhookResources(
-	webhookVariant webhookVariant,
-	webhookCaBundle []byte,
+	webhookOptions webhookOptions,
 	webhookRRules []admissionregistrationv1.RuleWithOperations,
 	serviceName,
 	extensionNamespace string,
 ) (map[string][]byte, error) {
 	clientConfigFor := func(path string) admissionregistrationv1.WebhookClientConfig {
-		if webhookVariant.useServiceClientConfig {
-			return serviceBasedWebhookClientConfig(webhookCaBundle, extensionNamespace, serviceName, path)
+		if webhookOptions.useServiceClientConfig {
+			return serviceBasedWebhookClientConfig(webhookOptions.caBundle, extensionNamespace, serviceName, path)
 		}
-		return urlBasedWebhookClientConfig(webhookCaBundle, fmt.Sprintf("%s.%s", serviceName, extensionNamespace), path)
+		return urlBasedWebhookClientConfig(webhookOptions.caBundle, fmt.Sprintf("%s.%s", serviceName, extensionNamespace), path)
 	}
 
 	var (
@@ -101,12 +104,12 @@ func getWebhookResources(
 		sideEffectClass   = admissionregistrationv1.SideEffectClassNone
 		failurePolicy     = admissionregistrationv1.Fail
 		timeOutSeconds    = ptr.To[int32](25)
-		namespaceSelector = webhookVariant.namespaceSelector
-		objectSelector    = webhookVariant.objectSelector
-		clientObjects     = []client.Object{
+		namespaceSelector = webhookOptions.namespaceSelector
+		objectSelector    = webhookOptions.objectSelector
+		resources         = []client.Object{
 			&admissionregistrationv1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   webhookVariant.configName,
+					Name:   webhookOptions.configName,
 					Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
 				},
 				Webhooks: []admissionregistrationv1.MutatingWebhook{{
@@ -124,7 +127,7 @@ func getWebhookResources(
 			},
 			&admissionregistrationv1.ValidatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   webhookVariant.configName,
+					Name:   webhookOptions.configName,
 					Labels: utils.MergeStringMaps(getLabels(), map[string]string{v1beta1constants.LabelExcludeWebhookFromRemediation: "true"}),
 				},
 				Webhooks: []admissionregistrationv1.ValidatingWebhook{{
@@ -143,8 +146,8 @@ func getWebhookResources(
 		}
 	)
 
-	if webhookVariant.resourceReaderSA != "" {
-		clientObjects = append(clientObjects,
+	if webhookOptions.resourceReaderSvcAccName != "" {
+		resources = append(resources,
 			&rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   constants.LakomResourceReader,
@@ -158,37 +161,19 @@ func getWebhookResources(
 					},
 				},
 			})
-		clientObjects = append(clientObjects,
-			getRoleBindings(webhookVariant.scope, webhookVariant.resourceReaderSA, webhookVariant.dashboardEnabled)...)
+		resources = append(resources,
+			getRoleBindings(webhookOptions.scope, webhookOptions.resourceReaderSvcAccName, webhookOptions.dashboardEnabled)...)
 
 	}
 
-	shootResources, err := webhookVariant.registry.AddAllAndSerialize(clientObjects...)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return shootResources, nil
+	return webhookOptions.registry.AddAllAndSerialize(resources...)
 }
-
-// lakomAuthMode selects how the lakom pod authenticates against the API server it validates.
-type lakomAuthMode int
-
-const (
-	// authInjectedKubeconfig injects a generic kubeconfig (shoot-access) into the deployment and points
-	// lakom at it via --kubeconfig.
-	authInjectedKubeconfig lakomAuthMode = iota
-	// authInClusterToken relies on the pod's mounted ServiceAccount token (in-cluster auth) and omits
-	// the --kubeconfig flag.
-	authInClusterToken
-)
 
 // lakomResourceOptions parameterizes getLakomResources across deployment flavours.
 type lakomResourceOptions struct {
 	replicas                    *int32
 	serverTLSSecretName         string
-	lakomConfig                 string
+	lakomPublicKeysConfig       string
 	image                       string
 	useOnlyImagePullSecrets     bool
 	allowUntrustedImages        bool
@@ -201,35 +186,28 @@ type lakomResourceOptions struct {
 	podLabels             map[string]string
 	priorityClassName     string
 	serviceMonitorSuffix  string
-	authMode              lakomAuthMode
+	useInClusterAuth      bool
 	genericKubeconfigName string
 	accessSecretName      string
-	createNamespace       bool
 	createInClusterRBAC   bool
-	// tlsServerSecret, when set, is delivered into opts.namespace as part of the ManagedResource. This is
-	// used by the runtime-garden flavour: the secretsManager generates the cert in the extension namespace,
-	// but the pod runs in lakom-system, so gardener-resource-manager must copy the secret there. When nil,
-	// the server TLS secret is expected to already exist in opts.namespace (shoot/virtual flavours).
-	tlsServerSecret *corev1.Secret
 }
 
 // getLakomResources builds the full lakom workload for a single flavour and
 // returns the serialized ManagedResource data.
 func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 	var (
-		tcpProto                     = corev1.ProtocolTCP
-		serverPort                   = intstr.FromInt32(10250)
-		metricsPort                  = intstr.FromInt32(8080)
-		healthPort                   = intstr.FromInt32(8081)
-		cacheTTL                     = time.Minute * 10
-		cacheRefreshInterval         = time.Second * 30
-		lakomConfigDir               = "/etc/lakom/config"
-		lakomConfigConfigMapName     = opts.serviceName + "-lakom-config"
-		webhookTLSCertDir            = "/etc/lakom/tls"
-		registry                     = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
-		requestMemory                = resource.MustParse("25M")
-		vpaUpdateMode                = vpaautoscalingv1.UpdateModeRecreate
-		automountServiceAccountToken = opts.authMode == authInClusterToken
+		tcpProto                 = corev1.ProtocolTCP
+		serverPort               = intstr.FromInt32(10250)
+		metricsPort              = intstr.FromInt32(8080)
+		healthPort               = intstr.FromInt32(8081)
+		cacheTTL                 = time.Minute * 10
+		cacheRefreshInterval     = time.Second * 30
+		lakomConfigDir           = "/etc/lakom/config"
+		lakomConfigConfigMapName = opts.serviceName + "-lakom-config"
+		webhookTLSCertDir        = "/etc/lakom/tls"
+		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
+		requestMemory            = resource.MustParse("25M")
+		vpaUpdateMode            = vpaautoscalingv1.UpdateModeInPlaceOrRecreate
 	)
 
 	lakomConfigConfigMap := corev1.ConfigMap{
@@ -239,7 +217,7 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 			Labels:    getLabels(),
 		},
 		Data: map[string]string{
-			"config.yaml": opts.lakomConfig,
+			"config.yaml": opts.lakomPublicKeysConfig,
 		},
 	}
 
@@ -255,15 +233,13 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 		"--health-bind-address=:" + healthPort.String(),
 		"--metrics-bind-address=:" + metricsPort.String(),
 		"--port=" + serverPort.String(),
+		"--use-only-image-pull-secrets=" + strconv.FormatBool(opts.useOnlyImagePullSecrets),
+		"--insecure-allow-untrusted-images=" + strconv.FormatBool(opts.allowUntrustedImages),
+		"--insecure-allow-insecure-registries=" + strconv.FormatBool(opts.allowInsecureRegistries),
 	}
-	if opts.authMode == authInjectedKubeconfig {
+	if !opts.useInClusterAuth {
 		args = append(args, "--kubeconfig="+gardenerutils.PathGenericKubeconfig)
 	}
-	args = append(args,
-		"--use-only-image-pull-secrets="+strconv.FormatBool(opts.useOnlyImagePullSecrets),
-		"--insecure-allow-untrusted-images="+strconv.FormatBool(opts.allowUntrustedImages),
-		"--insecure-allow-insecure-registries="+strconv.FormatBool(opts.allowInsecureRegistries),
-	)
 
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -306,7 +282,7 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 							}},
 						},
 					},
-					AutomountServiceAccountToken: ptr.To(automountServiceAccountToken),
+					AutomountServiceAccountToken: &opts.useInClusterAuth,
 					ServiceAccountName:           opts.serviceName,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: ptr.To(true),
@@ -400,7 +376,7 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 	}
 	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
 
-	if opts.authMode == authInjectedKubeconfig {
+	if !opts.useInClusterAuth {
 		if err := gardenerutils.InjectGenericKubeconfig(lakomDeployment, opts.genericKubeconfigName, opts.accessSecretName); err != nil {
 			return nil, err
 		}
@@ -459,27 +435,8 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 		},
 	}
 
-	clientObjects := []client.Object{}
-	if opts.createNamespace {
-		clientObjects = append(clientObjects, &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: opts.namespace,
-				// Labels: getLabels(),
-			},
-		})
-	}
-	if opts.tlsServerSecret != nil {
-		clientObjects = append(clientObjects, &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      opts.serverTLSSecretName,
-				Namespace: opts.namespace,
-				Labels:    getLabels(),
-			},
-			Type: opts.tlsServerSecret.Type,
-			Data: opts.tlsServerSecret.Data,
-		})
-	}
-	clientObjects = append(clientObjects,
+	resources := []client.Object{}
+	resources = append(resources,
 		lakomDeployment,
 		pdb,
 		&lakomConfigConfigMap,
@@ -489,11 +446,11 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 				Namespace: opts.namespace,
 				Labels:    getLabels(),
 			},
-			AutomountServiceAccountToken: ptr.To(automountServiceAccountToken),
+			AutomountServiceAccountToken: &opts.useInClusterAuth,
 		},
 	)
 	if opts.createInClusterRBAC {
-		clientObjects = append(clientObjects,
+		resources = append(resources,
 			&rbacv1.Role{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      opts.serviceName,
@@ -529,7 +486,7 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 			},
 		)
 	}
-	clientObjects = append(clientObjects,
+	resources = append(resources,
 		lakomService,
 		&vpaautoscalingv1.VerticalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
@@ -570,117 +527,92 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 		},
 	)
 
-	resources, err := registry.AddAllAndSerialize(clientObjects...)
-	if err != nil {
-		return nil, err
-	}
-
-	return resources, nil
+	return registry.AddAllAndSerialize(resources...)
 }
 
 func getSeedResources(
+	clusterCtx *clusterContext,
 	lakomReplicas *int32,
 	serviceName,
-	namespace,
-	genericKubeconfigName,
 	shootAccessSecretName,
-	serverTLSSecretName,
-	lakomConfig,
-	image string,
+	serverTLSSecretName string,
 	useOnlyImagePullSecrets,
 	allowUntrustedImages,
-	allowInsecureRegistries,
-	topologyAwareRoutingEnabled bool,
-	seedK8SVersion string,
+	allowInsecureRegistries bool,
 ) (map[string][]byte, error) {
 	return getLakomResources(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
-		lakomConfig:                 lakomConfig,
-		image:                       image,
+		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
+		image:                       clusterCtx.image,
 		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
 		allowUntrustedImages:        allowUntrustedImages,
 		allowInsecureRegistries:     allowInsecureRegistries,
-		topologyAwareRoutingEnabled: topologyAwareRoutingEnabled,
-		k8sVersion:                  seedK8SVersion,
+		topologyAwareRoutingEnabled: clusterCtx.topologyAwareRoutingEnabled,
+		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 serviceName,
-		namespace:                   namespace,
+		namespace:                   clusterCtx.namespace,
 		podLabels:                   getLabels(),
 		priorityClassName:           v1beta1constants.PriorityClassNameShootControlPlane300,
 		serviceMonitorSuffix:        "shoot",
-		authMode:                    authInjectedKubeconfig,
-		genericKubeconfigName:       genericKubeconfigName,
+		genericKubeconfigName:       clusterCtx.genericTokenKubeconfigName,
 		accessSecretName:            shootAccessSecretName,
 	})
 }
 
 func getGardenVirtualResources(
+	clusterCtx *clusterContext,
 	lakomReplicas *int32,
-	namespace,
-	genericKubeconfigName,
-	gardenAccessSecretName,
-	serverTLSSecretName,
-	lakomConfig,
-	image string,
+	accessSecretName string,
 	useOnlyImagePullSecrets,
 	allowUntrustedImages,
-	allowInsecureRegistries,
-	topologyAwareRoutingEnabled bool,
-	seedK8SVersion string,
+	allowInsecureRegistries bool,
 ) (map[string][]byte, error) {
 	return getLakomResources(lakomResourceOptions{
 		replicas:                    lakomReplicas,
-		serverTLSSecretName:         serverTLSSecretName,
-		lakomConfig:                 lakomConfig,
-		image:                       image,
+		serverTLSSecretName:         clusterCtx.generatedSecrets[constants.GardenVirtualWebhookTLSSecretName].Name,
+		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
+		image:                       clusterCtx.image,
 		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
 		allowUntrustedImages:        allowUntrustedImages,
 		allowInsecureRegistries:     allowInsecureRegistries,
-		topologyAwareRoutingEnabled: topologyAwareRoutingEnabled,
-		k8sVersion:                  seedK8SVersion,
+		topologyAwareRoutingEnabled: clusterCtx.topologyAwareRoutingEnabled,
+		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 constants.GardenVirtualExtensionServiceName,
-		namespace:                   namespace,
+		namespace:                   clusterCtx.namespace,
 		podLabels:                   getGardenPodLabels(true),
 		priorityClassName:           v1beta1constants.PriorityClassNameGardenSystem200,
 		serviceMonitorSuffix:        "garden-virtual",
-		authMode:                    authInjectedKubeconfig,
-		genericKubeconfigName:       genericKubeconfigName,
-		accessSecretName:            gardenAccessSecretName,
+		genericKubeconfigName:       clusterCtx.genericTokenKubeconfigName,
+		accessSecretName:            accessSecretName,
 	})
 }
 
 func getGardenRuntimeResources(
+	clusterCtx *clusterContext,
 	lakomReplicas *int32,
-	serverTLSSecret *corev1.Secret,
-	lakomConfig,
-	image string,
+	serverTLSSecretName string,
 	useOnlyImagePullSecrets,
 	allowUntrustedImages,
-	allowInsecureRegistries,
-	topologyAwareRoutingEnabled bool,
-	seedK8SVersion string,
+	allowInsecureRegistries bool,
 ) (map[string][]byte, error) {
 	return getLakomResources(lakomResourceOptions{
 		replicas:                    lakomReplicas,
-		serverTLSSecretName:         serverTLSSecret.Name,
-		lakomConfig:                 lakomConfig,
-		image:                       image,
+		serverTLSSecretName:         serverTLSSecretName,
+		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
+		image:                       clusterCtx.image,
 		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
 		allowUntrustedImages:        allowUntrustedImages,
 		allowInsecureRegistries:     allowInsecureRegistries,
-		topologyAwareRoutingEnabled: topologyAwareRoutingEnabled,
-		k8sVersion:                  seedK8SVersion,
+		topologyAwareRoutingEnabled: clusterCtx.topologyAwareRoutingEnabled,
+		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 constants.GardenRuntimeExtensionServiceName,
-		namespace:                   constants.LakomSystemNamespace,
+		namespace:                   constants.LakomSystemNamespaceName,
 		podLabels:                   getGardenPodLabels(false),
 		priorityClassName:           v1beta1constants.PriorityClassNameGardenSystem200,
 		serviceMonitorSuffix:        "garden-runtime",
-		authMode:                    authInClusterToken,
-		createNamespace:             true,
+		useInClusterAuth:            true,
 		createInClusterRBAC:         true,
-		// The runtime pod lives in lakom-system but the secretsManager generated the cert in the extension
-		// namespace, so deliver a copy of the secret into lakom-system via the ManagedResource.
-		tlsServerSecret: serverTLSSecret,
 	})
 }
 
@@ -740,57 +672,56 @@ func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string
 	return roleBindings
 }
 
-type webhookVariant struct {
-	registry               *managedresources.Registry
-	configName             string
-	resourceReaderSA       string
-	useServiceClientConfig bool
-	namespaceSelector      metav1.LabelSelector
-	objectSelector         metav1.LabelSelector
-	scope                  lakom.ScopeType
-	dashboardEnabled       bool
+type webhookOptions struct {
+	registry                 *managedresources.Registry
+	caBundle                 []byte
+	configName               string
+	resourceReaderSvcAccName string
+	useServiceClientConfig   bool
+	namespaceSelector        metav1.LabelSelector
+	objectSelector           metav1.LabelSelector
+	scope                    lakom.ScopeType
+	dashboardEnabled         bool
 }
 
-func shootWebhookVariant(configName, resourceReaderSA string, scope lakom.ScopeType, dashboardEnabled bool) webhookVariant {
-	return webhookVariant{
-		registry:          managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
-		configName:        configName,
-		resourceReaderSA:  resourceReaderSA,
-		namespaceSelector: scopeToNamespaceSelector(scope, dashboardEnabled),
-		objectSelector:    scopeToObjectSelector(scope),
-		scope:             scope,
-		dashboardEnabled:  dashboardEnabled,
+func shootWebhookOptions(configName, resourceReaderSvcAccName string, scope lakom.ScopeType, dashboardEnabled bool, caBundle []byte) webhookOptions {
+	return webhookOptions{
+		registry:                 managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
+		caBundle:                 caBundle,
+		configName:               configName,
+		resourceReaderSvcAccName: resourceReaderSvcAccName,
+		namespaceSelector:        scopeToNamespaceSelector(scope, dashboardEnabled),
+		objectSelector:           scopeToObjectSelector(scope),
+		scope:                    scope,
+		dashboardEnabled:         dashboardEnabled,
 	}
 }
 
-func gardenRuntimeWebhookVariant() webhookVariant {
-	return webhookVariant{
+func gardenRuntimeWebhookOptions(caBundle []byte) webhookOptions {
+	return webhookOptions{
 		registry:               managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer),
+		caBundle:               caBundle,
 		configName:             constants.GardenRuntimeWebhookConfigurationName,
 		useServiceClientConfig: true,
 		namespaceSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
 				Key:      corev1.LabelMetadataName,
 				Operator: metav1.LabelSelectorOpNotIn,
-				Values:   []string{constants.LakomSystemNamespace},
-			},
-		}},
-		// Exclude Lakom runtime pods (part-of=shoot-lakom-service) to avoid Fail-policy self-deadlock
-		objectSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key:      "app.kubernetes.io/part-of",
-				Operator: metav1.LabelSelectorOpNotIn,
-				Values:   []string{constants.ExtensionType},
+				Values: []string{
+					constants.LakomSystemNamespaceName,
+					metav1.NamespaceSystem,
+				},
 			},
 		}},
 	}
 }
 
-func gardenVirtualWebhookVariant(resourceReaderSA string) webhookVariant {
-	return webhookVariant{
-		registry:         managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
-		configName:       constants.GardenVirtualWebhookConfigurationName,
-		resourceReaderSA: resourceReaderSA,
+func gardenVirtualWebhookOptions(resourceReaderSvcAccName string, caBundle []byte) webhookOptions {
+	return webhookOptions{
+		registry:                 managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
+		caBundle:                 caBundle,
+		configName:               constants.GardenVirtualWebhookConfigurationName,
+		resourceReaderSvcAccName: resourceReaderSvcAccName,
 	}
 }
 
@@ -800,7 +731,7 @@ func serviceBasedWebhookClientConfig(caBundle []byte, namespace, serviceName, pa
 		Service: &admissionregistrationv1.ServiceReference{
 			Namespace: namespace,
 			Name:      serviceName,
-			Path:      ptr.To(path),
+			Path:      &path,
 		},
 		CABundle: caBundle,
 	}
@@ -810,7 +741,7 @@ func serviceBasedWebhookClientConfig(caBundle []byte, namespace, serviceName, pa
 func urlBasedWebhookClientConfig(caBundle []byte, host, path string) admissionregistrationv1.WebhookClientConfig {
 	url := fmt.Sprintf("https://%s%s", host, path)
 	return admissionregistrationv1.WebhookClientConfig{
-		URL:      ptr.To(url),
+		URL:      &url,
 		CABundle: caBundle,
 	}
 }

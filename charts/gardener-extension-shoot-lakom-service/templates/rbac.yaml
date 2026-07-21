@@ -18,6 +18,7 @@ rules:
   - get
   - list
   - watch
+{{- if .Values.gardener.runtimeCluster.enabled }}
 - apiGroups:
   - operator.gardener.cloud
   resources:
@@ -26,6 +27,7 @@ rules:
   - get
   - list
   - watch
+{{- end }}
 - apiGroups:
   - resources.gardener.cloud
   resources:
@@ -43,6 +45,8 @@ rules:
   resources:
   - namespaces
   verbs:
+  - create
+  - delete
   - get
   - list
   - watch
@@ -75,25 +79,6 @@ rules:
   - patch
   - update
   - deletecollection
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - create
-  - list
-  - watch
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  resourceNames:
-  - {{ include "leaderelectionid" . }}
-  - gardener-extension-heartbeat
-  verbs:
-  - get
-  - patch
-  - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

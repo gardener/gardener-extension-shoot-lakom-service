@@ -55,6 +55,6 @@ const (
 	LakomResolveTagPath = "/" + ApplicationName + "/resolve-tag-to-digest"
 	// LakomVerifyCosignSignaturePath is the URL path to the hook verifying the cosign signature of the image.
 	LakomVerifyCosignSignaturePath = "/" + ApplicationName + "/verify-cosign-signature"
-	// LakomSystemNamespace is the namespace in which the lakom extension controller is deployed.
-	LakomSystemNamespace = ApplicationName + "-system"
+	// LakomSystemNamespaceName is the namespace in which the garden-class lakom runtime workload is deployed.
+	LakomSystemNamespaceName = ApplicationName + "-system"
 )

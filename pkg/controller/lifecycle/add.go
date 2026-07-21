@@ -38,8 +38,6 @@ type AddOptions struct {
 	// IgnoreOperationAnnotation specifies whether to ignore the operation annotation or not.
 	IgnoreOperationAnnotation bool
 	// ExtensionClasses contains the extension classes the controller should reconcile.
-	// Only a single type of extension class is supported at the moment.
-	// Depending on the extension class, the controller will target shoot control plane or garden namespaces.
 	ExtensionClasses []extensionsv1alpha1.ExtensionClass
 }
 

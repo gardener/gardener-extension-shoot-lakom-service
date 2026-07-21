@@ -28,9 +28,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -107,6 +109,13 @@ func (o *Options) run(ctx context.Context) error {
 			DisableFor: []client.Object{
 				&corev1.Secret{},    // applied for ManagedResources
 				&corev1.ConfigMap{}, // applied for monitoring config
+			},
+		},
+	}
+	mgrOpts.Cache.ByObject = map[client.Object]cache.ByObject{
+		&coordinationv1.Lease{}: {
+			Namespaces: map[string]cache.Config{
+				mgrOpts.LeaderElectionNamespace: {},
 			},
 		},
 	}
