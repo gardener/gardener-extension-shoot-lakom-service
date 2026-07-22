@@ -678,7 +678,10 @@ func (a *actuator) prepareAdmissionConfig(
 			return fmt.Errorf("failed to get the additional keys: %w", err)
 		}
 	}
-	clusterCtx.lakomPublicKeysConfig = append(gardenerPublicKeys, clientPublicKeys...)
+	lakomPublicKeys := make([]byte, 0, len(gardenerPublicKeys)+len(clientPublicKeys))
+	lakomPublicKeys = append(lakomPublicKeys, gardenerPublicKeys...)
+	lakomPublicKeys = append(lakomPublicKeys, clientPublicKeys...)
+	clusterCtx.lakomPublicKeysConfig = lakomPublicKeys
 
 	return nil
 }

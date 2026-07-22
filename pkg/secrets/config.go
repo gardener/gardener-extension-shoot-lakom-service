@@ -51,7 +51,7 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 	}
 }
 
-// ConfigsFor returns specific configurations for the secrets manager when Lakom is deployed as extension class garden.
+// ConfigsForGarden returns specific configurations for the secrets manager when Lakom is deployed as extension class garden.
 func ConfigsForGarden() []extensionssecretsmanager.SecretConfigWithOptions {
 	return []extensionssecretsmanager.SecretConfigWithOptions{
 		{
