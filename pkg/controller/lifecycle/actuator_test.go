@@ -72,8 +72,8 @@ var _ = Describe("Actuator", func() {
 			Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/instance", expectedInstance))
 			Expect(labels).To(HaveLen(3))
 		},
-		Entry("Runtime garden variant", false, constants.GardenRuntimeExtensionServiceName),
-		Entry("Virtual garden variant", true, constants.GardenVirtualExtensionServiceName),
+		Entry("Runtime garden variant", false),
+		Entry("Virtual garden variant", true),
 	)
 
 	It("Should give the runtime and virtual garden variants disjoint selectors", func() {
