@@ -21,15 +21,18 @@ import (
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/heartbeat"
 	"github.com/gardener/gardener/extensions/pkg/util"
+	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	"github.com/gardener/gardener/pkg/controllerutils/routes"
 	gardenerhealthz "github.com/gardener/gardener/pkg/healthz"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -109,6 +112,13 @@ func (o *Options) run(ctx context.Context) error {
 			},
 		},
 	}
+	mgrOpts.Cache.ByObject = map[client.Object]cache.ByObject{
+		&coordinationv1.Lease{}: {
+			Namespaces: map[string]cache.Config{
+				mgrOpts.LeaderElectionNamespace: {},
+			},
+		},
+	}
 
 	mgr, err := manager.New(o.restOptions.Completed().Config, mgrOpts)
 	if err != nil {
@@ -127,6 +137,9 @@ func (o *Options) run(ctx context.Context) error {
 	if err := apislakom.AddToScheme(mgr.GetScheme()); err != nil {
 		return fmt.Errorf("failed to add internal version of `lakom.extensions.gardener.cloud/v1alpha1` to manager scheme: %w", err)
 	}
+	if err := operatorv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+		return fmt.Errorf("failed to add `operator.gardener.cloud/v1alpha1` to manager scheme: %w", err)
+	}
 
 	ctrlConfig.ApplyHealthCheckConfig(&healthcheck.DefaultAddOptions.HealthCheckConfig)
 	ctrlConfig.Apply(&lifecycle.DefaultAddOptions.ServiceConfig)
@@ -137,6 +150,8 @@ func (o *Options) run(ctx context.Context) error {
 	o.heartbeatOptions.Completed().Apply(&heartbeat.DefaultAddOptions)
 
 	seed.DefaultAddOptions.SeedTopologyAwareRoutingEnabled = o.lakomOptions.SeedTopologyAwareRoutingEnabled
+	lifecycle.DefaultAddOptions.ExtensionClasses = o.generalOptions.Completed().ExtensionClasses
+	healthcheck.DefaultAddOptions.ExtensionClasses = o.generalOptions.Completed().ExtensionClasses
 
 	if err := o.controllerSwitches.Completed().AddToManager(ctx, mgr); err != nil {
 		return fmt.Errorf("could not add controllers to manager: %s", err)

@@ -9,3 +9,11 @@
 {{- define "leaderelectionid" -}}
 extension-shoot-lakom-service-leader-election
 {{- end -}}
+
+{{- define "name" -}}
+{{- if .Values.gardener.runtimeCluster.enabled -}}
+shoot-lakom-service-runtime
+{{- else -}}
+shoot-lakom-service
+{{- end -}}
+{{- end -}}

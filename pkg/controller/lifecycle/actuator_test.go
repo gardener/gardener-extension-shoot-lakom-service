@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
@@ -55,6 +56,30 @@ var _ = Describe("Actuator", func() {
 		Expect(appPartOf).To(Equal("shoot-lakom-service"))
 	})
 
+	DescribeTable("Should get the garden pod labels with a variant-specific instance label",
+		func(virtualGarden bool) {
+			labels := getGardenPodLabels(virtualGarden)
+			expectedInstance := constants.GardenRuntimeExtensionServiceName
+			if virtualGarden {
+				expectedInstance = constants.GardenVirtualExtensionServiceName
+			}
+
+			// The common labels must always be present ...
+			Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/name", "lakom"))
+			Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/part-of", "shoot-lakom-service"))
+			// ... plus the variant-specific instance label used to give the runtime and
+			// virtual garden deployments disjoint selectors.
+			Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/instance", expectedInstance))
+			Expect(labels).To(HaveLen(3))
+		},
+		Entry("Runtime garden variant", false),
+		Entry("Virtual garden variant", true),
+	)
+
+	It("Should give the runtime and virtual garden variants disjoint selectors", func() {
+		Expect(getGardenPodLabels(false)).ToNot(Equal(getGardenPodLabels(true)))
+	})
+
 	DescribeTable("Should get the expected scope", func(configurableScope lakom.ScopeType, expected string) {
 		Expect(getScope(lakom.ScopeType(configurableScope))).To(BeEquivalentTo(&expected))
 	},
@@ -87,7 +112,7 @@ var _ = Describe("Actuator", func() {
 		Entry("Two RoleBindings when scope is KubeSystemManagedByGardener (dashboard enabled)", lakom.KubeSystemManagedByGardener, true, false, 2),
 	)
 
-	Context("getShootResources", func() {
+	Context("getWebhookResources", func() {
 		const (
 			shootNamespace                  = "garden-foo"
 			extensionNamespace              = "shoot--foo--bar"
@@ -122,7 +147,7 @@ var _ = Describe("Actuator", func() {
 
 		It("Should ensure the correct shoot resources are created", func() {
 
-			resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope, false)
+			resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, false, caBundle), shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 			Expect(err).ToNot(HaveOccurred())
@@ -135,7 +160,7 @@ var _ = Describe("Actuator", func() {
 			))
 
 			By("Enable kubernetes dashboard addon")
-			resources, err = getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope, true)
+			resources, err = getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, true, caBundle), shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err = test.ExtractManifestsFromManagedResourceData(resources)
 			Expect(err).ToNot(HaveOccurred())
@@ -151,7 +176,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the mutating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled, ca), shootWebhookRules, constants.ExtensionServiceName, ns)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -164,7 +189,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the validating webhook config is correctly set",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, scope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled, ca), shootWebhookRules, constants.ExtensionServiceName, ns)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -177,7 +202,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should return an empty object selector for the webhooks when scope is KubeSystem",
 			func(ca []byte, ns string) {
-				resources, err := getShootResources(ca, ns, shootAccessServiceAccountName, lakom.KubeSystem, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, lakom.KubeSystem, dashboardEnabled, ca), shootWebhookRules, constants.ExtensionServiceName, ns)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -193,7 +218,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure the rolebinding is correctly set",
 			func(saName string, lakomScope lakom.ScopeType, bindingNamespace string) {
-				resources, err := getShootResources(caBundle, extensionNamespace, saName, lakomScope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, saName, lakomScope, dashboardEnabled, caBundle), shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -207,7 +232,7 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should return the correct object and namespace selectors based on scope",
 			func(scope lakom.ScopeType, objectSelector, namespaceSelector string) {
-				resources, err := getShootResources(caBundle, extensionNamespace, shootAccessServiceAccountName, scope, dashboardEnabled)
+				resources, err := getWebhookResources(shootWebhookOptions(constants.WebhookConfigurationName, shootAccessServiceAccountName, scope, dashboardEnabled, caBundle), shootWebhookRules, constants.ExtensionServiceName, extensionNamespace)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
 				Expect(err).ToNot(HaveOccurred())
@@ -222,6 +247,80 @@ var _ = Describe("Actuator", func() {
 			Entry("Cluster scope", lakom.Cluster, emptyObjectSelector, emptyNamespaceSelector),
 		)
 
+	})
+
+	Context("webhookVariant constructors", func() {
+		var (
+			caBundle = []byte("caBundle")
+		)
+		It("Should build a shoot webhook variant that is URL-based and carries a resource-reader ServiceAccount", func() {
+			v := shootWebhookOptions(constants.WebhookConfigurationName, "some-sa", lakom.KubeSystemManagedByGardener, false, []byte("caBundle"))
+
+			Expect(v.configName).To(Equal(constants.WebhookConfigurationName))
+			Expect(v.resourceReaderSvcAccName).To(Equal("some-sa"))
+			Expect(v.useServiceClientConfig).To(BeFalse())
+			Expect(v.registry).ToNot(BeNil())
+		})
+
+		It("Should build a runtime webhook variant that is Service-based and has no resource-reader ServiceAccount", func() {
+			v := gardenRuntimeWebhookOptions(caBundle)
+
+			Expect(v.configName).To(Equal(constants.GardenRuntimeWebhookConfigurationName))
+			// The runtime lakom runs in the same (runtime) cluster it validates, so it is reached
+			// via a Service reference rather than a URL, and it reads secrets in-cluster instead of
+			// through a shoot-access ServiceAccount.
+			Expect(v.resourceReaderSvcAccName).To(BeEmpty())
+			Expect(v.useServiceClientConfig).To(BeTrue())
+			Expect(v.registry).ToNot(BeNil())
+			Expect(v.objectSelector.MatchExpressions).To(BeEmpty())
+			Expect(v.namespaceSelector.MatchExpressions).To(ContainElement(metav1.LabelSelectorRequirement{
+				Key:      corev1.LabelMetadataName,
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{constants.LakomSystemNamespaceName, metav1.NamespaceSystem},
+			}))
+		})
+	})
+
+	Context("getWebhookResources for the garden extension class", func() {
+		var (
+			caBundle = []byte("caBundle")
+		)
+
+		It("Should create Service-based runtime garden webhook configs without any RBAC resources", func() {
+			resources, err := getWebhookResources(
+				gardenRuntimeWebhookOptions(caBundle),
+				gardenRuntimeWebhookRules,
+				constants.GardenRuntimeExtensionServiceName,
+				constants.LakomSystemNamespaceName,
+			)
+			Expect(err).ToNot(HaveOccurred())
+			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+			Expect(err).ToNot(HaveOccurred())
+
+			// The runtime variant has no resourceReaderSA, so only the two webhook configs are
+			// rendered - no ClusterRole and no (Cluster)RoleBinding.
+			Expect(manifests).To(ConsistOf(
+				expectedRuntimeGardenMutatingWebhook(caBundle),
+				expectedRuntimeGardenValidatingWebhook(caBundle),
+			))
+		})
+
+		It("Should create URL-based virtual garden webhook configs targeting the virtual garden resources", func() {
+			resources, err := getWebhookResources(
+				gardenVirtualWebhookOptions("gardenAccessSA", caBundle),
+				gardenVirtualWebhookRules,
+				constants.GardenVirtualExtensionServiceName,
+				"garden",
+			)
+			Expect(err).ToNot(HaveOccurred())
+			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(manifests).To(ContainElements(
+				expectedVirtualGardenMutatingWebhook(caBundle, "garden"),
+				expectedVirtualGardenValidatingWebhook(caBundle, "garden"),
+			))
+		})
 	})
 
 	Context("getClientKeys", func() {
@@ -383,19 +482,26 @@ var _ = Describe("Actuator", func() {
 
 		DescribeTable("Should ensure resources are correctly created",
 			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
+				ctx := &clusterContext{
+					namespace:                   namespace,
+					genericTokenKubeconfigName:  genericKubeconfigName,
+					lakomPublicKeysConfig:       []byte(lakomConfig),
+					image:                       image,
+					topologyAwareRoutingEnabled: true,
+					kubernetesVersion:           "v1.34.0",
+					generatedSecrets: map[string]*corev1.Secret{
+						constants.WebhookTLSSecretName: {ObjectMeta: metav1.ObjectMeta{Name: serverTLSSecretName}},
+					},
+				}
 				resources, err := getSeedResources(
+					ctx,
 					&replicas,
-					namespace,
-					genericKubeconfigName,
+					constants.ExtensionServiceName,
 					shootAccessServiceAccountName,
 					serverTLSSecretName,
-					lakomConfig,
-					image,
 					useOnlyImagePullSecrets,
 					allowUntrustedImages,
 					allowInsecureRegistries,
-					true,
-					"v1.34.0",
 				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveKey("data.yaml.br"))
@@ -420,6 +526,179 @@ var _ = Describe("Actuator", func() {
 					expectedSeedServiceAccount(namespace, shootAccessServiceAccountName),
 					expectedSeedVPA(namespace),
 					expectedSeedServiceMonitor(namespace),
+				))
+			},
+			Entry("Default config", false, false, false),
+			Entry("Use only image pull secrets", true, false, false),
+			Entry("Allow untrusted images", false, true, false),
+			Entry("Allow insecure registries", false, false, true),
+		)
+	})
+
+	Context("getGardenVirtualResources", func() {
+		const (
+			namespace                = "garden"
+			genericKubeconfigName    = "generic-kubeconfig"
+			gardenAccessSecretName   = "garden-access-sa"
+			serverTLSSecretName      = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
+			image                    = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
+			lakomConfigConfigMapName = "extension-shoot-lakom-service-garden-virtual-lakom-config-5ccba116"
+		)
+
+		var (
+			replicas    int32
+			lakomConfig string
+		)
+
+		BeforeEach(func() {
+			replicas = int32(3)
+
+			lakomConfig = `publicKeys:
+- name: test-01
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
+    On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
+    -----END PUBLIC KEY-----
+- name: test-02
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
+    hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
+    -----END PUBLIC KEY-----
+`
+		})
+
+		DescribeTable("Should ensure resources are correctly created",
+			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
+				ctx := &clusterContext{
+					namespace:                   namespace,
+					genericTokenKubeconfigName:  genericKubeconfigName,
+					lakomPublicKeysConfig:       []byte(lakomConfig),
+					image:                       image,
+					topologyAwareRoutingEnabled: true,
+					kubernetesVersion:           "v1.34.0",
+					generatedSecrets: map[string]*corev1.Secret{
+						constants.GardenVirtualWebhookTLSSecretName: {ObjectMeta: metav1.ObjectMeta{Name: serverTLSSecretName}},
+					},
+				}
+				resources, err := getGardenVirtualResources(
+					ctx,
+					&replicas,
+					gardenAccessSecretName,
+					useOnlyImagePullSecrets,
+					allowUntrustedImages,
+					allowInsecureRegistries,
+				)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resources).To(HaveKey("data.yaml.br"))
+				compressedData := resources["data.yaml.br"]
+				data, err := test.BrotliDecompression(compressedData)
+				Expect(err).NotTo(HaveOccurred())
+
+				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
+				Expect(manifests).To(HaveLen(7))
+
+				for i := range manifests { // Re-add the trailing '\n' removed during the split from the separator above
+					if i < len(manifests)-1 {
+						manifests[i] += "\n"
+					}
+				}
+
+				Expect(manifests).To(ConsistOf(
+					expectedGardenVirtualDeployment(replicas, namespace, genericKubeconfigName, gardenAccessSecretName, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
+					expectedGardenVirtualPDB(namespace),
+					expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					expectedGardenVirtualService(namespace),
+					expectedGardenVirtualServiceAccount(namespace),
+					expectedGardenVirtualVPA(namespace),
+					expectedGardenVirtualServiceMonitor(namespace),
+				))
+			},
+			Entry("Default config", false, false, false),
+			Entry("Use only image pull secrets", true, false, false),
+			Entry("Allow untrusted images", false, true, false),
+			Entry("Allow insecure registries", false, false, true),
+		)
+	})
+
+	Context("getGardenRuntimeResources", func() {
+		const (
+			namespace                = "lakom-system"
+			serverTLSSecretName      = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
+			image                    = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
+			lakomConfigConfigMapName = "extension-shoot-lakom-service-garden-runtime-lakom-config-5ccba116"
+		)
+
+		var (
+			replicas    int32
+			lakomConfig string
+		)
+
+		BeforeEach(func() {
+			replicas = int32(3)
+
+			lakomConfig = `publicKeys:
+- name: test-01
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
+    On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
+    -----END PUBLIC KEY-----
+- name: test-02
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyLVOS/TWANf6sZJPDzogodvDz8NT
+    hjZVcW2ygAvImCAULGph2fqGkNUszl7ycJH/Dntw4wMLSbstUZomqPuIVQ==
+    -----END PUBLIC KEY-----
+`
+		})
+
+		DescribeTable("Should ensure resources are correctly created",
+			func(useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries bool) {
+				ctx := &clusterContext{
+					lakomPublicKeysConfig:       []byte(lakomConfig),
+					image:                       image,
+					topologyAwareRoutingEnabled: true,
+					kubernetesVersion:           "v1.34.0",
+				}
+				resources, err := getGardenRuntimeResources(
+					ctx,
+					&replicas,
+					serverTLSSecretName,
+					useOnlyImagePullSecrets,
+					allowUntrustedImages,
+					allowInsecureRegistries,
+				)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resources).To(HaveKey("data.yaml.br"))
+				compressedData := resources["data.yaml.br"]
+				data, err := test.BrotliDecompression(compressedData)
+				Expect(err).NotTo(HaveOccurred())
+
+				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
+				Expect(manifests).To(HaveLen(9))
+
+				for i := range manifests { // Re-add the trailing '\n' removed during the split from the separator above
+					if i < len(manifests)-1 {
+						manifests[i] += "\n"
+					}
+				}
+
+				Expect(manifests).To(ConsistOf(
+					expectedGardenRuntimeDeployment(replicas, namespace, image, lakomConfigConfigMapName, serverTLSSecretName, strconv.FormatBool(useOnlyImagePullSecrets), strconv.FormatBool(allowUntrustedImages), strconv.FormatBool(allowInsecureRegistries)),
+					expectedGardenRuntimePDB(namespace),
+					expectedSeedConfigMapLakomConfig(namespace, lakomConfigConfigMapName, lakomConfig),
+					expectedGardenRuntimeService(namespace),
+					expectedGardenRuntimeServiceAccount(namespace),
+					expectedGardenRuntimeRole(namespace),
+					expectedGardenRuntimeRoleBinding(namespace),
+					expectedGardenRuntimeVPA(namespace),
+					expectedGardenRuntimeServiceMonitor(namespace),
 				))
 			},
 			Entry("Default config", false, false, false),
@@ -501,6 +780,210 @@ webhooks:
     resources:
     - pods
     - pods/ephemeralcontainers
+  sideEffects: None
+  timeoutSeconds: 25
+`
+}
+
+func expectedRuntimeGardenMutatingWebhook(caBundle []byte) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	return `apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+  name: gardener-extension-shoot-lakom-service-runtime-garden
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ` + caBundleEncoded + `
+    service:
+      name: extension-shoot-lakom-service-garden-runtime
+      namespace: lakom-system
+      path: /lakom/resolve-tag-to-digest
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: resolve-tag.lakom.service.extensions.gardener.cloud
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - lakom-system
+      - kube-system
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+    - pods/ephemeralcontainers
+  - apiGroups:
+    - operator.gardener.cloud
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - extensions
+  sideEffects: None
+  timeoutSeconds: 25
+`
+}
+
+func expectedRuntimeGardenValidatingWebhook(caBundle []byte) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	return `apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+  name: gardener-extension-shoot-lakom-service-runtime-garden
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ` + caBundleEncoded + `
+    service:
+      name: extension-shoot-lakom-service-garden-runtime
+      namespace: lakom-system
+      path: /lakom/verify-cosign-signature
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: verify-signature.lakom.service.extensions.gardener.cloud
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - lakom-system
+      - kube-system
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+    - pods/ephemeralcontainers
+  - apiGroups:
+    - operator.gardener.cloud
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - extensions
+  sideEffects: None
+  timeoutSeconds: 25
+`
+}
+
+func expectedVirtualGardenMutatingWebhook(caBundle []byte, namespace string) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	return `apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+  name: gardener-extension-shoot-lakom-service-virtual-garden
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ` + caBundleEncoded + `
+    url: https://extension-shoot-lakom-service-garden-virtual.` + namespace + `/lakom/resolve-tag-to-digest
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: resolve-tag.lakom.service.extensions.gardener.cloud
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - core.gardener.cloud
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - controllerdeployments
+  - apiGroups:
+    - seedmanagement.gardener.cloud
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - gardenlets
+  sideEffects: None
+  timeoutSeconds: 25
+`
+}
+
+func expectedVirtualGardenValidatingWebhook(caBundle []byte, namespace string) string {
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
+
+	return `apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+  name: gardener-extension-shoot-lakom-service-virtual-garden
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ` + caBundleEncoded + `
+    url: https://extension-shoot-lakom-service-garden-virtual.` + namespace + `/lakom/verify-cosign-signature
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: verify-signature.lakom.service.extensions.gardener.cloud
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - core.gardener.cloud
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - controllerdeployments
+  - apiGroups:
+    - seedmanagement.gardener.cloud
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - gardenlets
   sideEffects: None
   timeoutSeconds: 25
 `
@@ -662,10 +1145,10 @@ spec:
         - --health-bind-address=:8081
         - --metrics-bind-address=:8080
         - --port=10250
-        - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
         - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
         - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
         - --insecure-allow-insecure-registries=` + allowInsecureRegistries + `
+        - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
         image: ` + image + `
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -846,5 +1329,562 @@ spec:
   updatePolicy:
     updateMode: InPlaceOrRecreate
 status: {}
+`
+}
+
+func expectedGardenVirtualDeployment(replicas int32, namespace, genericKubeconfigSecretName, gardenAccessSecretName, image, lakomConfigConfigMapName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
+	var (
+		genericKubeconfigSecretNameAnnotationKey = references.AnnotationKey("secret", genericKubeconfigSecretName)
+		gardenAccessSecretNameAnnotationKey      = references.AnnotationKey("secret", gardenAccessSecretName)
+		serverTLSSecretNameAnnotationKey         = references.AnnotationKey("secret", serverTLSSecretName)
+		lakomConfigConfigMapNameAnnotationKey    = references.AnnotationKey("configmap", lakomConfigConfigMapName)
+
+		annotations = []string{
+			lakomConfigConfigMapNameAnnotationKey + ": " + lakomConfigConfigMapName,
+			genericKubeconfigSecretNameAnnotationKey + ": " + genericKubeconfigSecretName,
+			gardenAccessSecretNameAnnotationKey + ": " + gardenAccessSecretName,
+			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
+		}
+	)
+
+	return `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    ` + strings.Join(annotations, "\n    ") + `
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    high-availability-config.resources.gardener.cloud/type: server
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  replicas: ` + fmt.Sprintf("%d", replicas) + `
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        ` + strings.Join(annotations, "\n        ") + `
+      labels:
+        app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+        app.kubernetes.io/name: lakom
+        app.kubernetes.io/part-of: shoot-lakom-service
+        networking.gardener.cloud/to-blocked-cidrs: allowed
+        networking.gardener.cloud/to-dns: allowed
+        networking.gardener.cloud/to-private-networks: allowed
+        networking.gardener.cloud/to-public-networks: allowed
+        networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+                  app.kubernetes.io/name: lakom
+                  app.kubernetes.io/part-of: shoot-lakom-service
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      automountServiceAccountToken: false
+      containers:
+      - args:
+        - --cache-ttl=10m0s
+        - --cache-refresh-interval=30s
+        - --lakom-config-path=/etc/lakom/config/config.yaml
+        - --tls-cert-dir=/etc/lakom/tls
+        - --health-bind-address=:8081
+        - --metrics-bind-address=:8080
+        - --port=10250
+        - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
+        - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
+        - --insecure-allow-insecure-registries=` + allowInsecureRegistries + `
+        - --kubeconfig=/var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/kubeconfig
+        image: ` + image + `
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 10
+        name: lakom
+        ports:
+        - containerPort: 10250
+          name: https
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+        resources:
+          requests:
+            memory: 25M
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+        volumeMounts:
+        - mountPath: /etc/lakom/config
+          name: lakom-config
+          readOnly: true
+        - mountPath: /etc/lakom/tls
+          name: lakom-server-tls
+          readOnly: true
+        - mountPath: /var/run/secrets/gardener.cloud/shoot/generic-kubeconfig
+          name: kubeconfig
+          readOnly: true
+      priorityClassName: gardener-garden-system-200
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: extension-shoot-lakom-service-garden-virtual
+      volumes:
+      - configMap:
+          name: ` + lakomConfigConfigMapName + `
+        name: lakom-config
+      - name: lakom-server-tls
+        secret:
+          secretName: ` + serverTLSSecretName + `
+      - name: kubeconfig
+        projected:
+          defaultMode: 420
+          sources:
+          - secret:
+              items:
+              - key: kubeconfig
+                path: kubeconfig
+              name: ` + genericKubeconfigSecretName + `
+              optional: false
+          - secret:
+              items:
+              - key: token
+                path: token
+              name: ` + gardenAccessSecretName + `
+              optional: false
+status: {}
+`
+}
+
+func expectedGardenVirtualPDB(namespace string) string {
+	return `apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+  unhealthyPodEvictionPolicy: AlwaysAllow
+status:
+  currentHealthy: 0
+  desiredHealthy: 0
+  disruptionsAllowed: 0
+  expectedPods: 0
+`
+}
+
+func expectedGardenVirtualService(namespace string) string {
+	return `apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports: '[{"protocol":"TCP","port":8080}]'
+    networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports: '[{"protocol":"TCP","port":10250}]'
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 10250
+  - name: metrics
+    port: 2718
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  trafficDistribution: PreferSameZone
+  type: ClusterIP
+status:
+  loadBalancer: {}
+`
+}
+
+func expectedGardenVirtualServiceAccount(namespace string) string {
+	return `apiVersion: v1
+automountServiceAccountToken: false
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+`
+}
+
+func expectedGardenVirtualVPA(namespace string) string {
+	return `apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  resourcePolicy:
+    containerPolicies:
+    - containerName: lakom
+      controlledResources:
+      - memory
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: extension-shoot-lakom-service-garden-virtual
+  updatePolicy:
+    updateMode: InPlaceOrRecreate
+status: {}
+`
+}
+
+func expectedGardenVirtualServiceMonitor(namespace string) string {
+	return `apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    prometheus: garden-virtual
+  name: garden-virtual-extension-shoot-lakom-service-garden-virtual
+  namespace: ` + namespace + `
+spec:
+  endpoints:
+  - metricRelabelings:
+    - action: keep
+      regex: ^(lakom_.*|controller_runtime_webhook_.*)$
+      sourceLabels:
+      - __name__
+    port: metrics
+  namespaceSelector: {}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+`
+}
+
+func expectedGardenRuntimeDeployment(replicas int32, namespace, image, lakomConfigConfigMapName, serverTLSSecretName, useOnlyImagePullSecrets, allowUntrustedImages, allowInsecureRegistries string) string {
+	var (
+		serverTLSSecretNameAnnotationKey      = references.AnnotationKey("secret", serverTLSSecretName)
+		lakomConfigConfigMapNameAnnotationKey = references.AnnotationKey("configmap", lakomConfigConfigMapName)
+
+		annotations = []string{
+			lakomConfigConfigMapNameAnnotationKey + ": " + lakomConfigConfigMapName,
+			serverTLSSecretNameAnnotationKey + ": " + serverTLSSecretName,
+		}
+	)
+
+	return `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    ` + strings.Join(annotations, "\n    ") + `
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+    high-availability-config.resources.gardener.cloud/type: server
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  replicas: ` + fmt.Sprintf("%d", replicas) + `
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        ` + strings.Join(annotations, "\n        ") + `
+      labels:
+        app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+        app.kubernetes.io/name: lakom
+        app.kubernetes.io/part-of: shoot-lakom-service
+        networking.gardener.cloud/to-blocked-cidrs: allowed
+        networking.gardener.cloud/to-dns: allowed
+        networking.gardener.cloud/to-private-networks: allowed
+        networking.gardener.cloud/to-public-networks: allowed
+        networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+                  app.kubernetes.io/name: lakom
+                  app.kubernetes.io/part-of: shoot-lakom-service
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      automountServiceAccountToken: true
+      containers:
+      - args:
+        - --cache-ttl=10m0s
+        - --cache-refresh-interval=30s
+        - --lakom-config-path=/etc/lakom/config/config.yaml
+        - --tls-cert-dir=/etc/lakom/tls
+        - --health-bind-address=:8081
+        - --metrics-bind-address=:8080
+        - --port=10250
+        - --use-only-image-pull-secrets=` + useOnlyImagePullSecrets + `
+        - --insecure-allow-untrusted-images=` + allowUntrustedImages + `
+        - --insecure-allow-insecure-registries=` + allowInsecureRegistries + `
+        image: ` + image + `
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 10
+        name: lakom
+        ports:
+        - containerPort: 10250
+          name: https
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+        resources:
+          requests:
+            memory: 25M
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+        volumeMounts:
+        - mountPath: /etc/lakom/config
+          name: lakom-config
+          readOnly: true
+        - mountPath: /etc/lakom/tls
+          name: lakom-server-tls
+          readOnly: true
+      priorityClassName: gardener-garden-system-200
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: extension-shoot-lakom-service-garden-runtime
+      volumes:
+      - configMap:
+          name: ` + lakomConfigConfigMapName + `
+        name: lakom-config
+      - name: lakom-server-tls
+        secret:
+          secretName: ` + serverTLSSecretName + `
+status: {}
+`
+}
+
+func expectedGardenRuntimePDB(namespace string) string {
+	return `apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
+  unhealthyPodEvictionPolicy: AlwaysAllow
+status:
+  currentHealthy: 0
+  desiredHealthy: 0
+  disruptionsAllowed: 0
+  expectedPods: 0
+`
+}
+
+func expectedGardenRuntimeService(namespace string) string {
+	return `apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    networking.resources.gardener.cloud/from-all-scrape-targets-allowed-ports: '[{"protocol":"TCP","port":8080}]'
+    networking.resources.gardener.cloud/from-all-webhook-targets-allowed-ports: '[{"protocol":"TCP","port":10250}]'
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 10250
+  - name: metrics
+    port: 2718
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  trafficDistribution: PreferSameZone
+  type: ClusterIP
+status:
+  loadBalancer: {}
+`
+}
+
+func expectedGardenRuntimeServiceAccount(namespace string) string {
+	return `apiVersion: v1
+automountServiceAccountToken: true
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+`
+}
+
+func expectedGardenRuntimeRole(namespace string) string {
+	return `apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+`
+}
+
+func expectedGardenRuntimeRoleBinding(namespace string) string {
+	return `apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-shoot-lakom-service-garden-runtime
+subjects:
+- kind: ServiceAccount
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+`
+}
+
+func expectedGardenRuntimeVPA(namespace string) string {
+	return `apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  labels:
+    app.kubernetes.io/name: lakom
+    app.kubernetes.io/part-of: shoot-lakom-service
+  name: extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  resourcePolicy:
+    containerPolicies:
+    - containerName: lakom
+      controlledResources:
+      - memory
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: extension-shoot-lakom-service-garden-runtime
+  updatePolicy:
+    updateMode: InPlaceOrRecreate
+status: {}
+`
+}
+
+func expectedGardenRuntimeServiceMonitor(namespace string) string {
+	return `apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    prometheus: garden-runtime
+  name: garden-runtime-extension-shoot-lakom-service-garden-runtime
+  namespace: ` + namespace + `
+spec:
+  endpoints:
+  - metricRelabelings:
+    - action: keep
+      regex: ^(lakom_.*|controller_runtime_webhook_.*)$
+      sourceLabels:
+      - __name__
+    port: metrics
+  namespaceSelector: {}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/part-of: shoot-lakom-service
 `
 }

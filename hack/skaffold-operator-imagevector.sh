@@ -35,4 +35,10 @@ spec:
           - name: lakom
             repository: ${image_repo}
             tag: ${image_tag}
+      runtimeClusterValues:
+        imageVectorOverwrite:
+          images:
+          - name: lakom
+            repository: ${image_repo}
+            tag: ${image_tag}
 EOF

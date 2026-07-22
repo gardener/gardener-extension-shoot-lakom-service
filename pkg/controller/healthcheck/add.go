@@ -15,6 +15,7 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/controller/healthcheck/general"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
+	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +33,23 @@ var (
 // RegisterHealthChecks registers health checks for each extension resource
 // HealthChecks are grouped by extension (e.g worker), extension.type (e.g aws) and  Health Check Type (e.g SystemComponentsHealthy)
 func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) error {
+	managedResourceNames := []string{constants.ManagedResourceNamesSeed}
+
+	if len(opts.ExtensionClasses) == 1 && opts.ExtensionClasses[0] == extensionsv1alpha1.ExtensionClassGarden {
+		managedResourceNames = []string{
+			constants.ManagedResourceNamesGardenRuntime,
+			constants.ManagedResourceNamesGardenVirtual,
+		}
+	}
+
+	healthChecks := make([]healthcheck.ConditionTypeToHealthCheck, 0, len(managedResourceNames))
+	for _, managedResourceName := range managedResourceNames {
+		healthChecks = append(healthChecks, healthcheck.ConditionTypeToHealthCheck{
+			ConditionType: string(operatorv1alpha1.RuntimeComponentsHealthy),
+			HealthCheck:   general.CheckManagedResource(managedResourceName),
+		})
+	}
+
 	return healthcheck.DefaultRegistration(
 		constants.ExtensionType,
 		extensionsv1alpha1.SchemeGroupVersion.WithKind(extensionsv1alpha1.ExtensionResource),
@@ -40,13 +58,7 @@ func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) 
 		mgr,
 		opts,
 		nil,
-		[]healthcheck.ConditionTypeToHealthCheck{
-			// Never register health checks for `managedresource.spec.class==nil` (ManagedResources installing resources in the shoot cluster) here as it is done by gardenlet, see https://github.com/gardener/gardener/blob/v1.71.3/docs/extensions/healthcheck-library.md?plain=1#L99
-			{
-				ConditionType: string(gardencorev1beta1.ShootControlPlaneHealthy),
-				HealthCheck:   general.CheckManagedResource(constants.ManagedResourceNamesSeed),
-			},
-		},
+		healthChecks,
 		sets.New[gardencorev1beta1.ConditionType]())
 }
 

@@ -5,7 +5,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: extensions.gardener.cloud:{{ .Values.serviceName }}
+  name: extensions.gardener.cloud:{{ include "name" . }}
   labels:
     app.kubernetes.io/name: gardener-extension-{{ .Values.serviceName }}
     app.kubernetes.io/instance: {{ .Release.Name }}
@@ -18,6 +18,16 @@ rules:
   - get
   - list
   - watch
+{{- if .Values.gardener.runtimeCluster.enabled }}
+- apiGroups:
+  - operator.gardener.cloud
+  resources:
+  - gardens
+  verbs:
+  - get
+  - list
+  - watch
+{{- end }}
 - apiGroups:
   - resources.gardener.cloud
   resources:
@@ -35,6 +45,8 @@ rules:
   resources:
   - namespaces
   verbs:
+  - create
+  - delete
   - get
   - list
   - watch
@@ -67,6 +79,32 @@ rules:
   - patch
   - update
   - deletecollection
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: extensions.gardener.cloud:{{ include "name" . }}
+  labels:
+    app.kubernetes.io/name: gardener-extension-{{ .Values.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: extensions.gardener.cloud:{{ include "name" . }}
+subjects:
+- kind: ServiceAccount
+  name: gardener-extension-{{ .Values.serviceName }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gardener-extension-{{ .Values.serviceName }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: gardener-extension-{{ .Values.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+rules:
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -88,16 +126,17 @@ rules:
   - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
-  name: extensions.gardener.cloud:{{ .Values.serviceName }}
+  name: gardener-extension-{{ .Values.serviceName }}-leader-election
+  namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: gardener-extension-{{ .Values.serviceName }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: extensions.gardener.cloud:{{ .Values.serviceName }}
+  kind: Role
+  name: gardener-extension-{{ .Values.serviceName }}-leader-election
 subjects:
 - kind: ServiceAccount
   name: gardener-extension-{{ .Values.serviceName }}
