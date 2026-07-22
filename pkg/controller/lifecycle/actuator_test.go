@@ -1572,7 +1572,7 @@ spec:
     kind: Deployment
     name: extension-shoot-lakom-service-garden-virtual
   updatePolicy:
-    updateMode: Recreate
+    updateMode: InPlaceOrRecreate
 status: {}
 `
 }
@@ -1589,7 +1589,7 @@ spec:
   endpoints:
   - metricRelabelings:
     - action: keep
-      regex: ^(lakom.*)$
+      regex: ^(lakom_.*|controller_runtime_webhook_.*)$
       sourceLabels:
       - __name__
     port: metrics
@@ -1859,7 +1859,7 @@ spec:
     kind: Deployment
     name: extension-shoot-lakom-service-garden-runtime
   updatePolicy:
-    updateMode: Recreate
+    updateMode: InPlaceOrRecreate
 status: {}
 `
 }
@@ -1876,7 +1876,7 @@ spec:
   endpoints:
   - metricRelabelings:
     - action: keep
-      regex: ^(lakom.*)$
+      regex: ^(lakom_.*|controller_runtime_webhook_.*)$
       sourceLabels:
       - __name__
     port: metrics

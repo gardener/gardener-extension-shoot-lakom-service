@@ -9,9 +9,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
+
+	"github.com/Masterminds/semver/v3"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
@@ -518,7 +519,7 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 				Selector: metav1.LabelSelector{MatchLabels: opts.podLabels},
 				Endpoints: []monitoringv1.Endpoint{{
 					Port:                 "metrics",
-					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom.*"),
+					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom_.*", "controller_runtime_webhook_.*"),
 				}},
 			},
 		},
