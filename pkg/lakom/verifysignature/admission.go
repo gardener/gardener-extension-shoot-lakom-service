@@ -325,7 +325,7 @@ func (h *handler) extractGardenletVerificationTargets(ctx context.Context, garde
 		artifactRef: gardenlet.Spec.Deployment.Helm.OCIRepository.GetURL(),
 		fldPath:     field.NewPath("spec", "deployment", "helm", "ociRepository"),
 	})
-	if gardenlet.Spec.Deployment.Image != nil {
+	if img := gardenlet.Spec.Deployment.Image; img != nil && (img.Ref != nil || img.Repository != nil) {
 		verificationTargets = append(verificationTargets, verificationTarget{
 			artifactRef: getURL(gardenlet.Spec.Deployment.Image),
 			fldPath:     field.NewPath("spec", "deployment", "image"),
@@ -395,8 +395,16 @@ func (h *handler) extractExtensionVerificationTargets(ctx context.Context, exten
 }
 
 // getURL returns the fully-qualified OCIRepository URL of the image.
+// The Image type allows either Ref or Repository/Tag to be set, but not both.
 func getURL(img *seedmanagementv1alpha1.Image) string {
-	ref := *img.Repository
+	if img.Ref != nil {
+		return strings.TrimPrefix(*img.Ref, "oci://")
+	}
+
+	var ref string
+	if img.Repository != nil {
+		ref = *img.Repository
+	}
 
 	if img.Tag != nil {
 		if strings.HasPrefix(*img.Tag, "sha256:") {

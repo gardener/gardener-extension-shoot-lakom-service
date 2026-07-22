@@ -215,7 +215,7 @@ func (h *handler) handleGardenlet(ctx context.Context, gardenlet seedmanagementv
 	}
 	gardenlet.Spec.Deployment.Helm.OCIRepository.Ref = &resolved.ref
 
-	if gardenlet.Spec.Deployment.Image != nil {
+	if img := gardenlet.Spec.Deployment.Image; img != nil && (img.Ref != nil || img.Repository != nil) {
 		resolved, err := h.resolveArtifact(ctx, getURL(gardenlet.Spec.Deployment.Image), kcr, logger)
 		if err != nil {
 			return nil, err
@@ -355,8 +355,16 @@ func (h *handler) handlePod(ctx context.Context, pod corev1.Pod) ([]byte, error)
 }
 
 // getURL returns the fully-qualified OCIRepository URL of the image.
+// The Image type allows either Ref or Repository/Tag to be set, but not both.
 func getURL(img *seedmanagementv1alpha1.Image) string {
-	ref := *img.Repository
+	if img.Ref != nil {
+		return strings.TrimPrefix(*img.Ref, "oci://")
+	}
+
+	var ref string
+	if img.Repository != nil {
+		ref = *img.Repository
+	}
 
 	if img.Tag != nil {
 		if strings.HasPrefix(*img.Tag, "sha256:") {
