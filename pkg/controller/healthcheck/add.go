@@ -38,7 +38,6 @@ func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) 
 	if len(opts.ExtensionClasses) == 1 && opts.ExtensionClasses[0] == extensionsv1alpha1.ExtensionClassGarden {
 		managedResourceNames = []string{
 			constants.ManagedResourceNamesGardenRuntime,
-			constants.ManagedResourceNamesGardenVirtual,
 		}
 	}
 

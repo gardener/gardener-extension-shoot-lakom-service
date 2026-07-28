@@ -15,14 +15,12 @@ import (
 	"github.com/Masterminds/semver/v3"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	resourcesv1alpha1 "github.com/gardener/gardener/pkg/apis/resources/v1alpha1"
-	"github.com/gardener/gardener/pkg/client/kubernetes"
 	kubeapiserverconstants "github.com/gardener/gardener/pkg/component/kubernetes/apiserver/constants"
 	monitoringutils "github.com/gardener/gardener/pkg/component/observability/monitoring/utils"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils"
 	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
 	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
-	"github.com/gardener/gardener/pkg/utils/managedresources"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -87,12 +85,13 @@ var (
 	}
 )
 
-func getWebhookResources(
+// getWebhookObjects builds the webhook configuration objects for a given set of webhook rules and options.
+func getWebhookObjects(
 	webhookOptions webhookOptions,
-	webhookRRules []admissionregistrationv1.RuleWithOperations,
+	webhookRules []admissionregistrationv1.RuleWithOperations,
 	serviceName,
 	extensionNamespace string,
-) (map[string][]byte, error) {
+) ([]client.Object, error) {
 	clientConfigFor := func(path string) admissionregistrationv1.WebhookClientConfig {
 		return getWebhookClientConfig(webhookOptions.useServiceClientConfig, webhookOptions.caBundle, extensionNamespace, serviceName, path)
 	}
@@ -104,7 +103,7 @@ func getWebhookResources(
 		timeOutSeconds    = ptr.To[int32](25)
 		namespaceSelector = webhookOptions.namespaceSelector
 		objectSelector    = webhookOptions.objectSelector
-		resources         = []client.Object{
+		objects           = []client.Object{
 			&admissionregistrationv1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   webhookOptions.configName,
@@ -112,7 +111,7 @@ func getWebhookResources(
 				},
 				Webhooks: []admissionregistrationv1.MutatingWebhook{{
 					Name:                    "resolve-tag.lakom.service.extensions.gardener.cloud",
-					Rules:                   webhookRRules,
+					Rules:                   webhookRules,
 					FailurePolicy:           &failurePolicy,
 					MatchPolicy:             &matchPolicy,
 					SideEffects:             &sideEffectClass,
@@ -130,7 +129,7 @@ func getWebhookResources(
 				},
 				Webhooks: []admissionregistrationv1.ValidatingWebhook{{
 					Name:                    "verify-signature.lakom.service.extensions.gardener.cloud",
-					Rules:                   webhookRRules,
+					Rules:                   webhookRules,
 					FailurePolicy:           &failurePolicy,
 					MatchPolicy:             &matchPolicy,
 					SideEffects:             &sideEffectClass,
@@ -144,30 +143,10 @@ func getWebhookResources(
 		}
 	)
 
-	if webhookOptions.resourceReaderSvcAccName != "" {
-		resources = append(resources,
-			&rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   constants.LakomResourceReader,
-					Labels: getLabels(),
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups: []string{""},
-						Resources: []string{"secrets"},
-						Verbs:     []string{"get"},
-					},
-				},
-			})
-		resources = append(resources,
-			getRoleBindings(webhookOptions.scope, webhookOptions.resourceReaderSvcAccName, webhookOptions.dashboardEnabled)...)
-
-	}
-
-	return webhookOptions.registry.AddAllAndSerialize(resources...)
+	return objects, nil
 }
 
-// lakomResourceOptions parameterizes getLakomResources across deployment flavours.
+// lakomResourceOptions parameterizes getLakomObjects across deployment flavours.
 type lakomResourceOptions struct {
 	replicas                    *int32
 	serverTLSSecretName         string
@@ -187,12 +166,11 @@ type lakomResourceOptions struct {
 	useInClusterAuth      bool
 	genericKubeconfigName string
 	accessSecretName      string
-	createInClusterRBAC   bool
 }
 
-// getLakomResources builds the full lakom workload for a single flavour and
-// returns the serialized ManagedResource data.
-func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
+// getLakomObjects builds the full lakom workload for a single flavour and
+// returns the assembled objects.
+func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
 		serverPort               = intstr.FromInt32(10250)
@@ -203,7 +181,6 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 		lakomConfigDir           = "/etc/lakom/config"
 		lakomConfigConfigMapName = opts.serviceName + "-lakom-config"
 		webhookTLSCertDir        = "/etc/lakom/tls"
-		registry                 = managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
 		requestMemory            = resource.MustParse("25M")
 		vpaUpdateMode            = vpaautoscalingv1.UpdateModeInPlaceOrRecreate
 	)
@@ -433,8 +410,8 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 		},
 	}
 
-	resources := []client.Object{}
-	resources = append(resources,
+	objects := []client.Object{}
+	objects = append(objects,
 		lakomDeployment,
 		pdb,
 		&lakomConfigConfigMap,
@@ -447,44 +424,7 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 			AutomountServiceAccountToken: &opts.useInClusterAuth,
 		},
 	)
-	if opts.createInClusterRBAC {
-		resources = append(resources,
-			&rbacv1.Role{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      opts.serviceName,
-					Namespace: opts.namespace,
-					Labels:    getLabels(),
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups: []string{""},
-						Resources: []string{"secrets"},
-						Verbs:     []string{"get", "list", "watch"},
-					},
-				},
-			},
-			&rbacv1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      opts.serviceName,
-					Namespace: opts.namespace,
-					Labels:    getLabels(),
-				},
-				RoleRef: rbacv1.RoleRef{
-					APIGroup: "rbac.authorization.k8s.io",
-					Kind:     "Role",
-					Name:     opts.serviceName,
-				},
-				Subjects: []rbacv1.Subject{
-					{
-						Kind:      rbacv1.ServiceAccountKind,
-						Name:      opts.serviceName,
-						Namespace: opts.namespace,
-					},
-				},
-			},
-		)
-	}
-	resources = append(resources,
+	objects = append(objects,
 		lakomService,
 		&vpaautoscalingv1.VerticalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
@@ -525,10 +465,10 @@ func getLakomResources(opts lakomResourceOptions) (map[string][]byte, error) {
 		},
 	)
 
-	return registry.AddAllAndSerialize(resources...)
+	return objects, nil
 }
 
-func getSeedResources(
+func getSeedObjects(
 	clusterCtx *clusterContext,
 	lakomReplicas *int32,
 	serviceName,
@@ -537,8 +477,8 @@ func getSeedResources(
 	useOnlyImagePullSecrets,
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
-) (map[string][]byte, error) {
-	return getLakomResources(lakomResourceOptions{
+) ([]client.Object, error) {
+	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
@@ -558,15 +498,15 @@ func getSeedResources(
 	})
 }
 
-func getGardenVirtualResources(
+func getGardenVirtualObjects(
 	clusterCtx *clusterContext,
 	lakomReplicas *int32,
 	accessSecretName string,
 	useOnlyImagePullSecrets,
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
-) (map[string][]byte, error) {
-	return getLakomResources(lakomResourceOptions{
+) ([]client.Object, error) {
+	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         clusterCtx.generatedSecrets[constants.GardenVirtualWebhookTLSSecretName].Name,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
@@ -586,15 +526,15 @@ func getGardenVirtualResources(
 	})
 }
 
-func getGardenRuntimeResources(
+func getGardenRuntimeObjects(
 	clusterCtx *clusterContext,
 	lakomReplicas *int32,
 	serverTLSSecretName string,
 	useOnlyImagePullSecrets,
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
-) (map[string][]byte, error) {
-	return getLakomResources(lakomResourceOptions{
+) ([]client.Object, error) {
+	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
@@ -610,11 +550,50 @@ func getGardenRuntimeResources(
 		priorityClassName:           v1beta1constants.PriorityClassNameGardenSystem200,
 		serviceMonitorSuffix:        "garden-runtime",
 		useInClusterAuth:            true,
-		createInClusterRBAC:         true,
 	})
 }
 
-func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string, dashboardEnabled bool) []client.Object {
+// getInClusterRBACObjects builds the RBAC that allows the lakom pod's own ServiceAccount to read
+// secrets in the cluster it runs in.
+func getInClusterRBACObjects(serviceName, namespace string) []client.Object {
+	return []client.Object{
+		&rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   serviceName,
+				Labels: getLabels(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"secrets"},
+					Verbs:     []string{"get"},
+				},
+			},
+		},
+		&rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   serviceName,
+				Labels: getLabels(),
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     serviceName,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      serviceName,
+					Namespace: namespace,
+				},
+			},
+		},
+	}
+}
+
+// getTargetClusterRBACObjects builds the RBAC that allows lakom to read secrets in a shoot (remote target) cluster
+// through the given shoot-access ServiceAccount.
+func getTargetClusterRBACObjects(scope lakom.ScopeType, shootAccessServiceAccountName string, dashboardEnabled bool) []client.Object {
 	roleRef := rbacv1.RoleRef{
 		APIGroup: "rbac.authorization.k8s.io",
 		Kind:     "ClusterRole",
@@ -631,8 +610,24 @@ func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string
 		resourcesv1alpha1.DeleteOnInvalidUpdate: "true",
 	}
 
+	objects := []client.Object{
+		&rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   constants.LakomResourceReader,
+				Labels: getLabels(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"secrets"},
+					Verbs:     []string{"get"},
+				},
+			},
+		},
+	}
+
 	if scope == lakom.Cluster {
-		return []client.Object{&rbacv1.ClusterRoleBinding{
+		return append(objects, &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        constants.LakomResourceReader,
 				Labels:      getLabels(),
@@ -640,10 +635,10 @@ func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string
 			},
 			RoleRef:  roleRef,
 			Subjects: subjects,
-		}}
+		})
 	}
 
-	roleBindings := []client.Object{&rbacv1.RoleBinding{
+	objects = append(objects, &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        constants.LakomResourceReader,
 			Namespace:   metav1.NamespaceSystem,
@@ -652,10 +647,10 @@ func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string
 		},
 		RoleRef:  roleRef,
 		Subjects: subjects,
-	}}
+	})
 
 	if dashboardEnabled {
-		roleBindings = append(roleBindings, &rbacv1.RoleBinding{
+		objects = append(objects, &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        constants.LakomResourceReader,
 				Namespace:   kubernetesDashboardNamespaceName,
@@ -667,37 +662,28 @@ func getRoleBindings(scope lakom.ScopeType, shootAccessServiceAccountName string
 		})
 	}
 
-	return roleBindings
+	return objects
 }
 
 type webhookOptions struct {
-	registry                 *managedresources.Registry
-	caBundle                 []byte
-	configName               string
-	resourceReaderSvcAccName string
-	useServiceClientConfig   bool
-	namespaceSelector        metav1.LabelSelector
-	objectSelector           metav1.LabelSelector
-	scope                    lakom.ScopeType
-	dashboardEnabled         bool
+	caBundle               []byte
+	configName             string
+	useServiceClientConfig bool
+	namespaceSelector      metav1.LabelSelector
+	objectSelector         metav1.LabelSelector
 }
 
-func shootWebhookOptions(configName, resourceReaderSvcAccName string, scope lakom.ScopeType, dashboardEnabled bool, caBundle []byte) webhookOptions {
+func shootWebhookOptions(configName string, scope lakom.ScopeType, dashboardEnabled bool, caBundle []byte) webhookOptions {
 	return webhookOptions{
-		registry:                 managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
-		caBundle:                 caBundle,
-		configName:               configName,
-		resourceReaderSvcAccName: resourceReaderSvcAccName,
-		namespaceSelector:        scopeToNamespaceSelector(scope, dashboardEnabled),
-		objectSelector:           scopeToObjectSelector(scope),
-		scope:                    scope,
-		dashboardEnabled:         dashboardEnabled,
+		caBundle:          caBundle,
+		configName:        configName,
+		namespaceSelector: scopeToNamespaceSelector(scope, dashboardEnabled),
+		objectSelector:    scopeToObjectSelector(scope),
 	}
 }
 
 func gardenRuntimeWebhookOptions(caBundle []byte) webhookOptions {
 	return webhookOptions{
-		registry:               managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer),
 		caBundle:               caBundle,
 		configName:             constants.GardenRuntimeWebhookConfigurationName,
 		useServiceClientConfig: true,
@@ -714,12 +700,10 @@ func gardenRuntimeWebhookOptions(caBundle []byte) webhookOptions {
 	}
 }
 
-func gardenVirtualWebhookOptions(resourceReaderSvcAccName string, caBundle []byte) webhookOptions {
+func gardenVirtualWebhookOptions(caBundle []byte) webhookOptions {
 	return webhookOptions{
-		registry:                 managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer),
-		caBundle:                 caBundle,
-		configName:               constants.GardenVirtualWebhookConfigurationName,
-		resourceReaderSvcAccName: resourceReaderSvcAccName,
+		caBundle:   caBundle,
+		configName: constants.GardenVirtualWebhookConfigurationName,
 	}
 }
 

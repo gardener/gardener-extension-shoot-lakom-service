@@ -112,6 +112,9 @@ func (o *Options) run(ctx context.Context) error {
 			},
 		},
 	}
+
+	// Configure the cache to only watch the Lease object in the leader election namespace.
+	// This is required to avoid watching all Lease objects cluster-wide, which would require additional RBAC permissions.
 	mgrOpts.Cache.ByObject = map[client.Object]cache.ByObject{
 		&coordinationv1.Lease{}: {
 			Namespaces: map[string]cache.Config{
