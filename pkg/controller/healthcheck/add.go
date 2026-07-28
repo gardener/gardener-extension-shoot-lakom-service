@@ -41,6 +41,8 @@ func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) 
 		}
 	}
 
+	// Never register health checks for `managedresource.spec.class==nil` (ManagedResources installing resources in the shoot cluster) here.
+	// It is done by gardenlet, see https://github.com/gardener/gardener/blob/v1.71.3/docs/extensions/healthcheck-library.md?plain=1#L99
 	healthChecks := make([]healthcheck.ConditionTypeToHealthCheck, 0, len(managedResourceNames))
 	for _, managedResourceName := range managedResourceNames {
 		healthChecks = append(healthChecks, healthcheck.ConditionTypeToHealthCheck{
