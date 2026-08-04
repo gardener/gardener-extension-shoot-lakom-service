@@ -13,6 +13,7 @@ updates:
   open-pull-requests-limit: 5
   allow:
   - dependency-name: "github.com/gardener/gardener"
+  - dependency-name: "github.com/gardener/gardener/hack/tools"
   - dependency-name: "github.com/gardener/gardener/pkg/apis"
   - dependency-name: "github.com/gardener/service-account-issuer-discovery"
   - dependency-name: "github.com/google/go-containerregistry"
@@ -25,6 +26,7 @@ updates:
     gardener:
       patterns:
         - "github.com/gardener/gardener"
+        - "github.com/gardener/gardener/hack/tools"
         - "github.com/gardener/gardener/pkg/apis"
   labels:
   - kind/enhancement
