@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	shootWebhookRules []admissionregistrationv1.RuleWithOperations = []admissionregistrationv1.RuleWithOperations{{
+	shootWebhookRules = []admissionregistrationv1.RuleWithOperations{{
 		Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
 		Rule: admissionregistrationv1.Rule{
 			APIGroups:   []string{""},
@@ -46,7 +46,7 @@ var (
 		},
 	}}
 
-	gardenRuntimeWebhookRules []admissionregistrationv1.RuleWithOperations = []admissionregistrationv1.RuleWithOperations{
+	gardenRuntimeWebhookRules = []admissionregistrationv1.RuleWithOperations{
 		{
 			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
 			Rule: admissionregistrationv1.Rule{
@@ -65,7 +65,7 @@ var (
 		},
 	}
 
-	gardenVirtualWebhookRules []admissionregistrationv1.RuleWithOperations = []admissionregistrationv1.RuleWithOperations{
+	gardenVirtualWebhookRules = []admissionregistrationv1.RuleWithOperations{
 		{
 			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
 			Rule: admissionregistrationv1.Rule{
@@ -593,7 +593,7 @@ func getInClusterRBACObjects(serviceName, namespace string) []client.Object {
 
 // getTargetClusterRBACObjects builds the RBAC that allows lakom to read secrets in a shoot (remote target) cluster
 // through the given shoot-access ServiceAccount.
-func getTargetClusterRBACObjects(scope lakom.ScopeType, shootAccessServiceAccountName string, dashboardEnabled bool) []client.Object {
+func getTargetClusterRBACObjects(scope lakom.ScopeType, targetAccessServiceAccountName, targetAccessServiceAccountNamespace string, dashboardEnabled bool) []client.Object {
 	roleRef := rbacv1.RoleRef{
 		APIGroup: "rbac.authorization.k8s.io",
 		Kind:     "ClusterRole",
@@ -602,8 +602,8 @@ func getTargetClusterRBACObjects(scope lakom.ScopeType, shootAccessServiceAccoun
 	subjects := []rbacv1.Subject{
 		{
 			Kind:      rbacv1.ServiceAccountKind,
-			Name:      shootAccessServiceAccountName,
-			Namespace: metav1.NamespaceSystem,
+			Name:      targetAccessServiceAccountName,
+			Namespace: targetAccessServiceAccountNamespace,
 		},
 	}
 	annotations := map[string]string{
@@ -641,7 +641,7 @@ func getTargetClusterRBACObjects(scope lakom.ScopeType, shootAccessServiceAccoun
 	objects = append(objects, &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        constants.LakomResourceReader,
-			Namespace:   metav1.NamespaceSystem,
+			Namespace:   targetAccessServiceAccountNamespace,
 			Labels:      getLabels(),
 			Annotations: annotations,
 		},

@@ -151,7 +151,7 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 		return err
 	}
 	shootObjects = append(shootObjects,
-		getTargetClusterRBACObjects(*clusterCtx.providerConfig.Scope, lakomShootAccessSecret.ServiceAccountName, clusterCtx.dashboardEnabled)...,
+		getTargetClusterRBACObjects(*clusterCtx.providerConfig.Scope, lakomShootAccessSecret.ServiceAccountName, clusterCtx.namespace, clusterCtx.dashboardEnabled)...,
 	)
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
 	shootResources, err := shootRegistry.AddAllAndSerialize(shootObjects...)
@@ -187,10 +187,8 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	gardenAccessSecret := gardenerutils.NewGardenAccessSecret(
-		gardenerutils.SecretNamePrefixGardenAccess+constants.ApplicationName,
-		clusterCtx.namespace,
-	)
+	gardenAccessSecret := gardenerutils.NewGardenAccessSecret(gardenerutils.SecretNamePrefixGardenAccess+constants.ApplicationName, clusterCtx.namespace).
+		WithServiceAccountNamespace(clusterCtx.namespace)
 
 	gardenAccessSecret.Secret.SetLabels(utils.MergeStringMaps(getLabels(), gardenAccessSecret.Secret.GetLabels()))
 	if err := gardenAccessSecret.Reconcile(ctx, a.client); err != nil {
@@ -251,7 +249,7 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 	}
 
 	gardenVirtualWebhookConfigObjects = append(gardenVirtualWebhookConfigObjects,
-		getTargetClusterRBACObjects("", gardenAccessSecret.ServiceAccountName, false)...,
+		getTargetClusterRBACObjects("", gardenAccessSecret.ServiceAccountName, clusterCtx.namespace, false)...,
 	)
 
 	virtualRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)

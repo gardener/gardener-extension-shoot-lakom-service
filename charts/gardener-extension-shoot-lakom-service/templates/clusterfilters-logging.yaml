@@ -13,6 +13,6 @@ spec:
   filters:
   - parser:
       keyName: log
-      parser: extension-shoot-lakom-service-lakom-parser-{{ include "name" . }}
+      parser: extension-{{ include "name" . }}-lakom-parser
       reserveData: true
   match: kubernetes.*extension-shoot-lakom-service*lakom*
