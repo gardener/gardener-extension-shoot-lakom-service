@@ -4,9 +4,9 @@ go 1.26.4
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/gardener/gardener v1.148.0
-	github.com/gardener/gardener/hack/tools v1.148.0
-	github.com/gardener/gardener/pkg/apis v1.148.0
+	github.com/gardener/gardener v1.148.2
+	github.com/gardener/gardener/hack/tools v1.148.2
+	github.com/gardener/gardener/pkg/apis v1.148.2
 	github.com/gardener/service-account-issuer-discovery v0.12.0
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-containerregistry v0.21.9
