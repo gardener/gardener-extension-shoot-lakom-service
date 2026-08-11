@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # SPDX-FileCopyrightText: SAP SE or an SAP affiliate company and Gardener contributors
 #
