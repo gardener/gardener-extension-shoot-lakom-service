@@ -154,6 +154,10 @@ test-cov:
 test-clean:
 	@bash $(GARDENER_HACK_DIR)/test-cover-clean.sh
 
+.PHONY: ci-e2e-kind
+ci-e2e-kind: $(KIND) $(YQ)
+	./hack/ci-e2e-kind.sh
+
 .PHONY: verify
 verify: check format test sast
 
