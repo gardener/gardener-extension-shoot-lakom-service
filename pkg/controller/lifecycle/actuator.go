@@ -151,7 +151,7 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 		return err
 	}
 	shootObjects = append(shootObjects,
-		getTargetClusterRBACObjects(*clusterCtx.providerConfig.Scope, lakomShootAccessSecret.ServiceAccountName, clusterCtx.namespace, clusterCtx.dashboardEnabled)...,
+		getTargetClusterRBACObjects(*clusterCtx.providerConfig.Scope, lakomShootAccessSecret.ServiceAccountName, metav1.NamespaceSystem, clusterCtx.dashboardEnabled)...,
 	)
 	shootRegistry := managedresources.NewRegistry(kubernetes.ShootScheme, kubernetes.ShootCodec, kubernetes.ShootSerializer)
 	shootResources, err := shootRegistry.AddAllAndSerialize(shootObjects...)
