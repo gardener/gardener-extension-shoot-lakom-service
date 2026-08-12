@@ -88,7 +88,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 
 	if !kcr.serviceConfig.SeedBootstrap.Enabled {
 		logger.Info("Deleting lakom admission controller from the seed cluster")
-		return managedresources.DeleteForSeed(ctx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeed)
+		return managedresources.DeleteForSeed(ctx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeedRuntime)
 	}
 	logger.Info("Installing lakom admission controller to the seed cluster")
 
@@ -142,14 +142,14 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		return err
 	}
 
-	if err := managedresources.CreateForSeed(ctx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeed, false, resources); err != nil {
+	if err := managedresources.CreateForSeed(ctx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeedRuntime, false, resources); err != nil {
 		return err
 	}
 
 	twoMinutes := 2 * time.Minute
 	timeoutHealthCtx, cancelHealthCtx := context.WithTimeout(ctx, twoMinutes)
 	defer cancelHealthCtx()
-	if err := managedresources.WaitUntilHealthy(timeoutHealthCtx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeed); err != nil {
+	if err := managedresources.WaitUntilHealthy(timeoutHealthCtx, kcr.client, ownerNamespace, constants.ManagedResourceNamesSeedRuntime); err != nil {
 		return err
 	}
 

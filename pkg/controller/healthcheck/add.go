@@ -33,7 +33,7 @@ var (
 // RegisterHealthChecks registers health checks for each extension resource
 // HealthChecks are grouped by extension (e.g worker), extension.type (e.g aws) and  Health Check Type (e.g SystemComponentsHealthy)
 func RegisterHealthChecks(mgr manager.Manager, opts healthcheck.DefaultAddArgs) error {
-	managedResourceNames := []string{constants.ManagedResourceNamesSeed}
+	managedResourceNames := []string{constants.ManagedResourceNamesShootRuntime}
 
 	if len(opts.ExtensionClasses) == 1 && opts.ExtensionClasses[0] == extensionsv1alpha1.ExtensionClassGarden {
 		managedResourceNames = []string{
