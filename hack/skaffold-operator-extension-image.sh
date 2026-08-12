@@ -33,4 +33,8 @@ spec:
         image:
           repository: ${image_repo}
           tag: ${image_tag}
+      runtimeClusterValues:
+        image:
+          repository: ${image_repo}
+          tag: ${image_tag}
 EOF

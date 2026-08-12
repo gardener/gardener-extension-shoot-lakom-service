@@ -8,11 +8,11 @@ kind: ClusterFilter
 metadata:
   labels:
     fluentbit.gardener/type: "seed"
-  name: extension-shoot-lakom-service-lakom
+  name: extension-{{ include "name" . }}-lakom
 spec:
   filters:
   - parser:
       keyName: log
-      parser: extension-shoot-lakom-service-lakom-parser
+      parser: extension-{{ include "name" . }}-lakom-parser
       reserveData: true
   match: kubernetes.*extension-shoot-lakom-service*lakom*
