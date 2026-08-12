@@ -5,6 +5,8 @@
 package secrets
 
 import (
+	"time"
+
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	extensionssecretsmanager "github.com/gardener/gardener/extensions/pkg/util/secret/manager"
@@ -17,10 +19,14 @@ import (
 const (
 	// ManagerIdentity is the identity used for the secrets manager.
 	ManagerIdentity = "extension-" + constants.ExtensionType
+	// ManagerIdentitySeed is the identity used for the secrets manager when extension is deployed for seed class extensions.
+	ManagerIdentitySeed = "extension-" + constants.ExtensionType + "-seed"
 	// ManagerIdentityGarden is the identity used for the secrets manager when extension is deployed for garden class extensions.
 	ManagerIdentityGarden = "extension-" + constants.ExtensionType + "-garden"
 	// CAName is the name of the CA secret.
 	CAName = "ca-extension-" + constants.ExtensionType
+	// CANameSeed is the name of the CA secret for seed class extensions.
+	CANameSeed = "ca-extension-" + constants.ExtensionType + "-seed"
 	// CANameGarden is the name of the CA secret for garden class extensions.
 	CANameGarden = "ca-extension-" + constants.ExtensionType + "-garden"
 )
@@ -47,6 +53,45 @@ func ConfigsFor(namespace string) []extensionssecretsmanager.SecretConfigWithOpt
 			// use current CA for signing server cert to prevent mismatches when dropping the old CA from the webhook
 			// config in phase Completing
 			Options: []secretsmanager.GenerateOption{secretsmanager.SignedByCA(CAName, secretsmanager.UseCurrentCA)},
+		},
+	}
+}
+
+// ConfigsForSeed returns specific configurations for the secrets manager when Lakom is deployed as extension class seed.
+func ConfigsForSeed() []extensionssecretsmanager.SecretConfigWithOptions {
+	day := time.Hour * 24
+	year := day * 365
+	threeMonths := day * 90
+	return []extensionssecretsmanager.SecretConfigWithOptions{
+		{
+			Config: &secretsutils.CertificateSecretConfig{
+				Name:       CANameSeed,
+				CommonName: CANameSeed,
+				CertType:   secretsutils.CACert,
+				Validity:   &year,
+			},
+			Options: []secretsmanager.GenerateOption{
+				secretsmanager.Rotate(secretsmanager.KeepOld),
+				secretsmanager.IgnoreOldSecretsAfter(day),
+			},
+		},
+		{
+			Config: &secretsutils.CertificateSecretConfig{
+				Name:                        constants.SeedWebhookTLSSecretName,
+				CommonName:                  constants.SeedExtensionServiceName,
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.SeedExtensionServiceName, constants.LakomSystemNamespaceName),
+				CertType:                    secretsutils.ServerCert,
+				SkipPublishingCACertificate: true,
+				Validity:                    &threeMonths,
+			},
+
+			Options: []secretsmanager.GenerateOption{
+				secretsmanager.SignedByCA(
+					CANameSeed,
+					secretsmanager.UseOldCA,
+				),
+				secretsmanager.Rotate(secretsmanager.KeepOld),
+			},
 		},
 	}
 }
