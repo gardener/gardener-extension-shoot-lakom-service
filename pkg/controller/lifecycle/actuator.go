@@ -651,7 +651,7 @@ func (a *actuator) buildSeedClusterContext(ctx context.Context, logger logr.Logg
 		a.client,
 		secrets.ManagerIdentitySeed,
 		secretsmanager.WithCASecretAutoRotation(),
-		secretsmanager.WithNamespaces(namespace),
+		secretsmanager.WithNamespaces(constants.LakomSystemNamespaceName),
 	)
 	if err != nil {
 		return nil, err
