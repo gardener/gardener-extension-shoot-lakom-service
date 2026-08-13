@@ -89,7 +89,7 @@ spec:
         - --disable-controllers=shoot_lakom_service_seed_bootstrap_controller
         - --extension-classes=garden
         {{- else }}
-        - --extension-classes=shoot
+        - --extension-classes=seed,shoot
         {{- end }}
         ports:
         - containerPort: {{ .Values.controllers.metricsPort }}
