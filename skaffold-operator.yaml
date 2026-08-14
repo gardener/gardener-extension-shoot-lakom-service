@@ -9,11 +9,11 @@ metadata:
 build:
   tagPolicy:
     customTemplate:
-      template: '{{.version}}-{{.sha}}'
+      template: "{{.version}}-{{.sha}}"
       components:
         - name: version
           envTemplate:
-            template: '{{.EFFECTIVE_VERSION}}'
+            template: "{{.EFFECTIVE_VERSION}}"
         - name: sha
           inputDigest: {}
   insecureRegistries:
@@ -41,7 +41,7 @@ build:
             - pkg/secrets
             - VERSION
         ldflags:
-          - '{{.EXTENSION_LD_FLAGS}}'
+          - "{{.EXTENSION_LD_FLAGS}}"
         main: ./cmd/gardener-extension-shoot-lakom-service
       hooks:
         after:
@@ -60,7 +60,7 @@ build:
             - pkg/lakom/utils
             - VERSION
         ldflags:
-          - '{{.SHOOT_ADMISSION_LD_FLAGS}}'
+          - "{{.SHOOT_ADMISSION_LD_FLAGS}}"
         main: ./cmd/gardener-extension-shoot-lakom-admission
       hooks:
         after:
@@ -82,7 +82,7 @@ build:
             - pkg/lakom/verifysignature
             - VERSION
         ldflags:
-          - '{{.ADMISSION_LD_FLAGS}}'
+          - "{{.ADMISSION_LD_FLAGS}}"
         main: ./cmd/lakom
     - image: local-skaffold/gardener-extension-shoot-lakom-admission/charts/application
       custom:
@@ -124,3 +124,10 @@ resourceSelector:
         - .spec.deployment.extension.helm.ociRepository.ref
         - .spec.deployment.admission.runtimeCluster.helm.ociRepository.ref
         - .spec.deployment.admission.virtualCluster.helm.ociRepository.ref
+profiles:
+  # The e2e profile deploys lakom with allowUntrustedImages: false via the local-setup/operator-e2e overlay.
+  - name: e2e
+    manifests:
+      kustomize:
+        paths:
+          - local-setup/operator-e2e

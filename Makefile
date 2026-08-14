@@ -25,6 +25,10 @@ CACHE_REFRESH_INTERVAL      ?= 30s
 KUBECONFIG                  ?= $(HOME)/.kube/config
 TARGET_PLATFORMS            ?= linux/$(shell go env GOARCH)
 PARALLEL_MODE               := sequential
+PARALLEL_E2E_TESTS          := 3
+GARDENER_REPO_ROOT          ?= $(REPO_ROOT)/gardener
+RUNTIME_KUBECONFIG          := $(GARDENER_REPO_ROOT)/dev-setup/kubeconfigs/runtime/kubeconfig
+VIRTUAL_KUBECONFIG          := $(GARDENER_REPO_ROOT)/dev-setup/kubeconfigs/virtual-garden/kubeconfig
 
 TOOLS_DIR := $(HACK_DIR)/tools
 include $(GARDENER_HACK_DIR)/tools.mk
@@ -154,8 +158,20 @@ test-cov:
 test-clean:
 	@bash $(GARDENER_HACK_DIR)/test-cover-clean.sh
 
+.PHONY: test-e2e-local
+test-e2e-local: $(GINKGO)
+	KUBECONFIG=$(VIRTUAL_KUBECONFIG) ./hack/test-e2e-local.sh --procs=$(PARALLEL_E2E_TESTS) $(LABEL_FILTER) ./test/e2e/...
+
+.PHONY: test-e2e-local-lifecycle
+test-e2e-local-lifecycle: $(GINKGO)
+	KUBECONFIG=$(VIRTUAL_KUBECONFIG) ./hack/test-e2e-local.sh --procs=$(PARALLEL_E2E_TESTS) --label-filter="Lakom && !signature-verification" ./test/e2e/...
+
+.PHONY: test-e2e-local-signature
+test-e2e-local-signature: $(GINKGO)
+	KUBECONFIG=$(VIRTUAL_KUBECONFIG) ./hack/test-e2e-local.sh --procs=$(PARALLEL_E2E_TESTS) --label-filter="Lakom && signature-verification" ./test/e2e/...
+
 .PHONY: ci-e2e-kind
-ci-e2e-kind:
+ci-e2e-kind: $(KIND) $(YQ)
 	./hack/ci-e2e-kind.sh
 
 .PHONY: verify
@@ -191,3 +207,14 @@ extension-operator-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL)
 
 extension-operator-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
 	$(SKAFFOLD) delete
+
+extension-operator-e2e-up extension-operator-e2e-down: export SKAFFOLD_DEFAULT_REPO = registry.local.gardener.cloud:5001
+extension-operator-e2e-up extension-operator-e2e-down: export SKAFFOLD_PUSH = true
+extension-operator-e2e-up extension-operator-e2e-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
+extension-operator-e2e-up extension-operator-e2e-down: export SKAFFOLD_FILENAME = skaffold-operator.yaml
+extension-operator-e2e-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL)
+	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) \
+		$(SKAFFOLD) --cache-artifacts=false -p e2e run
+
+extension-operator-e2e-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
+	$(SKAFFOLD) -p e2e delete
