@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 SAP SE or an SAP affiliate company and Gardener contributors
+// SPDX-FileCopyrightText: SAP SE or an SAP affiliate company and Gardener contributors
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -107,6 +107,7 @@ func (a *actuator) Reconcile(ctx context.Context, logger logr.Logger, ex *extens
 	}
 }
 
+// reconcileShoot reconciles extension resources of class shoot.
 func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
 	clusterCtx, err := a.buildShootClusterContext(ctx, logger, ex)
 	if err != nil {
@@ -149,10 +150,7 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 		clusterCtx.dashboardEnabled,
 		clusterCtx.caBundle,
 	)
-	shootObjects, err := getWebhookObjects(shootWebhookOptions, shootWebhookRules, constants.ExtensionServiceName, clusterCtx.namespace)
-	if err != nil {
-		return err
-	}
+	shootObjects := getWebhookObjects(shootWebhookOptions, shootWebhookRules, constants.ExtensionServiceName, clusterCtx.namespace)
 	shootObjects = append(shootObjects,
 		getTargetClusterRBACObjects(*clusterCtx.providerConfig.Scope, lakomShootAccessSecret.ServiceAccountName, metav1.NamespaceSystem, clusterCtx.dashboardEnabled)...,
 	)
@@ -179,6 +177,7 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 	return clusterCtx.secretsManager.Cleanup(ctx)
 }
 
+// reconcileSeed reconciles extension resources of class seed.
 func (a *actuator) reconcileSeed(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: constants.LakomSystemNamespaceName}}
 	if err := client.IgnoreAlreadyExists(a.client.Create(ctx, ns)); err != nil {
@@ -204,15 +203,12 @@ func (a *actuator) reconcileSeed(ctx context.Context, logger logr.Logger, ex *ex
 
 	seedRBACObjects := getInClusterRBACObjects(constants.SeedExtensionServiceName, constants.LakomSystemNamespaceName)
 
-	seedWebhookConfigObjects, err := getWebhookObjects(
+	seedWebhookConfigObjects := getWebhookObjects(
 		seedWebhookOptions(clusterCtx.caBundle),
 		seedWebhookRules,
 		constants.SeedExtensionServiceName,
 		constants.LakomSystemNamespaceName,
 	)
-	if err != nil {
-		return err
-	}
 
 	seedRegistry := managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
 	seedResources, err := seedRegistry.AddAllAndSerialize(slices.Concat(seedRuntimeObjects, seedRBACObjects, seedWebhookConfigObjects)...)
@@ -235,11 +231,11 @@ func (a *actuator) reconcileSeed(ctx context.Context, logger logr.Logger, ex *ex
 	if err := managedresources.WaitUntilHealthy(timeoutSeedCtx, a.client, clusterCtx.namespace, constants.ManagedResourceNamesSeedRuntime); err != nil {
 		return err
 	}
-	// Wait for the ManagedResources.
-	// Cleanup secrets manager after they are healthy.
+
 	return clusterCtx.secretsManager.Cleanup(ctx)
 }
 
+// reconcileGarden reconciles extension resources of class garden.
 func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: constants.LakomSystemNamespaceName}}
 	if err := client.IgnoreAlreadyExists(a.client.Create(ctx, ns)); err != nil {
@@ -286,15 +282,12 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	gardenRuntimeWebhookConfigObjects, err := getWebhookObjects(
+	gardenRuntimeWebhookConfigObjects := getWebhookObjects(
 		gardenRuntimeWebhookOptions(clusterCtx.caBundle),
 		gardenRuntimeWebhookRules,
 		constants.GardenRuntimeExtensionServiceName,
 		constants.LakomSystemNamespaceName,
 	)
-	if err != nil {
-		return err
-	}
 
 	runtimeRegistry := managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
 	gardenResources, err := runtimeRegistry.AddAllAndSerialize(slices.Concat(gardenRuntimeObjects, gardenVirtualObjects, gardenRuntimeWebhookConfigObjects)...)
@@ -302,15 +295,12 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	gardenVirtualWebhookConfigObjects, err := getWebhookObjects(
+	gardenVirtualWebhookConfigObjects := getWebhookObjects(
 		gardenVirtualWebhookOptions(clusterCtx.caBundle),
 		gardenVirtualWebhookRules,
 		constants.GardenVirtualExtensionServiceName,
 		clusterCtx.namespace,
 	)
-	if err != nil {
-		return err
-	}
 
 	gardenVirtualWebhookConfigObjects = append(gardenVirtualWebhookConfigObjects,
 		getTargetClusterRBACObjects("", gardenAccessSecret.ServiceAccountName, clusterCtx.namespace, false)...,
@@ -348,8 +338,6 @@ func (a *actuator) reconcileGarden(ctx context.Context, logger logr.Logger, ex *
 		return err
 	}
 
-	// Wait for the ManagedResources.
-	// Cleanup secrets manager after they are healthy.
 	return clusterCtx.secretsManager.Cleanup(ctx)
 }
 
@@ -515,7 +503,7 @@ func (a *actuator) Migrate(ctx context.Context, logger logr.Logger, ex *extensio
 	extensionClass := extensionsv1alpha1helper.GetExtensionClassOrDefault(ex.Spec.GetExtensionClass())
 	switch extensionClass {
 	case extensionsv1alpha1.ExtensionClassShoot:
-		// Keep objects for shoot managed resources so that they are not deleted from the shoot during the migration
+		// Keep objects for shoot managed resources so that they are not deleted from the shoot during the migration.
 		if err := managedresources.SetKeepObjects(ctx, a.client, ex.GetNamespace(), constants.ManagedResourceNamesShoot, true); err != nil {
 			return err
 		}
@@ -525,6 +513,7 @@ func (a *actuator) Migrate(ctx context.Context, logger logr.Logger, ex *extensio
 	}
 }
 
+// getLabels returns Lakom common labels.
 func getLabels() map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":    constants.ApplicationName,
@@ -573,7 +562,7 @@ func getClientKeys(ctx context.Context, client client.Client, resources []garden
 	return clientKeys, nil
 }
 
-// clusterContext contains cluster-specific settings extracted based on the extension class
+// clusterContext contains cluster-specific settings extracted based on the extension class.
 type clusterContext struct {
 	namespace                   string
 	genericTokenKubeconfigName  string
@@ -677,6 +666,7 @@ func (a *actuator) buildSeedClusterContext(ctx context.Context, logger logr.Logg
 	if err := a.prepareTLSSecrets(ctx, clusterCtx, configs); err != nil {
 		return nil, err
 	}
+
 	// Seed extensions do not support per-seed trusted key references (Seed.Spec.Resources).
 	// Only the Gardener-managed cosign keys from the
 	// extension config are used, so named resource references are passed as nil.
@@ -745,7 +735,7 @@ func (a *actuator) buildGardenClusterContext(ctx context.Context, logger logr.Lo
 }
 
 // prepareTLSSecrets generates all TLS secrets via the secrets manager, fetches the CA bundle
-// and populates relevant fields in the cluster context
+// and populates relevant fields in the cluster context.
 func (a *actuator) prepareTLSSecrets(ctx context.Context, clusterCtx *clusterContext, secretsConfigs []extensionssecretsmanager.SecretConfigWithOptions) error {
 	generatedSecrets, err := extensionssecretsmanager.GenerateAllSecrets(ctx, clusterCtx.secretsManager, secretsConfigs)
 	if err != nil {
