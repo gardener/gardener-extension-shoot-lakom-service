@@ -67,7 +67,7 @@ func getWebhookObjects(
 	webhookRules []admissionregistrationv1.RuleWithOperations,
 	serviceName,
 	extensionNamespace string,
-) ([]client.Object, error) {
+) []client.Object {
 	clientConfigFor := func(path string) admissionregistrationv1.WebhookClientConfig {
 		return getWebhookClientConfig(webhookOptions.useServiceClientConfig, webhookOptions.caBundle, extensionNamespace, serviceName, path)
 	}
@@ -119,7 +119,7 @@ func getWebhookObjects(
 		}
 	)
 
-	return objects, nil
+	return objects
 }
 
 // lakomResourceOptions parameterizes getLakomObjects across deployment flavours.
