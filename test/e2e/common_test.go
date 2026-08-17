@@ -83,7 +83,7 @@ func ensureLakomServiceIsDisabled(shoot *gardencorev1beta1.Shoot) error {
 func getLakomDeployment(ctx context.Context, c client.Client, namespace string) (*appsv1.Deployment, error) {
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ApplicationName,
+			Name:      constants.ExtensionServiceName,
 			Namespace: namespace,
 		},
 	}
@@ -95,7 +95,7 @@ func getLakomDeployment(ctx context.Context, c client.Client, namespace string) 
 func ensureLakomResourcesAreCleaned(ctx context.Context, c client.Client, namespace string) {
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ApplicationName,
+			Name:      constants.ExtensionServiceName,
 			Namespace: namespace,
 		},
 	}
