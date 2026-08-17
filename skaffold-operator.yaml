@@ -45,7 +45,7 @@ build:
         main: ./cmd/gardener-extension-shoot-lakom-service
       hooks:
         after:
-          - command: ["sh", "hack/skaffold-operator-extension-image.sh"]
+          - command: ["bash", "hack/skaffold-operator-extension-image.sh"]
     - image: local-skaffold/gardener-extension-shoot-lakom-admission
       ko:
         dependencies:
@@ -64,11 +64,11 @@ build:
         main: ./cmd/gardener-extension-shoot-lakom-admission
       hooks:
         after:
-          - command: ["sh", "hack/skaffold-operator-admission-image.sh"]
+          - command: ["bash", "hack/skaffold-operator-admission-image.sh"]
     - image: local-skaffold/lakom
       hooks:
         after:
-          - command: ["sh", "hack/skaffold-operator-imagevector.sh"]
+          - command: ["bash", "hack/skaffold-operator-imagevector.sh"]
       ko:
         dependencies:
           paths:
