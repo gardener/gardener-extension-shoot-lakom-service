@@ -31,14 +31,14 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 		Expect(f.UpdateShoot(ctx, f.Shoot, ensureLakomServiceIsEnabled)).To(Succeed())
 
 		_, seedClient, err := f.GetSeed(ctx, *f.Shoot.Status.SeedName)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		project, err := f.GetShootProject(ctx, f.Shoot.Namespace)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		shootSeedNamespace := tf.ComputeTechnicalID(project.Name, f.Shoot)
 
 		By("Verify Lakom Deployment is running")
 		depl, err := getLakomDeployment(ctx, seedClient.Client(), shootSeedNamespace)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		one := int32(1)
 		Expect(*depl.Spec.Replicas).To(BeNumerically(">=", one))
 		Expect(depl.Status.ReadyReplicas).To(BeNumerically(">=", one))

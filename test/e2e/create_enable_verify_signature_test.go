@@ -54,16 +54,16 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 			By("Generate cosign key pair")
 			var err error
 			privateKey, publicKeyPEM, err = common.GenerateKeyPair()
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Push and sign a trusted image, push an untrusted image")
 			signedImage, signedRef, err := common.PushRandomImage(fmt.Sprintf("%s/lakom-e2e-signed", localRegistry))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(common.SignImage(signedImage, signedRef, privateKey)).To(Succeed())
 			signedImageRef = signedRef
 
 			_, unsignedRef, err := common.PushRandomImage(fmt.Sprintf("%s/lakom-e2e-unsigned", localRegistry))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			unsignedImageRef = unsignedRef
 		})
 
@@ -112,8 +112,8 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 			ctx, cancel = context.WithTimeout(parentCtx, 15*time.Minute)
 			DeferCleanup(cancel)
 			Expect(f.UpdateShoot(ctx, f.Shoot, func(shoot *gardencorev1beta1.Shoot) error {
-				common.AddOrUpdateResourceReference(shoot, trustedKeysResourceRefName, "Secret", keysSecret.Name)
-				common.AddOrUpdateLakomExtensionWithTrustedKeys(shoot, apislakom.Cluster, trustedKeysResourceRefName)
+				common.AddOrUpdateShootResourceReference(shoot, trustedKeysResourceRefName, "Secret", keysSecret.Name)
+				common.AddOrUpdateShootLakomExtensionWithTrustedKeys(shoot, apislakom.Cluster, trustedKeysResourceRefName)
 				return nil
 			})).To(Succeed())
 

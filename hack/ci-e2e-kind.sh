@@ -40,6 +40,7 @@ make test-e2e-local-lifecycle
 
 KUBECONFIG="$RUNTIME_KUBECONFIG" make extension-operator-e2e-up
 make test-e2e-local-signature
+make test-e2e-local-garden
 
 KUBECONFIG="$RUNTIME_KUBECONFIG" make extension-operator-e2e-down
 make -C "$REPO_ROOT/gardener" gardener-down

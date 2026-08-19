@@ -104,3 +104,30 @@ func SignImage(image registryv1.Image, imageDigestRef string, privateKey *ecdsa.
 
 	return ociRemote.WriteSignatures(digest.Context(), si)
 }
+
+// SignImageByRef signs an already-pushed image identified by imageRef (a tag or digest reference) with
+// the provided private key. Unlike SignImage it does not require the built registryv1.Image object: it
+// pulls the image from the registry, resolves it to its digest and signs that. Use this to sign images
+// the test did not push itself (e.g. the extension's own lakom image, so it passes the runtime
+// signature webhook).
+func SignImageByRef(imageRef string, privateKey *ecdsa.PrivateKey) error {
+	ref, err := name.ParseReference(imageRef, name.Insecure)
+	if err != nil {
+		return err
+	}
+
+	image, err := remote.Image(ref)
+	if err != nil {
+		return fmt.Errorf("failed to pull image %s: %w", imageRef, err)
+	}
+
+	digest, err := image.Digest()
+	if err != nil {
+		return fmt.Errorf("failed to compute digest for image %s: %w", imageRef, err)
+	}
+
+	// cosign signs the digest reference, regardless of whether imageRef was a tag or a digest.
+	digestRef := fmt.Sprintf("%s@%s", ref.Context().Name(), digest.String())
+
+	return SignImage(image, digestRef, privateKey)
+}
