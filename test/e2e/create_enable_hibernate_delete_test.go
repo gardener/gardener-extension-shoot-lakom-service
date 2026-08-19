@@ -31,14 +31,14 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 		Expect(f.UpdateShoot(ctx, f.Shoot, ensureLakomServiceIsEnabled)).To(Succeed())
 
 		_, seedClient, err := f.GetSeed(ctx, *f.Shoot.Status.SeedName)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		project, err := f.GetShootProject(ctx, f.Shoot.Namespace)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		shootSeedNamespace := tf.ComputeTechnicalID(project.Name, f.Shoot)
 
 		By("Verify Lakom Deployment is running")
 		depl, err := getLakomDeployment(ctx, seedClient.Client(), shootSeedNamespace)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		one := int32(1)
 		Expect(*depl.Spec.Replicas).To(BeNumerically(">=", one))
 		Expect(depl.Status.ReadyReplicas).To(BeNumerically(">=", one))
@@ -51,8 +51,8 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 		By("Verify Lakom Deployment is scaled down to 0 replicas")
 		Eventually(func(g Gomega) {
 			depl, err := getLakomDeployment(ctx, seedClient.Client(), shootSeedNamespace)
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(depl.Spec.Replicas).NotTo(BeNil())
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(depl.Spec.Replicas).ToNot(BeNil())
 			g.Expect(*depl.Spec.Replicas).To(BeEquivalentTo(0))
 		}).WithTimeout(5 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
@@ -64,8 +64,8 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 		By("Verify Lakom Deployment is running again")
 		Eventually(func(g Gomega) {
 			depl, err := getLakomDeployment(ctx, seedClient.Client(), shootSeedNamespace)
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(depl.Spec.Replicas).NotTo(BeNil())
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(depl.Spec.Replicas).ToNot(BeNil())
 			g.Expect(*depl.Spec.Replicas).To(BeNumerically(">=", one))
 			g.Expect(depl.Status.ReadyReplicas).To(BeNumerically(">=", one))
 		}).WithTimeout(5 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())

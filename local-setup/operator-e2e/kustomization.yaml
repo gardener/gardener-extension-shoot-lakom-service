@@ -12,6 +12,10 @@ kind: Kustomization
 # unsigned control-plane resources are not blocked.
 resources:
 - ../operator
+# Allow the garden-virtual lakom pods to reach the local kind registry (deny-all + operator egress
+# policies in ns `garden` otherwise block the 172.18.0.0/24 node CIDR where the registry runs), so the
+# garden-signature-verification e2e spec can exercise the live virtual webhook.
+- allow-lakom-registry-egress.yaml
 
 patches:
 - patch: |
@@ -22,6 +26,9 @@ patches:
       path: /spec/deployment/extension/values/controllers/seedBootstrap
       value:
         disabled: true
+    - op: replace
+      path: /spec/deployment/extension/runtimeClusterValues/controllers/allowUntrustedImages
+      value: false
   target:
     group: operator.gardener.cloud
     kind: Extension

@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The `garden` namespace on the runtime cluster enforces a `deny-all` NetworkPolicy; pods opt into
+# egress via `networking.gardener.cloud/to-*=allowed` labels. The garden-virtual lakom flavour carries
+# `to-public-networks`/`to-private-networks`, but Gardener's operator egress policies deliberately
+# `except` the kind node CIDR 172.18.0.0/24 out of BOTH allow sets. The local skaffold OCI registry
+# (`registry.local.gardener.cloud:5001`) runs as a container ON that node network (172.18.0.2-6), so the
+# garden-virtual verify-signature webhook cannot fetch image signatures and every admission call hangs to
+# the 25s webhook deadline. This is purely a local-landscape artifact (in real landscapes registries live
+# on allowed public/private CIDRs). Add an explicit egress allowance so the garden-virtual lakom pods can
+# reach the local registry, letting the garden-signature-verification e2e spec exercise the live webhook.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-lakom-garden-virtual-to-local-registry
+  namespace: garden
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: lakom
+      app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
+  policyTypes:
+    - Egress
+  egress:
+    # The local kind node network hosts the skaffold registry container(s) at 172.18.0.0/24.
+    - to:
+        - ipBlock:
+            cidr: 172.18.0.0/24
