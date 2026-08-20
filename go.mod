@@ -288,6 +288,7 @@ require (
 	istio.io/api v1.29.6 // indirect
 	istio.io/client-go v1.29.2 // indirect
 	k8s.io/apiextensions-apiserver v0.36.3 // indirect
+	k8s.io/apiserver v0.36.3 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-aggregator v0.36.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20260603220949-865597e52e25 // indirect

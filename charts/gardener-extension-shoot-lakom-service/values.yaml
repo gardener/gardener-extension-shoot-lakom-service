@@ -37,6 +37,10 @@ controllers:
     concurrentSyncs: 20
   heartbeat:
     renewIntervalSeconds: 30
+  # seedBootstrap.disabled turns off the seed-bootstrap controller by passing --disable-controllers. 
+  # required for local e2e tests, so allowUntrustedImages: false is enforced
+  seedBootstrap:
+    disabled: false
   cosignPublicKeys: {}
     # publicKeys:
     # - name: key1
