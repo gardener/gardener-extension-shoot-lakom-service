@@ -346,6 +346,7 @@ func buildGardenlet(generateName, imageRef string) *seedmanagementv1alpha1.Garde
 		},
 	}
 }
+
 // skaffold wrote into the operator imagevector overwrite during "extension-operator-e2e-up". This is the
 // exact image the operator deploys for both lakom flavours, so signing it before the extension is enabled
 // lets the garden-virtual lakom pods pass the runtime signature webhook on their first creation.
@@ -357,6 +358,7 @@ func lakomImageRefFromImageVectorOverwrite() (string, error) {
 	// <repo>/test/e2e/create_enable_verify_signature_garden_test.go -> <repo>
 	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "local-setup", "operator", "patch-imagevector-overwrite.yaml")
 
+	// #nosec G304 -- path is derived solely from runtime.Caller and fixed path segments (no external input); it always points at the in-repo imagevector overwrite.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to read imagevector overwrite %s: %w", path, err)
