@@ -264,6 +264,31 @@ var _ = Describe("Admission Handler", func() {
 		}, true),
 	)
 
+	// An unsigned image cannot be verified successfully, so if the request is allowed it means that the verification was skipped.
+	DescribeTable("Skipping verification on update when no artifact changed",
+		func(requestBuilder func() admission.Request, allowed bool) {
+			response := handler.Handle(ctx, requestBuilder())
+			Expect(response.Allowed).To(Equal(allowed))
+		},
+		Entry("Should skip verification when the pod artifacts are unchanged", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, unsignedImageFullRef), oldObject: podWithImage(pod, unsignedImageFullRef)}.Build()
+		}, true),
+		Entry("Should skip verification when an artifact is only removed on update", func() admission.Request {
+			newPod := pod.DeepCopy()
+			newPod.Spec.Containers = nil
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: newPod, oldObject: podWithImage(pod, unsignedImageFullRef)}.Build()
+		}, true),
+		Entry("Should verify the changed artifact on update", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, unsignedImageFullRef), oldObject: pod}.Build()
+		}, false),
+		Entry("Should verify all artifacts when the old object is not set on update", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, unsignedImageFullRef)}.Build()
+		}, false),
+		Entry("Should verify all artifacts on create", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: podWithImage(pod, unsignedImageFullRef)}.Build()
+		}, false),
+	)
+
 	It("Should allow untrusted artifacts", func() {
 		allowUntrustedHandler, err := verifysignature.
 			NewHandleBuilder().
@@ -431,6 +456,7 @@ type admissionRequestBuilder struct {
 	subResource string
 	operation   admissionv1.Operation
 	object      runtime.Object
+	oldObject   runtime.Object
 }
 
 func (a admissionRequestBuilder) Build() admission.Request {
@@ -440,6 +466,9 @@ func (a admissionRequestBuilder) Build() admission.Request {
 	request.SubResource = a.subResource
 	request.Operation = a.operation
 	request.Object = runtime.RawExtension{Raw: encode(a.object)}
+	if a.oldObject != nil {
+		request.OldObject = runtime.RawExtension{Raw: encode(a.oldObject)}
+	}
 
 	return request
 }
