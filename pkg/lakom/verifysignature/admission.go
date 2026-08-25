@@ -233,6 +233,25 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
+	if request.Operation == admissionv1.Update && len(request.OldObject.Raw) > 0 {
+		oldArtifactRefs, err := h.extractOldArtifactRefs(ctx, request)
+		if err != nil {
+			logger.Info("could not determine artifacts of the old object, verifying all targets", "error", err.Error())
+		} else {
+			var changedTargets []verificationTarget
+			for _, target := range verificationTargets {
+				if !oldArtifactRefs.Has(target.artifactRef) {
+					changedTargets = append(changedTargets, target)
+				}
+			}
+			verificationTargets = changedTargets
+
+			if len(verificationTargets) == 0 {
+				return admission.Allowed("no artifact changed on update, skipping signature verification")
+			}
+		}
+	}
+
 	if err := h.validateTargets(ctx, logger, verificationTargets, kcr); err != nil {
 		if h.allowUntrustedImages {
 			logger.Info("resource validation failed but untrusted artifacts are allowed", "error", err.Error())
@@ -247,6 +266,52 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 	}
 
 	return admission.Allowed("All artifacts successfully validated with cosign public keys")
+}
+
+// extractOldArtifactRefs decodes request.OldObject for the request's kind and returns the set of
+// artifact references it contained.
+func (h *handler) extractOldArtifactRefs(ctx context.Context, request admission.Request) (sets.Set[string], error) {
+	var (
+		verificationTargets []verificationTarget
+		err                 error
+	)
+
+	switch request.Kind {
+	case podGVK:
+		oldPod := corev1.Pod{}
+		if err = h.decoder.DecodeRaw(request.OldObject, &oldPod); err != nil {
+			return nil, err
+		}
+		verificationTargets, _, err = h.extractPodVerificationTargets(ctx, oldPod)
+	case controllerDeploymentGVK:
+		oldControllerDeployment := gardencorev1.ControllerDeployment{}
+		if err = h.decoder.DecodeRaw(request.OldObject, &oldControllerDeployment); err != nil {
+			return nil, err
+		}
+		verificationTargets, _, err = h.extractControllerDeploymentVerificationTargets(ctx, oldControllerDeployment)
+	case gardenletGVK:
+		oldGardenlet := seedmanagementv1alpha1.Gardenlet{}
+		if err = h.decoder.DecodeRaw(request.OldObject, &oldGardenlet); err != nil {
+			return nil, err
+		}
+		verificationTargets, _, err = h.extractGardenletVerificationTargets(ctx, oldGardenlet)
+	case extensionGVK:
+		oldExtension := operatorv1alpha1.Extension{}
+		if err = h.decoder.DecodeRaw(request.OldObject, &oldExtension); err != nil {
+			return nil, err
+		}
+		verificationTargets, _, err = h.extractExtensionVerificationTargets(ctx, oldExtension)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	artifactRefs := sets.New[string]()
+	for _, target := range verificationTargets {
+		artifactRefs.Insert(target.artifactRef)
+	}
+
+	return artifactRefs, nil
 }
 
 // extractPodVerificationTargets returns an array of verification targets from the pod.
