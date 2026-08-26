@@ -16,7 +16,7 @@
 // This file was copied and modified from the sigstore/policy-controller project
 // https://github.com/sigstore/policy-controller/blob/c0ba5b3bf3cd0ee928a5b7efdafdbc87a039888d/pkg/webhook/validation.go
 //
-// Modifications Copyright Copyright Contributors to the Gardener project
+// Modifications Copyright Contributors to the Gardener project
 
 package utils
 
