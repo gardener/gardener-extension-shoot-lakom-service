@@ -46,10 +46,8 @@ rules:
   resources:
   - namespaces
   verbs:
-  {{- if .Values.gardener.runtimeCluster.enabled }}
   - create
   - delete
-  {{- end }}
   - get
   - list
   - watch

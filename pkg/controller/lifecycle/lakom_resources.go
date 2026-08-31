@@ -37,53 +37,29 @@ import (
 )
 
 var (
-	shootWebhookRules = []admissionregistrationv1.RuleWithOperations{{
-		Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-		Rule: admissionregistrationv1.Rule{
-			APIGroups:   []string{""},
-			APIVersions: []string{"v1"},
-			Resources:   []string{"pods", "pods/ephemeralcontainers"},
-		},
-	}}
+	operations = []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update}
 
-	gardenRuntimeWebhookRules = []admissionregistrationv1.RuleWithOperations{
-		{
-			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-			Rule: admissionregistrationv1.Rule{
-				APIGroups:   []string{""},
-				APIVersions: []string{"v1"},
-				Resources:   []string{"pods", "pods/ephemeralcontainers"},
-			},
-		},
-		{
-			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-			Rule: admissionregistrationv1.Rule{
-				APIGroups:   []string{"operator.gardener.cloud"},
-				APIVersions: []string{"v1alpha1"},
-				Resources:   []string{"extensions"},
-			},
-		},
-	}
+	podsRule                  = admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods", "pods/ephemeralcontainers"}}
+	extensionsRule            = admissionregistrationv1.Rule{APIGroups: []string{"operator.gardener.cloud"}, APIVersions: []string{"v1alpha1"}, Resources: []string{"extensions"}}
+	controllerDeploymentsRule = admissionregistrationv1.Rule{APIGroups: []string{"core.gardener.cloud"}, APIVersions: []string{"v1"}, Resources: []string{"controllerdeployments"}}
+	gardenletsRule            = admissionregistrationv1.Rule{APIGroups: []string{"seedmanagement.gardener.cloud"}, APIVersions: []string{"v1alpha1"}, Resources: []string{"gardenlets"}}
 
-	gardenVirtualWebhookRules = []admissionregistrationv1.RuleWithOperations{
-		{
-			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-			Rule: admissionregistrationv1.Rule{
-				APIGroups:   []string{"core.gardener.cloud"},
-				APIVersions: []string{"v1"},
-				Resources:   []string{"controllerdeployments"},
-			},
-		},
-		{
-			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-			Rule: admissionregistrationv1.Rule{
-				APIGroups:   []string{"seedmanagement.gardener.cloud"},
-				APIVersions: []string{"v1alpha1"},
-				Resources:   []string{"gardenlets"},
-			},
-		},
-	}
+	shootWebhookRules         = addForCreateUpdate(podsRule)
+	seedWebhookRules          = addForCreateUpdate(podsRule)
+	gardenRuntimeWebhookRules = addForCreateUpdate(podsRule, extensionsRule)
+	gardenVirtualWebhookRules = addForCreateUpdate(controllerDeploymentsRule, gardenletsRule)
 )
+
+func addForCreateUpdate(rules ...admissionregistrationv1.Rule) []admissionregistrationv1.RuleWithOperations {
+	res := make([]admissionregistrationv1.RuleWithOperations, 0, len(rules))
+	for _, rule := range rules {
+		res = append(res, admissionregistrationv1.RuleWithOperations{
+			Operations: operations,
+			Rule:       rule,
+		})
+	}
+	return res
+}
 
 // getWebhookObjects builds the webhook configuration objects for a given set of webhook rules and options.
 func getWebhookObjects(
@@ -91,7 +67,7 @@ func getWebhookObjects(
 	webhookRules []admissionregistrationv1.RuleWithOperations,
 	serviceName,
 	extensionNamespace string,
-) ([]client.Object, error) {
+) []client.Object {
 	clientConfigFor := func(path string) admissionregistrationv1.WebhookClientConfig {
 		return getWebhookClientConfig(webhookOptions.useServiceClientConfig, webhookOptions.caBundle, extensionNamespace, serviceName, path)
 	}
@@ -143,7 +119,7 @@ func getWebhookObjects(
 		}
 	)
 
-	return objects, nil
+	return objects
 }
 
 // lakomResourceOptions parameterizes getLakomObjects across deployment flavours.
@@ -468,7 +444,7 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 	return objects, nil
 }
 
-func getSeedObjects(
+func getShootRuntimeObjects(
 	clusterCtx *clusterContext,
 	lakomReplicas *int32,
 	serviceName,
@@ -495,6 +471,33 @@ func getSeedObjects(
 		serviceMonitorSuffix:        "shoot",
 		genericKubeconfigName:       clusterCtx.genericTokenKubeconfigName,
 		accessSecretName:            shootAccessSecretName,
+	})
+}
+
+func getSeedRuntimeObjects(
+	clusterCtx *clusterContext,
+	lakomReplicas *int32,
+	serverTLSSecretName string,
+	useOnlyImagePullSecrets,
+	allowUntrustedImages,
+	allowInsecureRegistries bool,
+) ([]client.Object, error) {
+	return getLakomObjects(lakomResourceOptions{
+		replicas:                    lakomReplicas,
+		serverTLSSecretName:         serverTLSSecretName,
+		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
+		image:                       clusterCtx.image,
+		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
+		allowUntrustedImages:        allowUntrustedImages,
+		allowInsecureRegistries:     allowInsecureRegistries,
+		topologyAwareRoutingEnabled: clusterCtx.topologyAwareRoutingEnabled,
+		k8sVersion:                  clusterCtx.kubernetesVersion,
+		serviceName:                 constants.SeedExtensionServiceName,
+		namespace:                   constants.LakomSystemNamespaceName,
+		podLabels:                   getLabels(),
+		priorityClassName:           v1beta1constants.PriorityClassNameSeedSystem900,
+		serviceMonitorSuffix:        "seed",
+		useInClusterAuth:            true,
 	})
 }
 
@@ -673,12 +676,30 @@ type webhookOptions struct {
 	objectSelector         metav1.LabelSelector
 }
 
-func shootWebhookOptions(configName string, scope lakom.ScopeType, dashboardEnabled bool, caBundle []byte) webhookOptions {
+func shootWebhookOptions(scope lakom.ScopeType, dashboardEnabled bool, caBundle []byte) webhookOptions {
 	return webhookOptions{
 		caBundle:          caBundle,
-		configName:        configName,
+		configName:        constants.WebhookConfigurationName,
 		namespaceSelector: scopeToNamespaceSelector(scope, dashboardEnabled),
 		objectSelector:    scopeToObjectSelector(scope),
+	}
+}
+
+func seedWebhookOptions(caBundle []byte) webhookOptions {
+	return webhookOptions{
+		caBundle:               caBundle,
+		configName:             constants.SeedWebhookConfigurationName,
+		useServiceClientConfig: true,
+		namespaceSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      corev1.LabelMetadataName,
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values: []string{
+					constants.LakomSystemNamespaceName,
+					metav1.NamespaceSystem,
+				},
+			},
+		}},
 	}
 }
 
