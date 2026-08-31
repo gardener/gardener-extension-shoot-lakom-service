@@ -238,6 +238,9 @@ var _ = Describe("Admission Handler", func() {
 		Entry("Disallow extension with invalid artifact", func() admission.Request {
 			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Create, object: extensionWithChart(extension, "invalid-artifact@sha256:123")}.Build()
 		}, false, "could not parse reference"),
+		Entry("Disallow pod with unsigned image on create", func() admission.Request {
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: podWithImage(pod, unsignedImageFullRef)}.Build()
+		}, false, "no valid signature found"),
 	)
 
 	// Use a closure for building the request to capture a ref of the
@@ -269,6 +272,11 @@ var _ = Describe("Admission Handler", func() {
 		func(requestBuilder func() admission.Request, allowed bool) {
 			response := handler.Handle(ctx, requestBuilder())
 			Expect(response.Allowed).To(Equal(allowed))
+			if allowed {
+				Expect(response.Result.Message).To(ContainSubstring("no artifact changed on update, skipping signature verification"))
+			} else {
+				Expect(response.Result.Message).To(ContainSubstring("no valid signature found"))
+			}
 		},
 		Entry("Should skip verification when the pod artifacts are unchanged", func() admission.Request {
 			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, unsignedImageFullRef), oldObject: podWithImage(pod, unsignedImageFullRef)}.Build()
@@ -284,8 +292,31 @@ var _ = Describe("Admission Handler", func() {
 		Entry("Should verify all artifacts when the old object is not set on update", func() admission.Request {
 			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, unsignedImageFullRef)}.Build()
 		}, false),
-		Entry("Should verify all artifacts on create", func() admission.Request {
-			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: podWithImage(pod, unsignedImageFullRef)}.Build()
+		Entry("Should verify only the changed container image on update", func() admission.Request {
+			newPod := pod.DeepCopy()
+			newPod.Spec.Containers = append(newPod.Spec.Containers, corev1.Container{Name: "extra", Image: unsignedImageFullRef})
+			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: newPod, oldObject: pod}.Build()
+		}, false),
+		Entry("Should skip verification when the controllerdeployment artifact is unchanged", func() admission.Request {
+			cd := controllerDeploymentWithChart(controllerDeployment, unsignedImageFullRef)
+			return admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Update, object: cd, oldObject: cd}.Build()
+		}, true),
+		Entry("Should verify the changed controllerdeployment artifact on update", func() admission.Request {
+			return admissionRequestBuilder{gvk: controllerDeploymentGVK, operation: admissionv1.Update, object: controllerDeploymentWithChart(controllerDeployment, unsignedImageFullRef), oldObject: controllerDeployment}.Build()
+		}, false),
+		Entry("Should skip verification when the gardenlet artifact is unchanged", func() admission.Request {
+			g := gardenletWithChart(gardenlet, unsignedImageFullRef)
+			return admissionRequestBuilder{gvk: gardenletGVK, operation: admissionv1.Update, object: g, oldObject: g}.Build()
+		}, true),
+		Entry("Should verify the changed gardenlet artifact on update", func() admission.Request {
+			return admissionRequestBuilder{gvk: gardenletGVK, operation: admissionv1.Update, object: gardenletWithChart(gardenlet, unsignedImageFullRef), oldObject: gardenlet}.Build()
+		}, false),
+		Entry("Should skip verification when the extension artifact is unchanged", func() admission.Request {
+			e := extensionWithChart(extension, unsignedImageFullRef)
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Update, object: e, oldObject: e}.Build()
+		}, true),
+		Entry("Should verify the changed extension artifact on update", func() admission.Request {
+			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Update, object: extensionWithChart(extension, unsignedImageFullRef), oldObject: extension}.Build()
 		}, false),
 	)
 
