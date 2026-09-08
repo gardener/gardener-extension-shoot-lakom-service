@@ -778,7 +778,7 @@ var _ = Describe("Actuator", func() {
 				Expect(resources).To(HaveKey("data.yaml.br"))
 				compressedData := resources["data.yaml.br"]
 				data, err := test.BrotliDecompression(compressedData)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
 				Expect(manifests).To(HaveLen(9))
