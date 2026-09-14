@@ -289,7 +289,7 @@ var _ = Describe("Actuator", func() {
 			Expect(v.namespaceSelector.MatchExpressions).To(ContainElement(metav1.LabelSelectorRequirement{
 				Key:      corev1.LabelMetadataName,
 				Operator: metav1.LabelSelectorOpNotIn,
-				Values:   []string{constants.LakomSystemNamespaceName, metav1.NamespaceSystem},
+				Values:   []string{metav1.NamespaceSystem},
 			}))
 		})
 	})
@@ -724,7 +724,7 @@ var _ = Describe("Actuator", func() {
 
 	Context("getSeedRuntimeResources", func() {
 		const (
-			namespace                = "lakom-system"
+			namespace                = "kube-system"
 			serverTLSSecretName      = "shoot-lakom-service-tls" //#nosec G101 -- this is false positive
 			image                    = "europe-docker.pkg.dev/gardener-project/releases/gardener/extensions/lakom:v0.0.0"
 			lakomConfigConfigMapName = "extension-shoot-lakom-service-seed-lakom-config-5ccba116"
@@ -773,7 +773,7 @@ var _ = Describe("Actuator", func() {
 					allowInsecureRegistries,
 				)
 				Expect(err).ToNot(HaveOccurred())
-				objects = append(objects, getInClusterRBACObjects(constants.SeedExtensionServiceName, constants.LakomSystemNamespaceName)...)
+				objects = append(objects, getInClusterRBACObjects(constants.SeedExtensionServiceName, metav1.NamespaceSystem)...)
 				resources := serializeSeedObjects(objects)
 				Expect(resources).To(HaveKey("data.yaml.br"))
 				compressedData := resources["data.yaml.br"]
@@ -2076,7 +2076,7 @@ metadata:
     app.kubernetes.io/part-of: shoot-lakom-service
     high-availability-config.resources.gardener.cloud/type: server
   name: extension-shoot-lakom-service-seed
-  namespace: lakom-system
+  namespace: kube-system
 spec:
   replicas: ` + fmt.Sprintf("%d", replicas) + `
   revisionHistoryLimit: 2
@@ -2185,7 +2185,7 @@ metadata:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
   name: extension-shoot-lakom-service-seed
-  namespace: lakom-system
+  namespace: kube-system
 spec:
   maxUnavailable: 1
   selector:
@@ -2212,7 +2212,7 @@ metadata:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
   name: extension-shoot-lakom-service-seed
-  namespace: lakom-system
+  namespace: kube-system
 spec:
   ports:
   - name: https
@@ -2242,7 +2242,7 @@ metadata:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
   name: extension-shoot-lakom-service-seed
-  namespace: lakom-system
+  namespace: kube-system
 `
 }
 
@@ -2279,7 +2279,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: extension-shoot-lakom-service-seed
-  namespace: lakom-system
+  namespace: kube-system
 `
 }
 
@@ -2291,7 +2291,7 @@ metadata:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
   name: extension-shoot-lakom-service-seed
-  namespace: lakom-system
+  namespace: kube-system
 spec:
   resourcePolicy:
     containerPolicies:
@@ -2315,7 +2315,7 @@ metadata:
   labels:
     prometheus: seed
   name: seed-extension-shoot-lakom-service-seed
-  namespace: lakom-system
+  namespace: kube-system
 spec:
   endpoints:
   - metricRelabelings:

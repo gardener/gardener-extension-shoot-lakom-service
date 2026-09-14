@@ -493,7 +493,7 @@ func getSeedRuntimeObjects(
 		topologyAwareRoutingEnabled: clusterCtx.topologyAwareRoutingEnabled,
 		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 constants.SeedExtensionServiceName,
-		namespace:                   constants.LakomSystemNamespaceName,
+		namespace:                   metav1.NamespaceSystem,
 		podLabels:                   getLabels(),
 		priorityClassName:           v1beta1constants.PriorityClassNameSeedSystem900,
 		serviceMonitorSuffix:        "seed",
@@ -695,7 +695,6 @@ func seedWebhookOptions(caBundle []byte) webhookOptions {
 				Key:      corev1.LabelMetadataName,
 				Operator: metav1.LabelSelectorOpNotIn,
 				Values: []string{
-					constants.LakomSystemNamespaceName,
 					metav1.NamespaceSystem,
 				},
 			},
