@@ -14,6 +14,7 @@ import (
 	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
 	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -79,7 +80,7 @@ func ConfigsForSeed() []extensionssecretsmanager.SecretConfigWithOptions {
 			Config: &secretsutils.CertificateSecretConfig{
 				Name:                        constants.SeedWebhookTLSSecretName,
 				CommonName:                  constants.SeedExtensionServiceName,
-				DNSNames:                    kubernetesutils.DNSNamesForService(constants.SeedExtensionServiceName, constants.LakomSystemNamespaceName),
+				DNSNames:                    kubernetesutils.DNSNamesForService(constants.SeedExtensionServiceName, metav1.NamespaceSystem),
 				CertType:                    secretsutils.ServerCert,
 				SkipPublishingCACertificate: true,
 				Validity:                    &threeMonths,
