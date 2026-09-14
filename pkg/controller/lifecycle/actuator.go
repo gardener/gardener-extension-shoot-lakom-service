@@ -179,11 +179,6 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 
 // reconcileSeed reconciles extension resources of class seed.
 func (a *actuator) reconcileSeed(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: constants.LakomSystemNamespaceName}}
-	if err := client.IgnoreAlreadyExists(a.client.Create(ctx, ns)); err != nil {
-		return fmt.Errorf("failed to create namespace %s: %w", constants.LakomSystemNamespaceName, err)
-	}
-
 	clusterCtx, err := a.buildSeedClusterContext(ctx, logger, ex)
 	if err != nil {
 		return err
@@ -201,13 +196,13 @@ func (a *actuator) reconcileSeed(ctx context.Context, logger logr.Logger, ex *ex
 		return err
 	}
 
-	seedRBACObjects := getInClusterRBACObjects(constants.SeedExtensionServiceName, constants.LakomSystemNamespaceName)
+	seedRBACObjects := getInClusterRBACObjects(constants.SeedExtensionServiceName, metav1.NamespaceSystem)
 
 	seedWebhookConfigObjects := getWebhookObjects(
 		seedWebhookOptions(clusterCtx.caBundle),
 		seedWebhookRules,
 		constants.SeedExtensionServiceName,
-		constants.LakomSystemNamespaceName,
+		metav1.NamespaceSystem,
 	)
 
 	seedRegistry := managedresources.NewRegistry(kubernetes.SeedScheme, kubernetes.SeedCodec, kubernetes.SeedSerializer)
@@ -417,11 +412,6 @@ func (a *actuator) deleteSeed(ctx context.Context, logger logr.Logger, ex *exten
 		return err
 	}
 
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: constants.LakomSystemNamespaceName}}
-	if err := client.IgnoreNotFound(a.client.Delete(ctx, ns)); err != nil {
-		return fmt.Errorf("failed to delete namespace %s: %w", constants.LakomSystemNamespaceName, err)
-	}
-
 	secretsManager, err := secretsmanager.New(
 		ctx,
 		logger.WithName("secretsmanager"),
@@ -429,7 +419,7 @@ func (a *actuator) deleteSeed(ctx context.Context, logger logr.Logger, ex *exten
 		a.client,
 		secrets.ManagerIdentitySeed,
 		secretsmanager.WithCASecretAutoRotation(),
-		secretsmanager.WithNamespaces(namespace),
+		secretsmanager.WithNamespaces(metav1.NamespaceSystem),
 	)
 	if err != nil {
 		return err
@@ -640,7 +630,7 @@ func (a *actuator) buildSeedClusterContext(ctx context.Context, logger logr.Logg
 		a.client,
 		secrets.ManagerIdentitySeed,
 		secretsmanager.WithCASecretAutoRotation(),
-		secretsmanager.WithNamespaces(constants.LakomSystemNamespaceName),
+		secretsmanager.WithNamespaces(metav1.NamespaceSystem),
 	)
 	if err != nil {
 		return nil, err
