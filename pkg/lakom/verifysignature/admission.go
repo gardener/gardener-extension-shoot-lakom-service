@@ -199,6 +199,10 @@ func (h *handler) Handle(ctx context.Context, request admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
+	if verificationTargets == nil {
+		return admission.Allowed("no verification targets found")
+	}
+
 	if request.Operation == admissionv1.Update {
 		if oldArtifactRefs, err := h.extractOldArtifactRefs(ctx, request); err != nil {
 			logger.Info("Could not determine artifacts of the old object, verifying all targets", "err", err.Error())

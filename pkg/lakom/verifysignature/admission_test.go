@@ -281,11 +281,6 @@ var _ = Describe("Admission Handler", func() {
 		Entry("Should skip verification when the pod artifacts are unchanged", func() admission.Request {
 			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, unsignedImageFullRef), oldObject: podWithImage(pod, unsignedImageFullRef)}.Build()
 		}, true),
-		Entry("Should skip verification when an artifact is only removed on update", func() admission.Request {
-			newPod := pod.DeepCopy()
-			newPod.Spec.Containers = nil
-			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: newPod, oldObject: podWithImage(pod, unsignedImageFullRef)}.Build()
-		}, true),
 		Entry("Should verify the changed artifact on update", func() admission.Request {
 			return admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: podWithImage(pod, unsignedImageFullRef), oldObject: pod}.Build()
 		}, false),
@@ -319,6 +314,16 @@ var _ = Describe("Admission Handler", func() {
 			return admissionRequestBuilder{gvk: extensionGVK, operation: admissionv1.Update, object: extensionWithChart(extension, unsignedImageFullRef), oldObject: extension}.Build()
 		}, false),
 	)
+
+	It("Should allow when the new object has no artifacts, without diffing the old object", func() {
+		newPod := pod.DeepCopy()
+		newPod.Spec.Containers = nil
+		request := admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Update, object: newPod, oldObject: podWithImage(pod, unsignedImageFullRef)}.Build()
+
+		response := handler.Handle(ctx, request)
+		Expect(response.Allowed).To(BeTrue())
+		Expect(response.Result.Message).To(ContainSubstring("no verification targets found"))
+	})
 
 	It("Should allow untrusted artifacts", func() {
 		allowUntrustedHandler, err := verifysignature.
