@@ -39,6 +39,9 @@ type AddOptions struct {
 	IgnoreOperationAnnotation bool
 	// ExtensionClasses contains the extension classes the controller should reconcile.
 	ExtensionClasses []extensionsv1alpha1.ExtensionClass
+	// SeedTopologyAwareRoutingEnabled specifies whether topology aware routing is enabled for the seed
+	// cluster. It is used when reconciling seed extensions.
+	SeedTopologyAwareRoutingEnabled bool
 }
 
 // AddToManager adds a Lakom Service Lifecycle controller to the given Controller Manager.
@@ -46,7 +49,7 @@ func AddToManager(ctx context.Context, mgr manager.Manager) error {
 	return extension.Add(
 		mgr,
 		extension.AddArgs{
-			Actuator:          NewActuator(mgr, DefaultAddOptions.ServiceConfig),
+			Actuator:          NewActuator(mgr, DefaultAddOptions.ServiceConfig, DefaultAddOptions.SeedTopologyAwareRoutingEnabled),
 			ControllerOptions: DefaultAddOptions.ControllerOptions,
 			ExtensionClasses:  DefaultAddOptions.ExtensionClasses,
 			Name:              Name,
