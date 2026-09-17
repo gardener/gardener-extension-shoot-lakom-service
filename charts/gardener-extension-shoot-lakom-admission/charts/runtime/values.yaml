@@ -33,7 +33,6 @@ service:
     enabled: false
 
 gardener:
-  virtualCluster:
-    enabled: true
+  virtualCluster: {}
   runtimeCluster: {}
 #   priorityClassName: gardener-garden-system-400

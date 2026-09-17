@@ -10,20 +10,21 @@ metadata:
     app.kubernetes.io/name: gardener-extension-{{ .Values.serviceName }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 rules:
-{{- if not .Values.gardener.runtimeCluster.enabled }}
+{{- /* TODO(vpnachev): Remove gardener.runtimeCluster.enabled, replaced by gardener.clusterTypes.gardenRuntimeCluster, it will be no longer supported by Gardener after v1.159.0 is released. */}}
+{{- if (or .Values.gardener.clusterTypes.gardenRuntimeCluster .Values.gardener.runtimeCluster.enabled) }}
 - apiGroups:
-  - extensions.gardener.cloud
+  - operator.gardener.cloud
   resources:
-  - clusters
+  - gardens
   verbs:
   - get
   - list
   - watch
 {{- else }}
 - apiGroups:
-  - operator.gardener.cloud
+  - extensions.gardener.cloud
   resources:
-  - gardens
+  - clusters
   verbs:
   - get
   - list
@@ -46,7 +47,8 @@ rules:
   resources:
   - namespaces
   verbs:
-  {{- if .Values.gardener.runtimeCluster.enabled }}
+  {{- /* TODO(vpnachev): Remove gardener.runtimeCluster.enabled, replaced by gardener.clusterTypes.gardenRuntimeCluster, it will be no longer supported by Gardener after v1.159.0 is released. */}}
+  {{- if (or .Values.gardener.clusterTypes.gardenRuntimeCluster .Values.gardener.runtimeCluster.enabled) }}
   - create
   - delete
   {{- end }}
