@@ -29,7 +29,7 @@ spec:
         networking.resources.gardener.cloud/to-virtual-garden-kube-apiserver-tcp-443: allowed
 {{ include "labels" . | indent 8 }}
     spec:
-      {{- if .Values.gardener.runtimeCluster.priorityClassName }}
+      {{- if (and .Values.gardener.runtimeCluster .Values.gardener.runtimeCluster.priorityClassName) }}
       priorityClassName: {{ .Values.gardener.runtimeCluster.priorityClassName }}
       {{- end }}
       serviceAccountName: {{ include "name" . }}
