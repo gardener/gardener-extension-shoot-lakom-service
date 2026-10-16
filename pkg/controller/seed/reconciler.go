@@ -61,7 +61,7 @@ func (kcr *kubeSystemReconciler) Reconcile(ctx context.Context, request reconcil
 	ns := corev1.Namespace{}
 	if err := kcr.client.Get(ctx, request.NamespacedName, &ns); err != nil {
 		logger.Error(err, "failed to get namespace", "namespace", request.NamespacedName)
-		return reconcile.Result{Requeue: true}, err
+		return reconcile.Result{}, err
 	}
 
 	if ns.Name != metav1.NamespaceSystem {
@@ -71,7 +71,7 @@ func (kcr *kubeSystemReconciler) Reconcile(ctx context.Context, request reconcil
 
 	if err := kcr.reconcile(ctx, logger); err != nil {
 		logger.Error(err, `"kube-system" namespace reconciliation failed`)
-		return reconcile.Result{Requeue: true}, err
+		return reconcile.Result{}, err
 	}
 
 	logger.Info(`"kube-system" namespace reconciliation succeeded`)
