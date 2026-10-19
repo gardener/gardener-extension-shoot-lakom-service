@@ -287,8 +287,8 @@ github.com/gardener/machine-controller-manager v0.63.0 h1:0mfZiop6jStdfQhsMYyTdR
 github.com/gardener/machine-controller-manager v0.63.0/go.mod h1:MU2Cyrwvh+jYYvRUGxUMx8LNmFUvGog01YHlpsCiRrM=
 github.com/gardener/pvc-autoscaler v0.3.1 h1:XMapVWBh0wrJk9Ac8WCIj6Ze7RH0FB1gP8q9XbpcyxI=
 github.com/gardener/pvc-autoscaler v0.3.1/go.mod h1:GVA7q8qiMi2UD/vcCBVbHEUijZvxVqZ1SGqiwKGHTE4=
-github.com/gardener/service-account-issuer-discovery v0.12.0 h1:O89X3JBaFxtWGwMDMJmQf0h85m2xKFZ1BZdFoNrFQjc=
-github.com/gardener/service-account-issuer-discovery v0.12.0/go.mod h1:cxHfRUrveDXeuI3ww2V4UkQuNW4ImWnfMD9+dADm9uE=
+github.com/gardener/service-account-issuer-discovery v0.14.0 h1:AQxK9vVpI/sIrkUOVpMQXHPd4sQOvzyN7QVFm3fEpoY=
+github.com/gardener/service-account-issuer-discovery v0.14.0/go.mod h1:UqpddMDrBRjqgAj465HJHNt9pXrP+RhITzi3CyfTstA=
 github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/gkampitakis/ciinfo v0.3.2 h1:JcuOPk8ZU7nZQjdUhctuhQofk7BGHuIy0c9Ez8BNhXs=
 github.com/gkampitakis/ciinfo v0.3.2/go.mod h1:1NIwaOcFChN4fa/B0hEBdAb6npDlFL8Bwx4dfRLRqAo=
@@ -1037,8 +1037,8 @@ golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9/go.mod h1:RxMgew5VJxzue5/jJ
 golang.org/x/sync v0.0.0-20201207232520-09787c993a3a/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.1.0/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
-golang.org/x/sync v0.23.0 h1:KameEIfc1IkluZyXWLn39Wd4tURc6GbCiISGiZm2bQk=
-golang.org/x/sync v0.23.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
+golang.org/x/sync v0.24.0 h1:iqiDrGoDgyuvAKrhLQthUEzU/R378N78gXbBjxed7oA=
+golang.org/x/sync v0.24.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
 golang.org/x/sys v0.0.0-20180830151530-49385e6e1522/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20180905080454-ebe1bf3edb33/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
