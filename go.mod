@@ -7,7 +7,7 @@ require (
 	github.com/gardener/gardener v1.153.1
 	github.com/gardener/gardener/hack/tools v1.153.1
 	github.com/gardener/gardener/pkg/apis v1.153.1
-	github.com/gardener/service-account-issuer-discovery v0.12.0
+	github.com/gardener/service-account-issuer-discovery v0.14.0
 	github.com/go-logr/logr v1.4.4
 	github.com/google/go-containerregistry v0.22.0
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20251113034745-2bb5bb01b8d9
@@ -20,7 +20,7 @@ require (
 	github.com/sigstore/sigstore v1.10.7
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/autoscaler/vertical-pod-autoscaler v1.7.2
