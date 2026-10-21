@@ -19,7 +19,7 @@ COPY . .
 RUN make build EFFECTIVE_VERSION=$EFFECTIVE_VERSION GOOS=$TARGETOS GOARCH=$TARGETARCH BUILD_OUTPUT_FILE="/output/bin/"
 
 ############# base
-FROM gcr.io/distroless/static-debian13:nonroot AS base
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:516757106de35205efb70b91ba03f6f1298424a0678c603255cf2852a7000087 AS base
 
 ############# lakom
 FROM base AS lakom
