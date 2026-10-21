@@ -153,6 +153,7 @@ func (o *Options) run(ctx context.Context) error {
 	o.heartbeatOptions.Completed().Apply(&heartbeat.DefaultAddOptions)
 
 	seed.DefaultAddOptions.SeedTopologyAwareRoutingEnabled = o.lakomOptions.SeedTopologyAwareRoutingEnabled
+	lifecycle.DefaultAddOptions.SeedTopologyAwareRoutingEnabled = o.lakomOptions.SeedTopologyAwareRoutingEnabled
 	lifecycle.DefaultAddOptions.ExtensionClasses = o.generalOptions.Completed().ExtensionClasses
 	healthcheck.DefaultAddOptions.ExtensionClasses = o.generalOptions.Completed().ExtensionClasses
 
