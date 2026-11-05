@@ -19,9 +19,6 @@ function run() {
   fi
 }
 
-run "skaffold.yaml" "gardener-extension-shoot-lakom-service"                "extension"
-run "skaffold.yaml" "lakom"                                                 "extension"
-run "skaffold.yaml" "gardener-extension-shoot-lakom-admission"              "admission"
 run "skaffold-operator.yaml" "lakom"                                        "operator"
 run "skaffold-operator.yaml" "gardener-extension-shoot-lakom-service"       "operator"
 run "skaffold-operator.yaml" "gardener-extension-shoot-lakom-admission"     "operator"

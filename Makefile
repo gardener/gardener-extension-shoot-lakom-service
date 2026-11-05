@@ -170,19 +170,10 @@ update-skaffold-deps: $(YQ)
 
 # speed-up skaffold deployments by building all images concurrently
 export SKAFFOLD_BUILD_CONCURRENCY = 0
-extension-up extension-dev extension-operator-up: export SKAFFOLD_DEFAULT_REPO = registry.local.gardener.cloud:5001
-extension-up extension-dev extension-operator-up: export SKAFFOLD_PUSH = true
+extension-operator-up: export SKAFFOLD_DEFAULT_REPO = registry.local.gardener.cloud:5001
+extension-operator-up: export SKAFFOLD_PUSH = true
 # use static label for skaffold to prevent rolling all gardener components on every `skaffold` invocation
-extension-up extension-dev extension-down extension-operator-up extension-operator-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
-
-extension-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL) $(CRANE)
-	$(SKAFFOLD) --cache-artifacts=false run
-
-extension-dev: $(SKAFFOLD) $(HELM) $(KUBECTL) $(CRANE) $(KIND)
-	$(SKAFFOLD) dev --cleanup=false --trigger=manual
-
-extension-down: $(SKAFFOLD) $(HELM) $(KUBECTL)
-	$(SKAFFOLD) delete
+extension-operator-up extension-operator-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
 
 extension-operator-up extension-operator-down: export SKAFFOLD_FILENAME = skaffold-operator.yaml
 extension-operator-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL)
