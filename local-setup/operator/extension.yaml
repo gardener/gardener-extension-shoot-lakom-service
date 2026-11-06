@@ -11,14 +11,20 @@ spec:
         helm:
           ociRepository:
             ref: local-skaffold/gardener-extension-shoot-lakom-admission/charts/runtime
+            caBundleSecretRef:
+              name: gardener-local-registry-ca
       virtualCluster:
         helm:
           ociRepository:
             ref: local-skaffold/gardener-extension-shoot-lakom-admission/charts/application
+            caBundleSecretRef:
+              name: gardener-local-registry-ca
     extension:
       helm:
         ociRepository:
           ref: local-skaffold/gardener-extension-shoot-lakom-service/charts/extension
+          caBundleSecretRef:
+            name: gardener-local-registry-ca
       policy: Always
       values: {}
       runtimeClusterValues: {}
