@@ -436,7 +436,7 @@ var _ = Describe("Actuator", func() {
 
 			_, err := getClientKeys(ctx, fakeclient, resources, resourceName, namespace)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to read referenced secret " + prefixedWrongName + " for reference " + resourceName))
+			Expect(err.Error()).To(ContainSubstring("failed to read referenced secret " + namespace + "/" + prefixedWrongName))
 		})
 
 		It("Should return an err if the reference is found, but its kind is not 'Secret'", func() {
@@ -449,6 +449,25 @@ var _ = Describe("Actuator", func() {
 
 		It("Should return an err if the Secret does not contains a 'keys' key in its data", func() {
 			_, err := getClientKeys(ctx, fakeclient, resources, resourceNoKeysName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("secret " + namespace + "/" + prefixedSecretNoKeysName + " is missing data key 'keys'"))
+		})
+
+		It("Should return the keys when reading by secret name (seed path)", func() {
+			result, err := getClientKeysFromSecret(ctx, fakeclient, secretName, namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(secretData))
+		})
+
+		It("Should return an err reading by name when the ref- secret is not found (seed path)", func() {
+			missing := "non-existent"
+			_, err := getClientKeysFromSecret(ctx, fakeclient, missing, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to read referenced secret " + namespace + "/" + v1beta1constants.ReferencedResourcesPrefix + missing))
+		})
+
+		It("Should return an err reading by name when the Secret is missing the 'keys' data key (seed path)", func() {
+			_, err := getClientKeysFromSecret(ctx, fakeclient, secretNoKeysName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("secret " + namespace + "/" + prefixedSecretNoKeysName + " is missing data key 'keys'"))
 		})
