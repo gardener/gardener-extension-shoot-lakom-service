@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	apisconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/cmd"
 
@@ -41,6 +42,24 @@ var _ = Describe("options", func() {
 
 			svcConfig := svcOpt.Completed()
 			Expect(svcConfig).To(Not(BeNil()))
+		})
+
+		It("Should parse seedResources injected by the chart", func() {
+			svcOpt, cleanupFunc := prepareServiceOptions(`seedResources:
+- name: lakom-ref
+  resourceRef:
+    apiVersion: v1
+    kind: Secret
+    name: lakom-secret`)
+			defer cleanupFunc()
+			Expect(svcOpt.Complete()).To(Succeed())
+
+			config := apisconfig.Configuration{}
+			svcOpt.Completed().Apply(&config)
+			Expect(config.SeedResources).To(HaveLen(1))
+			Expect(config.SeedResources[0].Name).To(Equal("lakom-ref"))
+			Expect(config.SeedResources[0].ResourceRef.Kind).To(Equal("Secret"))
+			Expect(config.SeedResources[0].ResourceRef.Name).To(Equal("lakom-secret"))
 		})
 	})
 
