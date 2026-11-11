@@ -523,7 +523,7 @@ func getGardenPodLabels(virtualGarden bool) map[string]string {
 	})
 }
 
-// getClientKeys retrieves the client keys from a secret referenced by name from the given list of named resource references.
+// getClientKeys retrieves the client keys from a referenced secret resource.
 func getClientKeys(ctx context.Context, client client.Client, resources []gardencorev1beta1.NamedResourceReference, resourceName, namespace string) ([]byte, error) {
 	ref := v1beta1helper.GetResourceByName(resources, resourceName)
 	if ref == nil {
@@ -533,15 +533,15 @@ func getClientKeys(ctx context.Context, client client.Client, resources []garden
 		return nil, fmt.Errorf("references resource with name %s is not of kind 'Secret'", resourceName)
 	}
 
-	return getClientKeysFromSecret(ctx, client, ref.ResourceRef.Name, namespace)
-}
+	refSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ref.ResourceRef.Name,
+			Namespace: namespace,
+		},
+	}
 
-// getClientKeysFromSecret retrieves the client keys from referenced secret with the given name in the given namespace.
-func getClientKeysFromSecret(ctx context.Context, c client.Client, secretName, namespace string) ([]byte, error) {
-	prefixedName := v1beta1constants.ReferencedResourcesPrefix + secretName
-	refSecret := &corev1.Secret{}
-	if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: prefixedName}, refSecret); err != nil {
-		return nil, fmt.Errorf("failed to read referenced secret %s/%s: %w", namespace, prefixedName, err)
+	if err := controller.GetObjectByReference(ctx, client, &ref.ResourceRef, namespace, refSecret); err != nil {
+		return nil, fmt.Errorf("failed to read referenced secret %s%s for reference %s: %w", v1beta1constants.ReferencedResourcesPrefix, ref.ResourceRef.Name, resourceName, err)
 	}
 
 	clientKeys, ok := refSecret.Data["keys"]
@@ -611,7 +611,7 @@ func (a *actuator) buildShootClusterContext(ctx context.Context, logger logr.Log
 	if err := a.prepareTLSSecrets(ctx, clusterCtx, configs); err != nil {
 		return nil, err
 	}
-	if err := a.prepareAdmissionConfig(ctx, ex, clusterCtx, cluster.Shoot.Spec.Resources, false); err != nil {
+	if err := a.prepareAdmissionConfig(ctx, ex, clusterCtx, cluster.Shoot.Spec.Resources); err != nil {
 		return nil, err
 	}
 
@@ -657,7 +657,7 @@ func (a *actuator) buildSeedClusterContext(ctx context.Context, logger logr.Logg
 		return nil, err
 	}
 
-	if err := a.prepareAdmissionConfig(ctx, ex, clusterCtx, nil, true); err != nil {
+	if err := a.prepareAdmissionConfig(ctx, ex, clusterCtx, a.serviceConfig.SeedResources); err != nil {
 		return nil, err
 	}
 
@@ -714,7 +714,7 @@ func (a *actuator) buildGardenClusterContext(ctx context.Context, logger logr.Lo
 	if err := a.prepareTLSSecrets(ctx, clusterCtx, configs); err != nil {
 		return nil, err
 	}
-	if err := a.prepareAdmissionConfig(ctx, ex, clusterCtx, garden.Spec.Resources, false); err != nil {
+	if err := a.prepareAdmissionConfig(ctx, ex, clusterCtx, garden.Spec.Resources); err != nil {
 		return nil, err
 	}
 
@@ -739,19 +739,11 @@ func (a *actuator) prepareTLSSecrets(ctx context.Context, clusterCtx *clusterCon
 	return nil
 }
 
-// prepareAdmissionConfig decodes the provider config, resolves the lakom container image,
-// assembles the cosign public keys and populates relevant fields in the cluster context.
-//
-// Additional trusted keys referenced via providerConfig.TrustedKeysResourceName are resolved differently per
-// extension class: shoot and garden look the reference up in namedResourceRef,
-// while the seed class reads the referenced secret directly,
-// since the reference list is not available to a seed extension.
 func (a *actuator) prepareAdmissionConfig(
 	ctx context.Context,
 	ex *extensionsv1alpha1.Extension,
 	clusterCtx *clusterContext,
 	namedResourceRef []gardencorev1beta1.NamedResourceReference,
-	resolveByName bool,
 ) error {
 	clusterCtx.providerConfig = &lakom.LakomConfig{}
 	if ex.Spec.ProviderConfig != nil {
@@ -779,26 +771,14 @@ func (a *actuator) prepareAdmissionConfig(
 	}
 
 	var clientPublicKeys []byte
-	if clusterCtx.providerConfig.TrustedKeysResourceName != nil {
-		switch {
-		case resolveByName:
-			clientPublicKeys, err = getClientKeysFromSecret(
-				ctx,
-				a.client,
-				*clusterCtx.providerConfig.TrustedKeysResourceName,
-				clusterCtx.namespace,
-			)
-		case namedResourceRef != nil:
-			clientPublicKeys, err = getClientKeys(
-				ctx,
-				a.client,
-				namedResourceRef,
-				*clusterCtx.providerConfig.TrustedKeysResourceName,
-				clusterCtx.namespace,
-			)
-		default:
-			return fmt.Errorf("trustedKeysResourceName %q is provided but no referenced resources are available to resolve it", *clusterCtx.providerConfig.TrustedKeysResourceName)
-		}
+	if clusterCtx.providerConfig.TrustedKeysResourceName != nil && namedResourceRef != nil {
+		clientPublicKeys, err = getClientKeys(
+			ctx,
+			a.client,
+			namedResourceRef,
+			*clusterCtx.providerConfig.TrustedKeysResourceName,
+			clusterCtx.namespace,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to get the additional keys: %w", err)
 		}

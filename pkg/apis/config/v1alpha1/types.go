@@ -8,6 +8,7 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 
 	extensionsconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
+	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -40,6 +41,10 @@ type Configuration struct {
 	// DefaultAdmissionScope is configuration exposing the option to overwrite the default scope
 	// for the lakom admission controller managed by the extension controller.
 	DefaultAdmissionScope lakom.ScopeType `json:"defaultAdmissionScope"`
+	// SeedResources is the list of named resource references from the Seed spec (Seed.Spec.Resources),
+	// injected by the chart. It lets the seed extension class resolve providerConfig.TrustedKeysResourceName.
+	// +optional
+	SeedResources []gardencorev1beta1.NamedResourceReference `json:"seedResources,omitempty"`
 }
 
 // DebugConfig contains debug configurations for the controller.
