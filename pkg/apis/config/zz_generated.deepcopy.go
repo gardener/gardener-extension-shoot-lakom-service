@@ -11,6 +11,7 @@ package config
 
 import (
 	v1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
+	v1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -34,6 +35,11 @@ func (in *Configuration) DeepCopyInto(out *Configuration) {
 		**out = **in
 	}
 	out.SeedBootstrap = in.SeedBootstrap
+	if in.SeedResources != nil {
+		in, out := &in.SeedResources, &out.SeedResources
+		*out = make([]v1beta1.NamedResourceReference, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
