@@ -92,8 +92,8 @@ spec:
         {{- $extensionEnabled := false }}{{- range .Values.gardener.seed.spec.extensions }}{{- if and (eq .type "shoot-lakom-service") (not .disabled) }}{{- $extensionEnabled = true }}{{- end }}{{- end }}
         {{- if $extensionEnabled }}
         - --extension-classes=seed,shoot
-        {{- else }}
         - --disable-controllers=shoot_lakom_service_seed_bootstrap_controller
+        {{- else }}
         - --extension-classes=shoot
         {{- end }}
         {{- end }}
