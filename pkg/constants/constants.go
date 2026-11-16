@@ -22,7 +22,7 @@ const (
 	// ManagedResourceNamesShoot is the name used to describe the managed resources for extension class shoot registered in shoot.
 	ManagedResourceNamesShoot = ExtensionServiceName + "-shoot"
 	// ManagedResourceNamesShootRuntime is the name used to describe the runtime managed resources for extension class shoot registered in seed.
-	ManagedResourceNamesShootRuntime = ExtensionServiceName + "-shoot-runtime"
+	ManagedResourceNamesShootRuntime = ExtensionServiceName + "-seed"
 	// ManagedResourceNamesSeedRuntime is the name used to describe the runtime managed resources for extension class seed registered in seed.
 	ManagedResourceNamesSeedRuntime = ExtensionServiceName + "-seed"
 	// ManagedResourceNamesGardenRuntime is the name used to describe the managed resources for extension class garden registered in the runtime garden.

@@ -137,6 +137,8 @@ type lakomResourceOptions struct {
 	serviceName           string
 	namespace             string
 	podLabels             map[string]string
+	deploymentLabels      map[string]string
+	deploymentAnnotations map[string]string
 	priorityClassName     string
 	serviceMonitorSuffix  string
 	useInClusterAuth      bool
@@ -194,8 +196,9 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      opts.serviceName,
-			Namespace: opts.namespace,
+			Name:        opts.serviceName,
+			Namespace:   opts.namespace,
+			Annotations: opts.deploymentAnnotations,
 			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
 				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
 			}),
@@ -213,13 +216,7 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: utils.MergeStringMaps(opts.podLabels, map[string]string{
-						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
-						gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
-					}),
+					Labels: opts.deploymentLabels,
 				},
 				Spec: corev1.PodSpec{
 					Affinity: &corev1.Affinity{
@@ -429,7 +426,11 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 				},
 			},
 		},
-		&monitoringv1.ServiceMonitor{
+	)
+
+	// TODO(h-mavrodiev): Remove conditinal after support for seed extension monitoring is implemented. (See issue #55)
+	if opts.serviceMonitorSuffix != "seed" {
+		objects = append(objects, &monitoringv1.ServiceMonitor{
 			ObjectMeta: monitoringutils.ConfigObjectMeta(opts.serviceName, opts.namespace, opts.serviceMonitorSuffix),
 			Spec: monitoringv1.ServiceMonitorSpec{
 				Selector: metav1.LabelSelector{MatchLabels: opts.podLabels},
@@ -438,8 +439,8 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom_.*", "controller_runtime_webhook_.*"),
 				}},
 			},
-		},
-	)
+		})
+	}
 
 	return objects, nil
 }
@@ -454,6 +455,15 @@ func getShootRuntimeObjects(
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
 ) ([]client.Object, error) {
+	baseLabels := getLabels()
+	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
+		v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
+		gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
+	})
+
 	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
@@ -466,7 +476,8 @@ func getShootRuntimeObjects(
 		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 serviceName,
 		namespace:                   clusterCtx.namespace,
-		podLabels:                   getLabels(),
+		podLabels:                   baseLabels,
+		deploymentLabels:            deploymentLabels,
 		priorityClassName:           v1beta1constants.PriorityClassNameShootControlPlane300,
 		serviceMonitorSuffix:        "shoot",
 		genericKubeconfigName:       clusterCtx.genericTokenKubeconfigName,
@@ -482,6 +493,13 @@ func getSeedRuntimeObjects(
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
 ) ([]client.Object, error) {
+	baseLabels := getLabels()
+	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
+		v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
+	})
 	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
@@ -495,9 +513,15 @@ func getSeedRuntimeObjects(
 		serviceName:                 constants.SeedExtensionServiceName,
 		namespace:                   metav1.NamespaceSystem,
 		podLabels:                   getLabels(),
-		priorityClassName:           v1beta1constants.PriorityClassNameSeedSystem900,
-		serviceMonitorSuffix:        "seed",
-		useInClusterAuth:            true,
+		deploymentLabels:            deploymentLabels,
+		// TODO(h-mavrodiev): Remove the DeleteOnInvalidUpdate annotation once all seeds have migrated off the legacy
+		// seed bootstrap controller.
+		deploymentAnnotations: map[string]string{
+			resourcesv1alpha1.DeleteOnInvalidUpdate: "true",
+		},
+		priorityClassName:    v1beta1constants.PriorityClassNameSeedSystem900,
+		serviceMonitorSuffix: "seed",
+		useInClusterAuth:     true,
 	})
 }
 
@@ -509,6 +533,15 @@ func getGardenVirtualObjects(
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
 ) ([]client.Object, error) {
+	baseLabels := getGardenPodLabels(true)
+	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
+		v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
+		gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
+	})
+
 	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         clusterCtx.generatedSecrets[constants.GardenVirtualWebhookTLSSecretName].Name,
@@ -521,7 +554,8 @@ func getGardenVirtualObjects(
 		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 constants.GardenVirtualExtensionServiceName,
 		namespace:                   clusterCtx.namespace,
-		podLabels:                   getGardenPodLabels(true),
+		podLabels:                   baseLabels,
+		deploymentLabels:            deploymentLabels,
 		priorityClassName:           v1beta1constants.PriorityClassNameGardenSystem200,
 		serviceMonitorSuffix:        "garden-virtual",
 		genericKubeconfigName:       clusterCtx.genericTokenKubeconfigName,
@@ -537,6 +571,13 @@ func getGardenRuntimeObjects(
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
 ) ([]client.Object, error) {
+	baseLabels := getGardenPodLabels(false)
+	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
+		v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
+	})
 	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
@@ -549,7 +590,8 @@ func getGardenRuntimeObjects(
 		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 constants.GardenRuntimeExtensionServiceName,
 		namespace:                   constants.LakomSystemNamespaceName,
-		podLabels:                   getGardenPodLabels(false),
+		podLabels:                   baseLabels,
+		deploymentLabels:            deploymentLabels,
 		priorityClassName:           v1beta1constants.PriorityClassNameGardenSystem200,
 		serviceMonitorSuffix:        "garden-runtime",
 		useInClusterAuth:            true,
