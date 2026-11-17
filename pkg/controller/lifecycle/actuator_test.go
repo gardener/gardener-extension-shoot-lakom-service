@@ -781,7 +781,7 @@ var _ = Describe("Actuator", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
-				Expect(manifests).To(HaveLen(9))
+				Expect(manifests).To(HaveLen(8))
 
 				for i := range manifests { // Re-add the trailing '\n' removed during the split from the separator above
 					if i < len(manifests)-1 {
@@ -798,7 +798,6 @@ var _ = Describe("Actuator", func() {
 					expectedSeedRuntimeClusterRole(),
 					expectedSeedRuntimeClusterRoleBinding(),
 					expectedSeedRuntimeVPA(),
-					expectedSeedRuntimeServiceMonitor(),
 				))
 			},
 			Entry("Default config", false, false, false),
@@ -1817,9 +1816,8 @@ spec:
         app.kubernetes.io/part-of: shoot-lakom-service
         networking.gardener.cloud/to-blocked-cidrs: allowed
         networking.gardener.cloud/to-dns: allowed
-        networking.gardener.cloud/to-private-networks: allowed
         networking.gardener.cloud/to-public-networks: allowed
-        networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
+        networking.gardener.cloud/to-runtime-apiserver: allowed
     spec:
       affinity:
         podAntiAffinity:
@@ -2071,6 +2069,7 @@ kind: Deployment
 metadata:
   annotations:
     ` + strings.Join(annotations, "\n    ") + `
+    resources.gardener.cloud/delete-on-invalid-update: "true"
   labels:
     app.kubernetes.io/name: lakom
     app.kubernetes.io/part-of: shoot-lakom-service
@@ -2098,9 +2097,8 @@ spec:
         app.kubernetes.io/part-of: shoot-lakom-service
         networking.gardener.cloud/to-blocked-cidrs: allowed
         networking.gardener.cloud/to-dns: allowed
-        networking.gardener.cloud/to-private-networks: allowed
         networking.gardener.cloud/to-public-networks: allowed
-        networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
+        networking.gardener.cloud/to-runtime-apiserver: allowed
     spec:
       affinity:
         podAntiAffinity:
@@ -2305,29 +2303,5 @@ spec:
   updatePolicy:
     updateMode: InPlaceOrRecreate
 status: {}
-`
-}
-
-func expectedSeedRuntimeServiceMonitor() string {
-	return `apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  labels:
-    prometheus: seed
-  name: seed-extension-shoot-lakom-service-seed
-  namespace: kube-system
-spec:
-  endpoints:
-  - metricRelabelings:
-    - action: keep
-      regex: ^(lakom_.*|controller_runtime_webhook_.*)$
-      sourceLabels:
-      - __name__
-    port: metrics
-  namespaceSelector: {}
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: lakom
-      app.kubernetes.io/part-of: shoot-lakom-service
 `
 }

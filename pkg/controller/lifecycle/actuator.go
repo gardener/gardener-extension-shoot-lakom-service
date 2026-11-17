@@ -179,6 +179,29 @@ func (a *actuator) reconcileShoot(ctx context.Context, logger logr.Logger, ex *e
 
 // reconcileSeed reconciles extension resources of class seed.
 func (a *actuator) reconcileSeed(ctx context.Context, logger logr.Logger, ex *extensionsv1alpha1.Extension) error {
+	// Clean up the managed resource created by the legacy seed bootstrap controller so that the new seed-class
+	// managed resource adopts the existing objects instead of racing with it. SetKeepObjects ensures only the
+	// managed resource is removed, not the lakom objects it manages in the kube-system namespace, so the
+	// deployment and webhooks keep serving across the migration. No secret cleanup is needed: the bootstrap
+	// controller and the seed-class actuator use the same secrets-manager identity and CA/TLS secret names, so
+	// the secrets manager adopts and rotates the existing secrets in place rather than orphaning them.
+	// TODO(h-mavrodiev): remove after bootstrap controller migration.
+	bootstrapNamespace := a.serviceConfig.SeedBootstrap.OwnerNamespace
+	if err := managedresources.SetKeepObjects(ctx, a.client, bootstrapNamespace, constants.ManagedResourceNamesSeedRuntime, true); err != nil {
+		return err
+	}
+
+	logger.Info("Deleting legacy seed bootstrap managed resource to migrate to the seed extension class",
+		"namespace", bootstrapNamespace, "name", constants.ManagedResourceNamesSeedRuntime)
+	timeoutDeleteCtx, cancelDeleteCtx := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancelDeleteCtx()
+	if err := managedresources.DeleteForSeed(ctx, a.client, bootstrapNamespace, constants.ManagedResourceNamesSeedRuntime); err != nil {
+		return err
+	}
+	if err := managedresources.WaitUntilDeleted(timeoutDeleteCtx, a.client, bootstrapNamespace, constants.ManagedResourceNamesSeedRuntime); err != nil {
+		return fmt.Errorf("failed waiting for the legacy seed bootstrap managed resource %s/%s to be deleted; migration is blocked: %w", bootstrapNamespace, constants.ManagedResourceNamesSeedRuntime, err)
+	}
+
 	clusterCtx, err := a.buildSeedClusterContext(ctx, logger, ex)
 	if err != nil {
 		return err
