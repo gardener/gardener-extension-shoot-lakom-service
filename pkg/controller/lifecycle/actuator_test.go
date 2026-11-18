@@ -12,11 +12,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
+	lakomv1alpha1 "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom/v1alpha1"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
+	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
@@ -27,6 +30,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -429,6 +437,12 @@ var _ = Describe("Actuator", func() {
 			Expect(err.Error()).To(ContainSubstring("failed to find referenced resource with name " + resourceName))
 		})
 
+		It("Should return an err if the resource list is nil", func() {
+			_, err := getClientKeys(ctx, fakeclient, nil, resourceName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to find referenced resource with name " + resourceName))
+		})
+
 		It("Should return an err if the reference is found but the resource with the given name is not found", func() {
 			wrongName := "non-existent"
 			prefixedWrongName := v1beta1constants.ReferencedResourcesPrefix + wrongName
@@ -451,6 +465,95 @@ var _ = Describe("Actuator", func() {
 			_, err := getClientKeys(ctx, fakeclient, resources, resourceNoKeysName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("secret " + namespace + "/" + prefixedSecretNoKeysName + " is missing data key 'keys'"))
+		})
+	})
+
+	Context("prepareAdmissionConfig trusted keys resolution", func() {
+		const (
+			namespace    = "garden"
+			resourceName = "trusted-keys"
+			secretName   = "lakom-secret"
+		)
+
+		var (
+			ctx          = context.TODO()
+			a            *actuator
+			newExtension func(trustedKeysResourceName *string) *extensionsv1alpha1.Extension
+			secretData   = []byte(`- name: client-01
+  algorithm: RSASSA-PKCS1-v1_5-SHA256
+  key: |-
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5WIqxApep8Q53M5zrd0Hhuk03tCn
+    On/cxJW6vXn3mvlqgyc4MO/ZXb5EputelfyP5n1NYWWcomeQTDG/E3EbdQ==
+    -----END PUBLIC KEY-----
+`)
+		)
+
+		BeforeEach(func() {
+			scheme := runtime.NewScheme()
+			Expect(lakom.AddToScheme(scheme)).ToNot(HaveOccurred())
+			Expect(lakomv1alpha1.AddToScheme(scheme)).ToNot(HaveOccurred())
+
+			codecs := serializer.NewCodecFactory(scheme)
+			ser := jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, scheme, scheme, jsonserializer.SerializerOptions{})
+			versions := schema.GroupVersions([]schema.GroupVersion{lakomv1alpha1.SchemeGroupVersion})
+			encoder := codecs.CodecForVersions(ser, ser, versions, versions)
+			// newExtension builds an Extension whose providerConfig optionally sets trustedKeysResourceName,
+			// encoding the typed LakomConfig through the scheme (as upstream tests do via runtime.Encode).
+			newExtension = func(trustedKeysResourceName *string) *extensionsv1alpha1.Extension {
+				cfg := &lakomv1alpha1.LakomConfig{
+					Scope:                   ptr.To(lakom.KubeSystemManagedByGardener),
+					TrustedKeysResourceName: trustedKeysResourceName,
+				}
+				raw, err := runtime.Encode(encoder, cfg)
+				Expect(err).ToNot(HaveOccurred())
+				return &extensionsv1alpha1.Extension{
+					ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "shoot-lakom-service"},
+					Spec: extensionsv1alpha1.ExtensionSpec{
+						DefaultSpec: extensionsv1alpha1.DefaultSpec{
+							ProviderConfig: &runtime.RawExtension{Raw: raw},
+						},
+					},
+				}
+			}
+
+			a = &actuator{
+				client:  fakeclient.NewClientBuilder().Build(),
+				decoder: serializer.NewCodecFactory(scheme, serializer.EnableStrict).UniversalDecoder(),
+				serviceConfig: config.Configuration{
+					CosignPublicKeys: &runtime.RawExtension{Raw: []byte(`{"publicKeys":[]}`)},
+				},
+			}
+		})
+
+		It("Should not resolve keys when trustedKeysResourceName is unset", func() {
+			clusterCtx := &clusterContext{namespace: namespace}
+			// nil resource list is fine here: no trusted keys requested.
+			Expect(a.prepareAdmissionConfig(ctx, newExtension(nil), clusterCtx, nil)).ToNot(HaveOccurred())
+		})
+
+		It("Should return an err when trustedKeysResourceName is set but the resource list is empty", func() {
+			clusterCtx := &clusterContext{namespace: namespace}
+			err := a.prepareAdmissionConfig(ctx, newExtension(ptr.To(resourceName)), clusterCtx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to find referenced resource with name " + resourceName))
+		})
+
+		It("Should resolve the keys when trustedKeysResourceName is set and the resource exists", func() {
+			resources := []gardencorev1beta1.NamedResourceReference{{
+				Name: resourceName,
+				ResourceRef: autoscalingv1.CrossVersionObjectReference{
+					Kind: "Secret", Name: secretName, APIVersion: "v1",
+				},
+			}}
+			Expect(a.client.Create(ctx, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: v1beta1constants.ReferencedResourcesPrefix + secretName},
+				Data:       map[string][]byte{"keys": secretData},
+			})).ToNot(HaveOccurred())
+
+			clusterCtx := &clusterContext{namespace: namespace}
+			Expect(a.prepareAdmissionConfig(ctx, newExtension(ptr.To(resourceName)), clusterCtx, resources)).ToNot(HaveOccurred())
+			Expect(string(clusterCtx.lakomPublicKeysConfig)).To(ContainSubstring("client-01"))
 		})
 	})
 
