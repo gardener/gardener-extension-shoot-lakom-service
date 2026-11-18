@@ -794,7 +794,7 @@ func (a *actuator) prepareAdmissionConfig(
 	}
 
 	var clientPublicKeys []byte
-	if clusterCtx.providerConfig.TrustedKeysResourceName != nil && namedResourceRef != nil {
+	if clusterCtx.providerConfig.TrustedKeysResourceName != nil {
 		clientPublicKeys, err = getClientKeys(
 			ctx,
 			a.client,
