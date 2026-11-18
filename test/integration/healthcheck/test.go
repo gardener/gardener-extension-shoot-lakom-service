@@ -40,8 +40,8 @@ var _ = ginkgov2.Describe("Extension-shoot-lakom-service integration test: healt
 
 	ginkgov2.Context("Extension", func() {
 		ginkgov2.Context("Condition type: ShootControlPlaneHealthy", func() {
-			f.Serial().Release().CIt(fmt.Sprintf("Extension CRD should contain unhealthy condition due to ManagedResource '%s' is unhealthy", constants.ManagedResourceNamesSeed), func(ctx context.Context) {
-				err := healthcheckoperation.ExtensionHealthCheckWithManagedResource(ctx, timeout, f, "shoot-lakom-service", constants.ManagedResourceNamesSeed, gardencorev1beta1.ShootControlPlaneHealthy)
+			f.Serial().Release().CIt(fmt.Sprintf("Extension CRD should contain unhealthy condition due to ManagedResource '%s' is unhealthy", constants.ManagedResourceNamesShootRuntime), func(ctx context.Context) {
+				err := healthcheckoperation.ExtensionHealthCheckWithManagedResource(ctx, timeout, f, "shoot-lakom-service", constants.ManagedResourceNamesShootRuntime, gardencorev1beta1.ShootControlPlaneHealthy)
 				framework.ExpectNoError(err)
 			}, timeout)
 		})

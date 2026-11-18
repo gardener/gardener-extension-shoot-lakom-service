@@ -29,3 +29,7 @@ data:
     {{- if .Values.controllers.defaultAdmissionScope }}
     defaultAdmissionScope: {{ .Values.controllers.defaultAdmissionScope }}
     {{- end }}
+    {{- if (dig "gardener" "seed" "spec" "resources" (list) (.Values | merge (dict))) }}
+    seedResources:
+{{ toYaml .Values.gardener.seed.spec.resources | indent 6 }}
+    {{- end }}
