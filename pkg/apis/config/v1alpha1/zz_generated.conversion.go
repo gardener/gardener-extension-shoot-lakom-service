@@ -15,6 +15,7 @@ import (
 	config "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/config"
 	lakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
 	configv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
+	v1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -70,6 +71,7 @@ func autoConvert_v1alpha1_Configuration_To_config_Configuration(in *Configuratio
 	out.AllowUntrustedImages = in.AllowUntrustedImages
 	out.AllowInsecureRegistries = in.AllowInsecureRegistries
 	out.DefaultAdmissionScope = lakom.ScopeType(in.DefaultAdmissionScope)
+	out.SeedResources = *(*[]v1beta1.NamedResourceReference)(unsafe.Pointer(&in.SeedResources))
 	return nil
 }
 
@@ -89,6 +91,7 @@ func autoConvert_config_Configuration_To_v1alpha1_Configuration(in *config.Confi
 	out.AllowUntrustedImages = in.AllowUntrustedImages
 	out.AllowInsecureRegistries = in.AllowInsecureRegistries
 	out.DefaultAdmissionScope = lakom.ScopeType(in.DefaultAdmissionScope)
+	out.SeedResources = *(*[]v1beta1.NamedResourceReference)(unsafe.Pointer(&in.SeedResources))
 	return nil
 }
 

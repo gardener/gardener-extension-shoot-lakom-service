@@ -48,7 +48,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>TrustedKeysResourceName is the name of the shoot resource providing additional cosign public keys for image signature validation.</p>
+<p>TrustedKeysResourceName is the name of the shoot, seed or garden resource providing additional cosign public keys for image signature validation.</p>
 </td>
 </tr>
 

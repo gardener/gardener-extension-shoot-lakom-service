@@ -37,53 +37,29 @@ import (
 )
 
 var (
-	shootWebhookRules = []admissionregistrationv1.RuleWithOperations{{
-		Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-		Rule: admissionregistrationv1.Rule{
-			APIGroups:   []string{""},
-			APIVersions: []string{"v1"},
-			Resources:   []string{"pods", "pods/ephemeralcontainers"},
-		},
-	}}
+	operations = []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update}
 
-	gardenRuntimeWebhookRules = []admissionregistrationv1.RuleWithOperations{
-		{
-			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-			Rule: admissionregistrationv1.Rule{
-				APIGroups:   []string{""},
-				APIVersions: []string{"v1"},
-				Resources:   []string{"pods", "pods/ephemeralcontainers"},
-			},
-		},
-		{
-			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-			Rule: admissionregistrationv1.Rule{
-				APIGroups:   []string{"operator.gardener.cloud"},
-				APIVersions: []string{"v1alpha1"},
-				Resources:   []string{"extensions"},
-			},
-		},
-	}
+	podsRule                  = admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods", "pods/ephemeralcontainers"}}
+	extensionsRule            = admissionregistrationv1.Rule{APIGroups: []string{"operator.gardener.cloud"}, APIVersions: []string{"v1alpha1"}, Resources: []string{"extensions"}}
+	controllerDeploymentsRule = admissionregistrationv1.Rule{APIGroups: []string{"core.gardener.cloud"}, APIVersions: []string{"v1"}, Resources: []string{"controllerdeployments"}}
+	gardenletsRule            = admissionregistrationv1.Rule{APIGroups: []string{"seedmanagement.gardener.cloud"}, APIVersions: []string{"v1alpha1"}, Resources: []string{"gardenlets"}}
 
-	gardenVirtualWebhookRules = []admissionregistrationv1.RuleWithOperations{
-		{
-			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-			Rule: admissionregistrationv1.Rule{
-				APIGroups:   []string{"core.gardener.cloud"},
-				APIVersions: []string{"v1"},
-				Resources:   []string{"controllerdeployments"},
-			},
-		},
-		{
-			Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
-			Rule: admissionregistrationv1.Rule{
-				APIGroups:   []string{"seedmanagement.gardener.cloud"},
-				APIVersions: []string{"v1alpha1"},
-				Resources:   []string{"gardenlets"},
-			},
-		},
-	}
+	shootWebhookRules         = addForCreateUpdate(podsRule)
+	seedWebhookRules          = addForCreateUpdate(podsRule)
+	gardenRuntimeWebhookRules = addForCreateUpdate(podsRule, extensionsRule)
+	gardenVirtualWebhookRules = addForCreateUpdate(controllerDeploymentsRule, gardenletsRule)
 )
+
+func addForCreateUpdate(rules ...admissionregistrationv1.Rule) []admissionregistrationv1.RuleWithOperations {
+	res := make([]admissionregistrationv1.RuleWithOperations, 0, len(rules))
+	for _, rule := range rules {
+		res = append(res, admissionregistrationv1.RuleWithOperations{
+			Operations: operations,
+			Rule:       rule,
+		})
+	}
+	return res
+}
 
 // getWebhookObjects builds the webhook configuration objects for a given set of webhook rules and options.
 func getWebhookObjects(
@@ -91,7 +67,7 @@ func getWebhookObjects(
 	webhookRules []admissionregistrationv1.RuleWithOperations,
 	serviceName,
 	extensionNamespace string,
-) ([]client.Object, error) {
+) []client.Object {
 	clientConfigFor := func(path string) admissionregistrationv1.WebhookClientConfig {
 		return getWebhookClientConfig(webhookOptions.useServiceClientConfig, webhookOptions.caBundle, extensionNamespace, serviceName, path)
 	}
@@ -143,7 +119,7 @@ func getWebhookObjects(
 		}
 	)
 
-	return objects, nil
+	return objects
 }
 
 // lakomResourceOptions parameterizes getLakomObjects across deployment flavours.
@@ -161,6 +137,8 @@ type lakomResourceOptions struct {
 	serviceName           string
 	namespace             string
 	podLabels             map[string]string
+	deploymentLabels      map[string]string
+	deploymentAnnotations map[string]string
 	priorityClassName     string
 	serviceMonitorSuffix  string
 	useInClusterAuth      bool
@@ -218,8 +196,9 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      opts.serviceName,
-			Namespace: opts.namespace,
+			Name:        opts.serviceName,
+			Namespace:   opts.namespace,
+			Annotations: opts.deploymentAnnotations,
 			Labels: utils.MergeStringMaps(getLabels(), map[string]string{
 				resourcesv1alpha1.HighAvailabilityConfigType: resourcesv1alpha1.HighAvailabilityConfigTypeServer,
 			}),
@@ -237,13 +216,7 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: utils.MergeStringMaps(opts.podLabels, map[string]string{
-						v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
-						gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
-					}),
+					Labels: opts.deploymentLabels,
 				},
 				Spec: corev1.PodSpec{
 					Affinity: &corev1.Affinity{
@@ -453,7 +426,11 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 				},
 			},
 		},
-		&monitoringv1.ServiceMonitor{
+	)
+
+	// TODO(h-mavrodiev): Remove conditinal after support for seed extension monitoring is implemented. (See issue #55)
+	if opts.serviceMonitorSuffix != "seed" {
+		objects = append(objects, &monitoringv1.ServiceMonitor{
 			ObjectMeta: monitoringutils.ConfigObjectMeta(opts.serviceName, opts.namespace, opts.serviceMonitorSuffix),
 			Spec: monitoringv1.ServiceMonitorSpec{
 				Selector: metav1.LabelSelector{MatchLabels: opts.podLabels},
@@ -462,13 +439,13 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 					MetricRelabelConfigs: monitoringutils.StandardMetricRelabelConfig("lakom_.*", "controller_runtime_webhook_.*"),
 				}},
 			},
-		},
-	)
+		})
+	}
 
 	return objects, nil
 }
 
-func getSeedObjects(
+func getShootRuntimeObjects(
 	clusterCtx *clusterContext,
 	lakomReplicas *int32,
 	serviceName,
@@ -478,6 +455,15 @@ func getSeedObjects(
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
 ) ([]client.Object, error) {
+	baseLabels := getLabels()
+	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
+		v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
+		gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
+	})
+
 	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
@@ -490,11 +476,52 @@ func getSeedObjects(
 		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 serviceName,
 		namespace:                   clusterCtx.namespace,
-		podLabels:                   getLabels(),
+		podLabels:                   baseLabels,
+		deploymentLabels:            deploymentLabels,
 		priorityClassName:           v1beta1constants.PriorityClassNameShootControlPlane300,
 		serviceMonitorSuffix:        "shoot",
 		genericKubeconfigName:       clusterCtx.genericTokenKubeconfigName,
 		accessSecretName:            shootAccessSecretName,
+	})
+}
+
+func getSeedRuntimeObjects(
+	clusterCtx *clusterContext,
+	lakomReplicas *int32,
+	serverTLSSecretName string,
+	useOnlyImagePullSecrets,
+	allowUntrustedImages,
+	allowInsecureRegistries bool,
+) ([]client.Object, error) {
+	baseLabels := getLabels()
+	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
+		v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
+	})
+	return getLakomObjects(lakomResourceOptions{
+		replicas:                    lakomReplicas,
+		serverTLSSecretName:         serverTLSSecretName,
+		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
+		image:                       clusterCtx.image,
+		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
+		allowUntrustedImages:        allowUntrustedImages,
+		allowInsecureRegistries:     allowInsecureRegistries,
+		topologyAwareRoutingEnabled: clusterCtx.topologyAwareRoutingEnabled,
+		k8sVersion:                  clusterCtx.kubernetesVersion,
+		serviceName:                 constants.SeedExtensionServiceName,
+		namespace:                   metav1.NamespaceSystem,
+		podLabels:                   getLabels(),
+		deploymentLabels:            deploymentLabels,
+		// TODO(h-mavrodiev): Remove the DeleteOnInvalidUpdate annotation once all seeds have migrated off the legacy
+		// seed bootstrap controller.
+		deploymentAnnotations: map[string]string{
+			resourcesv1alpha1.DeleteOnInvalidUpdate: "true",
+		},
+		priorityClassName:    v1beta1constants.PriorityClassNameSeedSystem900,
+		serviceMonitorSuffix: "seed",
+		useInClusterAuth:     true,
 	})
 }
 
@@ -506,6 +533,15 @@ func getGardenVirtualObjects(
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
 ) ([]client.Object, error) {
+	baseLabels := getGardenPodLabels(true)
+	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
+		v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
+		gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
+	})
+
 	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         clusterCtx.generatedSecrets[constants.GardenVirtualWebhookTLSSecretName].Name,
@@ -518,7 +554,8 @@ func getGardenVirtualObjects(
 		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 constants.GardenVirtualExtensionServiceName,
 		namespace:                   clusterCtx.namespace,
-		podLabels:                   getGardenPodLabels(true),
+		podLabels:                   baseLabels,
+		deploymentLabels:            deploymentLabels,
 		priorityClassName:           v1beta1constants.PriorityClassNameGardenSystem200,
 		serviceMonitorSuffix:        "garden-virtual",
 		genericKubeconfigName:       clusterCtx.genericTokenKubeconfigName,
@@ -534,6 +571,13 @@ func getGardenRuntimeObjects(
 	allowUntrustedImages,
 	allowInsecureRegistries bool,
 ) ([]client.Object, error) {
+	baseLabels := getGardenPodLabels(false)
+	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
+		v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
+		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
+	})
 	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
@@ -546,7 +590,8 @@ func getGardenRuntimeObjects(
 		k8sVersion:                  clusterCtx.kubernetesVersion,
 		serviceName:                 constants.GardenRuntimeExtensionServiceName,
 		namespace:                   constants.LakomSystemNamespaceName,
-		podLabels:                   getGardenPodLabels(false),
+		podLabels:                   baseLabels,
+		deploymentLabels:            deploymentLabels,
 		priorityClassName:           v1beta1constants.PriorityClassNameGardenSystem200,
 		serviceMonitorSuffix:        "garden-runtime",
 		useInClusterAuth:            true,
@@ -673,12 +718,29 @@ type webhookOptions struct {
 	objectSelector         metav1.LabelSelector
 }
 
-func shootWebhookOptions(configName string, scope lakom.ScopeType, dashboardEnabled bool, caBundle []byte) webhookOptions {
+func shootWebhookOptions(scope lakom.ScopeType, dashboardEnabled bool, caBundle []byte) webhookOptions {
 	return webhookOptions{
 		caBundle:          caBundle,
-		configName:        configName,
+		configName:        constants.WebhookConfigurationName,
 		namespaceSelector: scopeToNamespaceSelector(scope, dashboardEnabled),
 		objectSelector:    scopeToObjectSelector(scope),
+	}
+}
+
+func seedWebhookOptions(caBundle []byte) webhookOptions {
+	return webhookOptions{
+		caBundle:               caBundle,
+		configName:             constants.SeedWebhookConfigurationName,
+		useServiceClientConfig: true,
+		namespaceSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      corev1.LabelMetadataName,
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values: []string{
+					metav1.NamespaceSystem,
+				},
+			},
+		}},
 	}
 }
 
