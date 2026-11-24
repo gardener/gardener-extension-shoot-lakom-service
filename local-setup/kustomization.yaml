@@ -15,7 +15,6 @@ patches:
       path: /helm/values/controllers
       value:
         allowUntrustedImages: true
-        allowInsecureRegistries: true
         cosignPublicKeys:
           publicKeys:
           - name: example-01

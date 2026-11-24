@@ -1,3 +1,4 @@
 patch-admission-image.yaml
 patch-extension-image.yaml
 patch-imagevector-overwrite.yaml
+patch-registry-ca.yaml

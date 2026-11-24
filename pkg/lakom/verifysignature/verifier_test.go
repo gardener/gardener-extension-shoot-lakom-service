@@ -80,7 +80,7 @@ var _ = Describe("Verifier", func() {
 			// this logic was but I remember seeing it.
 			//
 			// Thus when testing the fake registry on localhost, the `false` here does not matter.
-			directVerifier = verifysignature.NewDirectVerifier(*lakomConfig, false)
+			directVerifier = verifysignature.NewDirectVerifier(*lakomConfig, false, nil)
 		})
 
 		DescribeTable("Verify images",
@@ -124,7 +124,7 @@ var _ = Describe("Verifier", func() {
 			cache, err = verifysignature.NewSignatureVerificationResultCache(refresh, ttl)
 			Expect(err).ToNot(HaveOccurred())
 
-			directVerifier := verifysignature.NewDirectVerifier(*lakomConfig, false)
+			directVerifier := verifysignature.NewDirectVerifier(*lakomConfig, false, nil)
 			cachedVerifier = verifysignature.NewCacheVerifier(cache, directVerifier)
 		})
 

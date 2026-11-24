@@ -6,6 +6,7 @@ package resolvetag
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
@@ -16,11 +17,18 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-type directResolver struct{}
+type directResolver struct {
+	// transport is the registry CA-aware HTTP transport. It is nil when no custom registry CA is
+	// configured, in which case go-containerregistry uses its default transport (system roots).
+	transport http.RoundTripper
+}
 
-// NewDirectResolver creates new resolver and returns it.
-func NewDirectResolver() *directResolver {
-	dc := &directResolver{}
+// NewDirectResolver creates new resolver and returns it. The optional transport carries custom
+// registry CA trust; pass nil to use go-containerregistry's default transport.
+func NewDirectResolver(transport http.RoundTripper) *directResolver {
+	dc := &directResolver{
+		transport: transport,
+	}
 	return dc
 }
 
@@ -35,6 +43,9 @@ func (r *directResolver) Resolve(ctx context.Context, tagRef name.Tag, kcr utils
 		remote.WithContext(ctx),
 		remote.WithUserAgent(constants.ApplicationName),
 		remote.WithAuthFromKeychain(keyChain),
+	}
+	if r.transport != nil {
+		remoteOpts = append(remoteOpts, remote.WithTransport(r.transport))
 	}
 
 	desc, err := remote.Head(tagRef, remoteOpts...)

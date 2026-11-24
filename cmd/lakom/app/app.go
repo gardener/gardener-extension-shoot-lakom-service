@@ -104,6 +104,9 @@ type Options struct {
 	// AllowInsecureRegistries configures the webhook to fallback to HTTP if HTTPS communication with
 	// the respective registry is not possible.
 	AllowInsecureRegistries bool
+	// RegistryCADir is the directory containing the registry CA bundle (key "bundle.crt") used to
+	// trust HTTPS registries served by a private CA. Empty means only the system roots are trusted.
+	RegistryCADir string
 }
 
 // AddFlags adds lakom admission controller's flags to the specified FlagSet.
@@ -121,6 +124,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.UseOnlyImagePullSecrets, "use-only-image-pull-secrets", false, "If set, only the credentials from the image pull secrets of the pod are used to access the OCI registry. Otherwise, the node identity and docker config are also used.")
 	fs.BoolVar(&o.AllowUntrustedImages, "insecure-allow-untrusted-images", false, "If set, the webhook will just return warning for the images without trusted signatures.")
 	fs.BoolVar(&o.AllowInsecureRegistries, "insecure-allow-insecure-registries", false, "If set, communication via HTTP with registries will be allowed.")
+	fs.StringVar(&o.RegistryCADir, "registry-ca-dir", "", "Directory containing the registry CA bundle (file \"bundle.crt\") used to trust HTTPS registries served by a private CA. The public system root CAs remain trusted. If empty, only the system roots are used.")
 }
 
 // validate validates all the required options.
@@ -216,6 +220,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithCacheRefreshInterval(o.CacheRefreshInterval).
 		WithUseOnlyImagePullSecrets(o.UseOnlyImagePullSecrets).
 		WithAllowInsecureRegistries(o.AllowInsecureRegistries).
+		WithRegistryCADir(o.RegistryCADir).
 		Build()
 	if err != nil {
 		return err
@@ -235,6 +240,7 @@ func (o *Options) Run(ctx context.Context) error {
 		WithUseOnlyImagePullSecrets(o.UseOnlyImagePullSecrets).
 		WithAllowUntrustedImages(o.AllowUntrustedImages).
 		WithAllowInsecureRegistries(o.AllowInsecureRegistries).
+		WithRegistryCADir(o.RegistryCADir).
 		Build()
 	if err != nil {
 		return err

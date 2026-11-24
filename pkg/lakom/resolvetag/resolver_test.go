@@ -38,7 +38,7 @@ var _ = Describe("Resolver", func() {
 		refresh        = time.Millisecond * 100
 		ttl            = time.Second
 		kcr            = &anonymousKeyChainReader{}
-		directResolver = resolvetag.NewDirectResolver()
+		directResolver = resolvetag.NewDirectResolver(nil)
 		ctx            context.Context
 	)
 

@@ -176,7 +176,7 @@ extension-operator-up: export SKAFFOLD_PUSH = true
 extension-operator-up extension-operator-down: export SKAFFOLD_LABEL = skaffold.dev/run-id=extension-local
 
 extension-operator-up extension-operator-down: export SKAFFOLD_FILENAME = skaffold-operator.yaml
-extension-operator-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL)
+extension-operator-up: $(SKAFFOLD) $(KIND) $(HELM) $(KUBECTL) $(YQ)
 	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) EFFECTIVE_VERSION=$(EFFECTIVE_VERSION) \
 		$(SKAFFOLD) --cache-artifacts=false run
 

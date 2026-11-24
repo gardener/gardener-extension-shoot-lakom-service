@@ -11,19 +11,27 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
-var imageVector imagevector.ImageVector
+var (
+	imageVector imagevector.ImageVector
+	caBundle    *imagevector.CABundle
+)
 
 func init() {
 	var err error
 
-	imageVector, _, err = imagevector.Read([]byte(charts.ImagesYAML))
+	imageVector, caBundle, err = imagevector.Read([]byte(charts.ImagesYAML))
 	runtime.Must(err)
 
-	imageVector, _, err = imagevector.WithEnvOverride(imageVector, nil, imagevector.OverrideEnv)
+	imageVector, caBundle, err = imagevector.WithEnvOverride(imageVector, caBundle, imagevector.OverrideEnv)
 	runtime.Must(err)
 }
 
 // ImageVector is the image vector that contains all the needed images.
 func ImageVector() imagevector.ImageVector {
 	return imageVector
+}
+
+// CABundle returns the CA bundle defined in the container image vector.
+func CABundle() *imagevector.CABundle {
+	return caBundle
 }

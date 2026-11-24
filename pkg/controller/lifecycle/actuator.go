@@ -30,6 +30,7 @@ import (
 	"github.com/gardener/gardener/pkg/extensions"
 	"github.com/gardener/gardener/pkg/utils"
 	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
+	imagevectorutils "github.com/gardener/gardener/pkg/utils/imagevector"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
 	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
@@ -590,6 +591,7 @@ type clusterContext struct {
 	generatedSecrets      map[string]*corev1.Secret
 	lakomPublicKeysConfig []byte
 	image                 string
+	registryCABundle      *imagevectorutils.CABundle
 	providerConfig        *lakom.LakomConfig
 }
 
@@ -787,6 +789,7 @@ func (a *actuator) prepareAdmissionConfig(
 		image.Tag = ptr.To(version.Get().GitVersion)
 	}
 	clusterCtx.image = image.String()
+	clusterCtx.registryCABundle = imagevector.CABundle()
 
 	gardenerPublicKeys, err := yaml.JSONToYAML(a.serviceConfig.CosignPublicKeys.Raw)
 	if err != nil {

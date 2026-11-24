@@ -9,6 +9,7 @@ resources:
 
 patches:
 - path: patch-imagevector-overwrite.yaml
+- path: patch-registry-ca.yaml
 - path: patch-extension-image.yaml
 - path: patch-admission-image.yaml
 - patch: |
@@ -16,7 +17,6 @@ patches:
       path: /spec/deployment/extension/values/controllers
       value:
         allowUntrustedImages: true
-        allowInsecureRegistries: true
         cosignPublicKeys:
           publicKeys:
           - name: example-01
@@ -30,7 +30,6 @@ patches:
       path: /spec/deployment/extension/runtimeClusterValues/controllers
       value:
         allowUntrustedImages: true
-        allowInsecureRegistries: true
         cosignPublicKeys:
           publicKeys:
           - name: example-01

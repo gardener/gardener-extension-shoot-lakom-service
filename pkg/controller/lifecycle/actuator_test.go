@@ -22,10 +22,12 @@ import (
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
+	"github.com/gardener/gardener/pkg/utils/imagevector"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
 	"github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -907,6 +909,84 @@ var _ = Describe("Actuator", func() {
 			Entry("Use only image pull secrets", true, false, false),
 			Entry("Allow untrusted images", false, true, false),
 			Entry("Allow insecure registries", false, false, true),
+		)
+	})
+
+	Context("Registry CA bundle", func() {
+		DescribeTable("should manage registry trust and roll out CA changes", func(namespace string, build func(*clusterContext) ([]client.Object, error)) {
+			clusterCtx := &clusterContext{
+				namespace:         namespace,
+				kubernetesVersion: "1.34.1",
+				generatedSecrets:  map[string]*corev1.Secret{constants.GardenVirtualWebhookTLSSecretName: {}},
+			}
+			var previousTemplate *corev1.PodTemplateSpec
+			var previousBundle string
+			for _, bundle := range []string{"", "first-ca", "first-ca", "rotated-ca", ""} {
+				clusterCtx.registryCABundle = nil
+				if bundle != "" {
+					clusterCtx.registryCABundle = &imagevector.CABundle{Inline: ptr.To(bundle)}
+				}
+				objects, err := build(clusterCtx)
+				Expect(err).ToNot(HaveOccurred())
+				var deployment *appsv1.Deployment
+				var caConfigMap *corev1.ConfigMap
+				for _, object := range objects {
+					switch obj := object.(type) {
+					case *appsv1.Deployment:
+						deployment = obj
+					case *corev1.ConfigMap:
+						if _, found := obj.Data["bundle.crt"]; found {
+							caConfigMap = obj
+						}
+					}
+				}
+				Expect(deployment).ToNot(BeNil())
+				container := deployment.Spec.Template.Spec.Containers[0]
+				if bundle == "" {
+					Expect(caConfigMap).To(BeNil())
+					Expect(container.Args).ToNot(ContainElement(HavePrefix("--registry-ca-dir=")))
+					Expect(container.VolumeMounts).ToNot(ContainElement(HaveField("Name", "registry-ca")))
+					Expect(deployment.Spec.Template.Spec.Volumes).ToNot(ContainElement(HaveField("Name", "registry-ca")))
+				} else {
+					Expect(caConfigMap).ToNot(BeNil())
+					Expect(caConfigMap.Namespace).To(Equal(namespace))
+					Expect(caConfigMap.Data).To(Equal(map[string]string{"bundle.crt": bundle}))
+					Expect(caConfigMap.Immutable).To(Equal(ptr.To(true)))
+					Expect(caConfigMap.Labels).To(HaveKeyWithValue(references.LabelKeyGarbageCollectable, "true"))
+					Expect(deployment.Spec.Template.Annotations).To(HaveKeyWithValue(references.AnnotationKey(references.KindConfigMap, caConfigMap.Name), caConfigMap.Name))
+					Expect(container.Args).To(ContainElement("--registry-ca-dir=/etc/lakom/registry-ca"))
+					Expect(container.Env).ToNot(ContainElement(HaveField("Name", "SSL_CERT_DIR")))
+					Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{Name: "registry-ca", MountPath: "/etc/lakom/registry-ca", ReadOnly: true}))
+					Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(corev1.Volume{
+						Name: "registry-ca",
+						VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{Name: caConfigMap.Name},
+						}},
+					}))
+				}
+				if previousTemplate != nil {
+					if bundle == previousBundle {
+						Expect(deployment.Spec.Template).To(Equal(*previousTemplate))
+					} else {
+						Expect(deployment.Spec.Template).ToNot(Equal(*previousTemplate))
+					}
+				}
+				previousTemplate = deployment.Spec.Template.DeepCopy()
+				previousBundle = bundle
+			}
+		},
+			Entry("shoot control plane", "shoot--local--local", func(ctx *clusterContext) ([]client.Object, error) {
+				return getShootRuntimeObjects(ctx, ptr.To[int32](1), "lakom", "access", "tls", false, false, false)
+			}),
+			Entry("seed runtime", metav1.NamespaceSystem, func(ctx *clusterContext) ([]client.Object, error) {
+				return getSeedRuntimeObjects(ctx, ptr.To[int32](1), "tls", false, false, false)
+			}),
+			Entry("garden runtime", constants.LakomSystemNamespaceName, func(ctx *clusterContext) ([]client.Object, error) {
+				return getGardenRuntimeObjects(ctx, ptr.To[int32](1), "tls", false, false, false)
+			}),
+			Entry("garden virtual", "garden", func(ctx *clusterContext) ([]client.Object, error) {
+				return getGardenVirtualObjects(ctx, ptr.To[int32](1), "access", false, false, false)
+			}),
 		)
 	})
 

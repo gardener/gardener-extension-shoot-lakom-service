@@ -6,6 +6,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"maps"
 	"strconv"
 	"time"
 
@@ -20,7 +21,9 @@ import (
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils"
 	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
+	"github.com/gardener/gardener/pkg/utils/imagevector"
 	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
+	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -128,6 +131,7 @@ type lakomResourceOptions struct {
 	serverTLSSecretName         string
 	lakomPublicKeysConfig       string
 	image                       string
+	registryCABundle            *imagevector.CABundle
 	useOnlyImagePullSecrets     bool
 	allowUntrustedImages        bool
 	allowInsecureRegistries     bool
@@ -189,6 +193,9 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 		"--use-only-image-pull-secrets=" + strconv.FormatBool(opts.useOnlyImagePullSecrets),
 		"--insecure-allow-untrusted-images=" + strconv.FormatBool(opts.allowUntrustedImages),
 		"--insecure-allow-insecure-registries=" + strconv.FormatBool(opts.allowInsecureRegistries),
+	}
+	if opts.registryCABundle != nil && opts.registryCABundle.Inline != nil {
+		args = append(args, "--registry-ca-dir="+registryCAMountPath)
 	}
 	if !opts.useInClusterAuth {
 		args = append(args, "--kubeconfig="+gardenerutils.PathGenericKubeconfig)
@@ -330,6 +337,11 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 		}
 	}
 
+	registryCAConfigMap, err := injectRegistryCABundle(lakomDeployment, opts.registryCABundle)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := references.InjectAnnotations(lakomDeployment); err != nil {
 		return nil, err
 	}
@@ -384,6 +396,9 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 	}
 
 	objects := []client.Object{}
+	if registryCAConfigMap != nil {
+		objects = append(objects, registryCAConfigMap)
+	}
 	objects = append(objects,
 		lakomDeployment,
 		pdb,
@@ -445,6 +460,50 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 	return objects, nil
 }
 
+// registryCAMountPath is the directory where the optional registry CA bundle ConfigMap is mounted
+// into the Lakom container. The webhook is pointed at it via the --registry-ca-dir flag.
+const registryCAMountPath = "/etc/lakom/registry-ca"
+
+// injectRegistryCABundle mounts the optional registry CA bundle into a Lakom deployment
+// and returns the ConfigMap to include in its ManagedResource.
+func injectRegistryCABundle(deployment *appsv1.Deployment, bundle *imagevector.CABundle) (*corev1.ConfigMap, error) {
+	if bundle == nil || bundle.Inline == nil {
+		return nil, nil
+	}
+
+	const volumeName = "registry-ca"
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deployment.Name + "-registry-ca",
+			Namespace: deployment.Namespace,
+			Labels:    maps.Clone(deployment.Spec.Selector.MatchLabels),
+		},
+		Data: map[string]string{secretsutils.DataKeyCertificateBundle: *bundle.Inline},
+	}
+	if err := kubernetesutils.MakeUnique(configMap); err != nil {
+		return nil, err
+	}
+
+	podSpec := &deployment.Spec.Template.Spec
+	container := &podSpec.Containers[0]
+	// The bundle is read by the webhook (via --registry-ca-dir) and added to the registry client's
+	// TLS trust alongside the system roots. Trust stays scoped to the OCI registry client.
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      volumeName,
+		MountPath: registryCAMountPath,
+		ReadOnly:  true,
+	})
+	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: configMap.Name},
+			},
+		},
+	})
+	return configMap, nil
+}
+
 func getShootRuntimeObjects(
 	clusterCtx *clusterContext,
 	lakomReplicas *int32,
@@ -469,6 +528,7 @@ func getShootRuntimeObjects(
 		serverTLSSecretName:         serverTLSSecretName,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
 		image:                       clusterCtx.image,
+		registryCABundle:            clusterCtx.registryCABundle,
 		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
 		allowUntrustedImages:        allowUntrustedImages,
 		allowInsecureRegistries:     allowInsecureRegistries,
@@ -505,6 +565,7 @@ func getSeedRuntimeObjects(
 		serverTLSSecretName:         serverTLSSecretName,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
 		image:                       clusterCtx.image,
+		registryCABundle:            clusterCtx.registryCABundle,
 		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
 		allowUntrustedImages:        allowUntrustedImages,
 		allowInsecureRegistries:     allowInsecureRegistries,
@@ -547,6 +608,7 @@ func getGardenVirtualObjects(
 		serverTLSSecretName:         clusterCtx.generatedSecrets[constants.GardenVirtualWebhookTLSSecretName].Name,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
 		image:                       clusterCtx.image,
+		registryCABundle:            clusterCtx.registryCABundle,
 		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
 		allowUntrustedImages:        allowUntrustedImages,
 		allowInsecureRegistries:     allowInsecureRegistries,
@@ -583,6 +645,7 @@ func getGardenRuntimeObjects(
 		serverTLSSecretName:         serverTLSSecretName,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
 		image:                       clusterCtx.image,
+		registryCABundle:            clusterCtx.registryCABundle,
 		useOnlyImagePullSecrets:     useOnlyImagePullSecrets,
 		allowUntrustedImages:        allowUntrustedImages,
 		allowInsecureRegistries:     allowInsecureRegistries,

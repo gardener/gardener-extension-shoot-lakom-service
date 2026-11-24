@@ -38,6 +38,7 @@ type HandleBuilder struct {
 	cacheRefreshInterval    time.Duration
 	useOnlyImagePullSecrets bool
 	allowInsecureRegistries bool
+	registryCADir           string
 }
 
 // NewHandleBuilder returns new handle builder.
@@ -61,6 +62,13 @@ func (hb HandleBuilder) WithUseOnlyImagePullSecrets(useOnlyImagePullSecrets bool
 // WithAllowInsecureRegistries allows Lakom to use HTTP for communication with the registries
 func (hb HandleBuilder) WithAllowInsecureRegistries(allowInsecureRegistries bool) HandleBuilder {
 	hb.allowInsecureRegistries = allowInsecureRegistries
+	return hb
+}
+
+// WithRegistryCADir sets the directory containing the registry CA bundle (key "bundle.crt") used to
+// trust HTTPS registries served by a private CA. An empty value keeps the default system trust.
+func (hb HandleBuilder) WithRegistryCADir(registryCADir string) HandleBuilder {
+	hb.registryCADir = registryCADir
 	return hb
 }
 
@@ -95,7 +103,12 @@ func (hb HandleBuilder) Build() (*handler, error) {
 		resolver Resolver
 	)
 
-	resolver = NewDirectResolver()
+	transport, err := utils.RegistryTransport(hb.registryCADir)
+	if err != nil {
+		return nil, err
+	}
+
+	resolver = NewDirectResolver(transport)
 	if hb.cacheTTL != 0 {
 		cache, err := NewDigestCache(hb.cacheRefreshInterval, hb.cacheTTL)
 		if err != nil {
