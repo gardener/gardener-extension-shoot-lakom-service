@@ -180,3 +180,67 @@ func RemoveGardenLakomExtension(garden *operatorv1alpha1.Garden) {
 		return ext.Type == constants.ExtensionType
 	})
 }
+
+// AddOrUpdateSeedResourceReference adds or updates a resource reference to the given seed.
+func AddOrUpdateSeedResourceReference(seed *gardencorev1beta1.Seed, resourceRefName string, resource client.Object, resourceName string, scheme *runtime.Scheme) error {
+	refs, err := addOrUpdateResourceRef(seed.Spec.Resources, resourceRefName, resource, resourceName, scheme)
+	if err != nil {
+		return err
+	}
+	seed.Spec.Resources = refs
+	return nil
+}
+
+// RemoveSeedResourceReference removes the resource reference from the given seed by name.
+func RemoveSeedResourceReference(seed *gardencorev1beta1.Seed, resourceRefName string) {
+	seed.Spec.Resources = slices.DeleteFunc(seed.Spec.Resources, func(resource gardencorev1beta1.NamedResourceReference) bool {
+		return resource.Name == resourceRefName
+	})
+}
+
+// AddOrUpdateSeedLakomExtension adds or updates the shoot-lakom-service extension on the given seed with the provided
+// LakomConfig provider config. The extension is enabled (Disabled=false).
+func AddOrUpdateSeedLakomExtension(seed *gardencorev1beta1.Seed, providerConfig *lakomv1alpha1.LakomConfig) error {
+	providerConfig.TypeMeta = metav1.TypeMeta{
+		APIVersion: lakomv1alpha1.SchemeGroupVersion.String(),
+		Kind:       "LakomConfig",
+	}
+
+	providerConfigJSON, err := json.Marshal(providerConfig)
+	if err != nil {
+		return fmt.Errorf("could not marshal lakom provider config: %w", err)
+	}
+
+	extension := gardencorev1beta1.Extension{
+		Type: constants.ExtensionType,
+		ProviderConfig: &runtime.RawExtension{
+			Raw: providerConfigJSON,
+		},
+	}
+
+	i := slices.IndexFunc(seed.Spec.Extensions, func(ext gardencorev1beta1.Extension) bool {
+		return ext.Type == constants.ExtensionType
+	})
+	if i == -1 {
+		seed.Spec.Extensions = append(seed.Spec.Extensions, extension)
+	} else {
+		seed.Spec.Extensions[i] = extension
+	}
+	return nil
+}
+
+// AddOrUpdateSeedLakomExtensionWithTrustedKeys adds or updates the shoot-lakom-service extension on the given seed,
+// configured with a reference to a Secret providing additional trusted cosign public keys. Scope is intentionally
+// omitted: the seed webhook has fixed rules (pods only), so scope is irrelevant.
+func AddOrUpdateSeedLakomExtensionWithTrustedKeys(seed *gardencorev1beta1.Seed, trustedKeysResourceName string) error {
+	return AddOrUpdateSeedLakomExtension(seed, &lakomv1alpha1.LakomConfig{
+		TrustedKeysResourceName: &trustedKeysResourceName,
+	})
+}
+
+// RemoveSeedLakomExtension removes the shoot-lakom-service extension from the given seed.
+func RemoveSeedLakomExtension(seed *gardencorev1beta1.Seed) {
+	seed.Spec.Extensions = slices.DeleteFunc(seed.Spec.Extensions, func(ext gardencorev1beta1.Extension) bool {
+		return ext.Type == constants.ExtensionType
+	})
+}

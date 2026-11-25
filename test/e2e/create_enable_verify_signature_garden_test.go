@@ -40,13 +40,13 @@ const (
 	// gardenTrustedKeysRefName is the NamedResourceReference name recorded in Garden.Spec.Resources and
 	// referenced from the lakom providerConfig via trustedKeysResourceName.
 	gardenTrustedKeysRefName = "lakom-e2e-garden-keys"
-)
 
-// gardenTrustedKeysSecretName is the actual Secret name the lakom garden actuator resolves the reference to.
-// Gardener resolves NamedResourceReferences by prefixing the referenced object name with "ref-" (see
-// extensions/pkg/controller.GetObjectByReference), and — unlike gardenlet for shoots — the operator does not
-// copy Garden.Spec.Resources into "ref-"-prefixed objects. So the test must create the Secret already prefixed.
-var gardenTrustedKeysSecretName = v1beta1constants.ReferencedResourcesPrefix + gardenTrustedKeysRefName
+	// gardenTrustedKeysSecretName is the actual Secret name the lakom garden actuator resolves the reference to.
+	// Gardener resolves NamedResourceReferences by prefixing the referenced object name with "ref-" (see
+	// extensions/pkg/controller.GetObjectByReference), and — unlike gardenlet for shoots — the operator does not
+	// copy Garden.Spec.Resources into "ref-"-prefixed objects. So the test must create the Secret already prefixed.
+	gardenTrustedKeysSecretName = v1beta1constants.ReferencedResourcesPrefix + gardenTrustedKeysRefName
+)
 
 var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 	Context("Garden signature verification", Label("garden-signature-verification"), Ordered, func() {

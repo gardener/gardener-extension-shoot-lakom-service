@@ -164,7 +164,7 @@ test-e2e-local: $(GINKGO)
 
 .PHONY: test-e2e-local-lifecycle
 test-e2e-local-lifecycle: $(GINKGO)
-	KUBECONFIG=$(VIRTUAL_KUBECONFIG) ./hack/test-e2e-local.sh --procs=$(PARALLEL_E2E_TESTS) --label-filter="Lakom && !signature-verification && !garden-signature-verification" ./test/e2e/...
+	KUBECONFIG=$(VIRTUAL_KUBECONFIG) ./hack/test-e2e-local.sh --procs=$(PARALLEL_E2E_TESTS) --label-filter="Lakom && !signature-verification && !garden-signature-verification && !seed-signature-verification" ./test/e2e/...
 
 .PHONY: test-e2e-local-signature
 test-e2e-local-signature: $(GINKGO)
@@ -173,6 +173,10 @@ test-e2e-local-signature: $(GINKGO)
 .PHONY: test-e2e-local-garden
 test-e2e-local-garden: $(GINKGO)
 	KUBECONFIG=$(RUNTIME_KUBECONFIG) ./hack/test-e2e-local.sh --procs=$(PARALLEL_E2E_TESTS) --label-filter="Lakom && garden-signature-verification" ./test/e2e/...
+
+.PHONY: test-e2e-local-seed
+test-e2e-local-seed: $(GINKGO)
+	KUBECONFIG=$(VIRTUAL_KUBECONFIG) ./hack/test-e2e-local.sh --procs=$(PARALLEL_E2E_TESTS) --label-filter="Lakom && seed-signature-verification" ./test/e2e/...
 
 .PHONY: ci-e2e-kind
 ci-e2e-kind: $(KIND) $(YQ)
