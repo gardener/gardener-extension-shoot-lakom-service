@@ -88,7 +88,7 @@ spec:
         {{- if (or .Values.gardener.runtimeCluster (.Values | merge (dict) | dig "gardener" "runtimeCluster" "enabled" false) .Values.controllers.seedBootstrap.disabled) }}
         - --disable-controllers=shoot_lakom_service_seed_bootstrap_controller
         {{- end }}
-        {{- if .Values.gardener.runtimeCluster.enabled }}
+        {{- if (or .Values.gardener.runtimeCluster (.Values | merge (dict) | dig "gardener" "runtimeCluster" "enabled" false)) }}
         - --extension-classes=garden
         {{- else }}
         {{- $extensionEnabled := false }}{{- range .Values.gardener.seed.spec.extensions }}{{- if and (eq .type "shoot-lakom-service") (not .disabled) }}{{- $extensionEnabled = true }}{{- end }}{{- end }}
