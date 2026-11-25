@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"strings"
 	"time"
 
 	apislakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
@@ -112,9 +113,10 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 			ctx, cancel = context.WithTimeout(parentCtx, 15*time.Minute)
 			DeferCleanup(cancel)
 			Expect(f.UpdateShoot(ctx, f.Shoot, func(shoot *gardencorev1beta1.Shoot) error {
-				common.AddOrUpdateShootResourceReference(shoot, trustedKeysResourceRefName, "Secret", keysSecret.Name)
-				common.AddOrUpdateShootLakomExtensionWithTrustedKeys(shoot, apislakom.Cluster, trustedKeysResourceRefName)
-				return nil
+				if err := common.AddOrUpdateShootResourceReference(shoot, trustedKeysResourceRefName, keysSecret, keysSecret.Name, f.GardenClient.Client().Scheme()); err != nil {
+					return err
+				}
+				return common.AddOrUpdateShootLakomExtensionWithTrustedKeys(shoot, apislakom.Cluster, trustedKeysResourceRefName)
 			})).To(Succeed())
 
 			shootClient := f.ShootFramework.ShootClient.Client()
@@ -155,35 +157,11 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 // admission decision (Create succeeds or is denied), not on the Pod reaching a running state. Therefore the
 // image is never pulled by a node and imagePullPolicy is set to Never.
 func buildPod(name, imageRef string) *corev1.Pod {
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: verifyTestNamespace,
-		},
-		Spec: corev1.PodSpec{
-			RestartPolicy: corev1.RestartPolicyNever,
-			Containers: []corev1.Container{{
-				Name:            "test",
-				Image:           imageRef,
-				ImagePullPolicy: corev1.PullNever,
-			}},
-		},
-	}
+	return buildPodInNamespace(name, imageRef, verifyTestNamespace)
 }
 
-// indent prefixes every line of s with the given prefix.
+// indent prefixes every line of s with the given prefix. A trailing newline (e.g. the one pem.EncodeToMemory
+// appends) would otherwise yield a final prefix-only whitespace line, so it is trimmed first.
 func indent(s, prefix string) string {
-	var b []byte
-	lineStart := true
-	for i := 0; i < len(s); i++ {
-		if lineStart {
-			b = append(b, prefix...)
-			lineStart = false
-		}
-		b = append(b, s[i])
-		if s[i] == '\n' {
-			lineStart = true
-		}
-	}
-	return string(b)
+	return prefix + strings.ReplaceAll(strings.TrimSuffix(s, "\n"), "\n", "\n"+prefix)
 }

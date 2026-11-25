@@ -48,15 +48,14 @@ func GenerateKeyPair() (*ecdsa.PrivateKey, string, error) {
 
 // PushRandomImage pushes a randomly-generated OCI image to the given repository (e.g.
 // "registry.local.gardener.cloud:5001/lakom-e2e-signed") and returns the built image together with
-// its fully-qualified digest reference. The registry is treated as insecure (HTTP) to support the
-// local landscape registry.
+// its fully-qualified digest reference.
 func PushRandomImage(repository string) (registryv1.Image, string, error) {
 	img, err := random.Image(512, 1)
 	if err != nil {
 		return nil, "", err
 	}
 
-	tagRef, err := name.NewTag(repository+":latest", name.Insecure)
+	tagRef, err := name.NewTag(repository + ":latest")
 	if err != nil {
 		return nil, "", err
 	}
@@ -76,7 +75,7 @@ func PushRandomImage(repository string) (registryv1.Image, string, error) {
 // SignImage signs the given image at imageDigestRef with the provided private key and attaches the
 // cosign signature next to the image in the registry. imageDigestRef must be a digest reference.
 func SignImage(image registryv1.Image, imageDigestRef string, privateKey *ecdsa.PrivateKey) error {
-	digest, err := name.NewDigest(imageDigestRef, name.Insecure)
+	digest, err := name.NewDigest(imageDigestRef)
 	if err != nil {
 		return err
 	}
@@ -111,7 +110,7 @@ func SignImage(image registryv1.Image, imageDigestRef string, privateKey *ecdsa.
 // the test did not push itself (e.g. the extension's own lakom image, so it passes the runtime
 // signature webhook).
 func SignImageByRef(imageRef string, privateKey *ecdsa.PrivateKey) error {
-	ref, err := name.ParseReference(imageRef, name.Insecure)
+	ref, err := name.ParseReference(imageRef)
 	if err != nil {
 		return err
 	}

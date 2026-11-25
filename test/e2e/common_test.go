@@ -11,15 +11,10 @@ import (
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
-	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
-	. "github.com/gardener/gardener/pkg/utils/test/matchers"
 	"github.com/gardener/gardener/test/framework"
 	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -57,7 +52,7 @@ func ensureLakomServiceIsEnabled(shoot *gardencorev1beta1.Shoot) error {
 	for i, e := range shoot.Spec.Extensions {
 		if e.Type == constants.ExtensionType {
 			if e.Disabled != nil && *e.Disabled {
-				shoot.Spec.Extensions[i].Disabled = ptr.To(false)
+				shoot.Spec.Extensions[i].Disabled = new(false)
 			}
 			return nil
 		}
@@ -65,18 +60,8 @@ func ensureLakomServiceIsEnabled(shoot *gardencorev1beta1.Shoot) error {
 
 	shoot.Spec.Extensions = append(shoot.Spec.Extensions, gardencorev1beta1.Extension{
 		Type:     constants.ExtensionType,
-		Disabled: ptr.To(false),
+		Disabled: new(false),
 	})
-	return nil
-}
-
-func ensureLakomServiceIsDisabled(shoot *gardencorev1beta1.Shoot) error {
-	for i, e := range shoot.Spec.Extensions {
-		if e.Type == constants.ExtensionType {
-			shoot.Spec.Extensions[i].Disabled = ptr.To(true)
-			return nil
-		}
-	}
 	return nil
 }
 
@@ -90,34 +75,4 @@ func getLakomDeployment(ctx context.Context, c client.Client, namespace string) 
 
 	err := c.Get(ctx, client.ObjectKeyFromObject(lakomDeployment), lakomDeployment)
 	return lakomDeployment, err
-}
-
-func ensureLakomResourcesAreCleaned(ctx context.Context, c client.Client, namespace string) {
-	lakomDeployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.ExtensionServiceName,
-			Namespace: namespace,
-		},
-	}
-
-	// Ensure that the lakom deployment is deleted.
-	err := c.Get(ctx, client.ObjectKeyFromObject(lakomDeployment), lakomDeployment)
-	Expect(err).To(HaveOccurred())
-	Expect(err).To(BeNotFoundError())
-
-	// Ensure that the manually-managed secrets (i.e. not managed by the GRM) are deleted.
-	for _, name := range []string{
-		gardenerutils.SecretNamePrefixShootAccess + constants.ApplicationName,
-		constants.WebhookTLSSecretName,
-	} {
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-			},
-		}
-		err = c.Get(ctx, client.ObjectKeyFromObject(secret), secret)
-		Expect(err).To(HaveOccurred())
-		Expect(err).To(BeNotFoundError())
-	}
 }

@@ -12,9 +12,10 @@ REPO_ROOT="$(readlink -f "$(dirname "${0}")/..")"
 GARDENER_VERSION=$(go list -m -f '{{.Version}}' github.com/gardener/gardener)
 
 if [[ ! -d "$REPO_ROOT/gardener" ]]; then
-  git clone --branch "$GARDENER_VERSION" https://github.com/gardener/gardener.git "$REPO_ROOT/gardener"
+  git clone --depth 1 --branch "$GARDENER_VERSION" https://github.com/gardener/gardener.git "$REPO_ROOT/gardener"
 else
-  (cd "$REPO_ROOT/gardener" && git checkout "$GARDENER_VERSION")
+  git -C "$REPO_ROOT/gardener" fetch --depth 1 --tags origin "$GARDENER_VERSION"
+  git -C "$REPO_ROOT/gardener" checkout "$GARDENER_VERSION"
 fi
 
 source "$REPO_ROOT/gardener/hack/ci-common.sh"

@@ -5,11 +5,10 @@
 package e2e_test
 
 import (
+	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
@@ -19,7 +18,7 @@ import (
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
-	"github.com/gardener/gardener/pkg/utils/gardener/operator"
+	"github.com/gardener/gardener/pkg/controllerutils"
 	. "github.com/gardener/gardener/pkg/utils/test/matchers"
 	e2e "github.com/gardener/gardener/test/e2e"
 	gardenere2e "github.com/gardener/gardener/test/e2e/gardener"
@@ -31,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -102,11 +100,16 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 					Name:      gardenTrustedKeysSecretName,
 					Namespace: v1beta1constants.GardenNamespace, // "garden"
 				},
-				StringData: map[string]string{
-					"keys": fmt.Sprintf("- name: lakom-e2e-garden-key\n  key: |-\n%s", indent(publicKeyPEM, "    ")),
-				},
 			}
-			Expect(gardenContext.GardenClient.Create(ctx, keysSecret)).To(Or(Succeed(), BeAlreadyExistsError()))
+			// Use GetAndCreateOrMergePatch so a Secret left over from a previous run (possibly carrying a
+			// different key) is updated to the key generated above, rather than kept stale.
+			_, err = controllerutils.GetAndCreateOrMergePatch(ctx, gardenContext.GardenClient, keysSecret, func() error {
+				keysSecret.StringData = map[string]string{
+					"keys": fmt.Sprintf("- name: lakom-e2e-garden-key\n  key: |-\n%s", indent(publicKeyPEM, "    ")),
+				}
+				return nil
+			})
+			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func(ctx SpecContext) {
 				Expect(gardenContext.GardenClient.Delete(ctx, keysSecret)).To(Or(Succeed(), BeNotFoundError()))
 			})
@@ -117,16 +120,21 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 			// "garden". With the local skaffold dev image (unsigned) lakom would reject the creation of its
 			// own garden-virtual pods. Signing that image with the same trusted key BEFORE the extension is
 			// enabled means those pods are admitted on their very first creation — no ReplicaFailure, no
-			// create-backoff, no rollout restart. The image ref is read from the skaffold-generated operator
-			// imagevector overwrite, which is already on disk before this test runs.
-			lakomImageRef, err := lakomImageRefFromImageVectorOverwrite()
+			// create-backoff, no rollout restart.
+			// The image ref is read from the live lakom Extension resource (its extension
+			// imageVectorOverwrite values), which the operator has already populated before this test runs.
+			lakomImageRef, err := lakomImageRefFromExtension(ctx, gardenContext.GardenClient)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(common.SignImageByRef(lakomImageRef, privateKey)).To(Succeed())
 
 			By("Enable the lakom garden extension with a trusted key")
 			patch := client.MergeFrom(gardenContext.Garden.DeepCopy())
-			common.AddOrUpdateGardenResourceReference(gardenContext.Garden, gardenTrustedKeysRefName, "Secret", gardenTrustedKeysRefName)
-			common.AddOrUpdateGardenLakomExtensionWithTrustedKeys(gardenContext.Garden, gardenTrustedKeysRefName)
+			// resourceName is the UNprefixed ref name, not keysSecret.Name: the operator does not copy
+			// Garden.Spec.Resources into "ref-"-prefixed objects (see gardenTrustedKeysSecretName above), and
+			// the lakom actuator re-adds the "ref-" prefix when resolving the reference. keysSecret is passed
+			// only so Kind/APIVersion are derived from the real object via the scheme.
+			Expect(common.AddOrUpdateGardenResourceReference(gardenContext.Garden, gardenTrustedKeysRefName, keysSecret, gardenTrustedKeysRefName, gardenContext.GardenClient.Scheme())).To(Succeed())
+			Expect(common.AddOrUpdateGardenLakomExtensionWithTrustedKeys(gardenContext.Garden, gardenTrustedKeysRefName)).To(Succeed())
 			Expect(gardenContext.GardenClient.Patch(ctx, gardenContext.Garden, patch)).To(Succeed())
 
 			DeferCleanup(func(ctx SpecContext) {
@@ -146,17 +154,13 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 			})
 		}, NodeTimeout(5*time.Minute))
 
-		It("Wait for the garden-runtime deployment and runtime webhook", func(ctx SpecContext) {
-			// Enabling the extension re-triggers a Garden reconciliation. The operator's extension
-			// controller only deploys the garden-runtime workload once the Garden reports
-			// "Reconcile Succeeded" (see IsGardenSuccessfullyReconciled), so wait for that first —
-			// otherwise the runtime Deployment simply never appears within a short window. The Garden
-			// reconcile can take several minutes, matching gardener's own ItShouldWaitForGardenToBeReconciledAndHealthy.
-			Eventually(ctx, func(g Gomega) {
-				g.Expect(gardenContext.GardenClient.Get(ctx, client.ObjectKeyFromObject(gardenContext.Garden), gardenContext.Garden)).To(Succeed())
-				g.Expect(operator.IsGardenSuccessfullyReconciled(gardenContext.Garden)).To(BeTrue(), "Garden is not yet successfully reconciled")
-			}).WithTimeout(15 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+		// Enabling the extension in BeforeAll re-triggers a Garden reconciliation. The operator's extension
+		// controller only deploys the garden-runtime/garden-virtual workloads once the Garden reports
+		// "Reconcile Succeeded", so wait for that here (right after the patch) before asserting on the
+		// deployed resources below. Reuse gardener's own helper, which registers its own It node.
+		gardenoperator.ItShouldWaitForGardenToBeReconciledAndHealthy(gardenContext)
 
+		It("Wait for the garden-runtime deployment and runtime webhook", func(ctx SpecContext) {
 			Eventually(ctx, func(g Gomega) {
 				deploy := &appsv1.Deployment{}
 				g.Expect(gardenContext.GardenClient.Get(ctx, client.ObjectKey{
@@ -169,7 +173,7 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 					client.ObjectKey{Name: constants.GardenRuntimeWebhookConfigurationName},
 					&admissionregistrationv1.ValidatingWebhookConfiguration{})).To(Succeed())
 			}).WithTimeout(5 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
-		}, SpecTimeout(21*time.Minute))
+		}, SpecTimeout(6*time.Minute))
 
 		// gardenContext.VirtualClusterClient from the "gardener" secret in ns "garden" on the runtime cluster.
 		gardenoperator.ItShouldInitializeVirtualClusterClient(gardenContext)
@@ -232,7 +236,7 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 			Expect(err.Error()).To(ContainSubstring("no valid signature found"))
 		}, SpecTimeout(3*time.Minute))
 
-		It("Reject an unsigned ControllerDeployment (virtual webhook)", func(ctx SpecContext) {
+		It("Admit a signed ControllerDeployment and reject an unsigned ControllerDeployment (virtual webhook)", func(ctx SpecContext) {
 			// Positive control: a signed CD must be admitted (proves the webhook inspects the field and
 			// does not blanket-deny). The garden-virtual lakom pod has only just become Ready, and its
 			// very first verification reaches out to the local registry to fetch the artifact + signature.
@@ -240,11 +244,11 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 			// an "Internal error: ... Get https://registry.local.gardener.cloud:5001/v2/: context canceled"
 			// 403 — a transient infrastructure hiccup, NOT a signature rejection. Retry until the signed CD
 			// is admitted; this also warms the registry connection before the negative assertion below.
+			// Use dry-run (lakom sideEffects=None → still invoked, nothing persisted) so gardener never starts
+			// reconciling a throwaway CD referencing a random test artifact — and no cleanup is needed.
 			Eventually(ctx, func(g Gomega) {
 				signedCD := buildControllerDeployment("lakom-e2e-garden-signed-", signedImageRef)
-				g.Expect(gardenContext.VirtualClusterClient.Create(ctx, signedCD)).To(Succeed())
-				// Clean up the successfully-admitted CD; only reached once Create succeeded.
-				g.Expect(gardenContext.VirtualClusterClient.Delete(ctx, signedCD)).To(Or(Succeed(), BeNotFoundError()))
+				g.Expect(gardenContext.VirtualClusterClient.Create(ctx, signedCD, client.DryRunAll)).To(Succeed())
 			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
 			// Negative: an unsigned CD must be rejected by the signature-verification webhook. Use Eventually
@@ -252,7 +256,7 @@ var _ = Describe("Lakom Extension Tests", Label("Lakom"), func() {
 			// failure — retry until the rejection is specifically the lakom verify-signature denial.
 			Eventually(ctx, func(g Gomega) {
 				unsignedCD := buildControllerDeployment("lakom-e2e-garden-unsigned-", unsignedImageRef)
-				err := gardenContext.VirtualClusterClient.Create(ctx, unsignedCD)
+				err := gardenContext.VirtualClusterClient.Create(ctx, unsignedCD, client.DryRunAll)
 				g.Expect(err).To(BeForbiddenError())
 				g.Expect(err.Error()).To(ContainSubstring("verify-signature.lakom.service.extensions.gardener.cloud"))
 				g.Expect(err.Error()).To(ContainSubstring("no valid signature found"))
@@ -347,48 +351,42 @@ func buildGardenlet(generateName, imageRef string) *seedmanagementv1alpha1.Garde
 	}
 }
 
-// skaffold wrote into the operator imagevector overwrite during "extension-operator-e2e-up". This is the
-// exact image the operator deploys for both lakom flavours, so signing it before the extension is enabled
-// lets the garden-virtual lakom pods pass the runtime signature webhook on their first creation.
-func lakomImageRefFromImageVectorOverwrite() (string, error) {
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		return "", fmt.Errorf("could not determine caller to locate the imagevector overwrite file")
+// lakomImageRefFromExtension reads the lakom image reference from the live lakom Extension resource's
+// extension imageVectorOverwrite values. This is the exact image the operator deploys for both lakom
+// flavours, so signing it before the extension is enabled lets the garden-virtual lakom pods pass the
+// runtime signature webhook on their first creation. Reading from the API (rather than the on-disk
+// skaffold overwrite) keeps the test independent of the local-setup file layout.
+func lakomImageRefFromExtension(ctx context.Context, gardenClient client.Client) (string, error) {
+	extension := &operatorv1alpha1.Extension{
+		ObjectMeta: metav1.ObjectMeta{Name: "extension-shoot-lakom-service"},
 	}
-	// <repo>/test/e2e/create_enable_verify_signature_garden_test.go -> <repo>
-	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "local-setup", "operator", "patch-imagevector-overwrite.yaml")
-
-	// #nosec G304 -- path is derived solely from runtime.Caller and fixed path segments (no external input); it always points at the in-repo imagevector overwrite.
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("failed to read imagevector overwrite %s: %w", path, err)
+	if err := gardenClient.Get(ctx, client.ObjectKeyFromObject(extension), extension); err != nil {
+		return "", err
 	}
 
-	var overwrite struct {
-		Spec struct {
-			Deployment struct {
-				Extension struct {
-					Values struct {
-						ImageVectorOverwrite struct {
-							Images []struct {
-								Name       string `json:"name"`
-								Repository string `json:"repository"`
-								Tag        string `json:"tag"`
-							} `json:"images"`
-						} `json:"imageVectorOverwrite"`
-					} `json:"values"`
-				} `json:"extension"`
-			} `json:"deployment"`
-		} `json:"spec"`
-	}
-	if err := yaml.Unmarshal(raw, &overwrite); err != nil {
-		return "", fmt.Errorf("failed to parse imagevector overwrite %s: %w", path, err)
+	if extension.Spec.Deployment == nil ||
+		extension.Spec.Deployment.ExtensionDeployment == nil ||
+		extension.Spec.Deployment.ExtensionDeployment.Values == nil {
+		return "", fmt.Errorf("extension %q has no extension deployment values", extension.Name)
 	}
 
-	for _, img := range overwrite.Spec.Deployment.Extension.Values.ImageVectorOverwrite.Images {
+	var values struct {
+		ImageVectorOverwrite struct {
+			Images []struct {
+				Name       string `json:"name"`
+				Repository string `json:"repository"`
+				Tag        string `json:"tag"`
+			} `json:"images"`
+		} `json:"imageVectorOverwrite"`
+	}
+	if err := json.Unmarshal(extension.Spec.Deployment.ExtensionDeployment.Values.Raw, &values); err != nil {
+		return "", fmt.Errorf("failed to parse extension deployment values: %w", err)
+	}
+
+	for _, img := range values.ImageVectorOverwrite.Images {
 		if img.Name == "lakom" && img.Repository != "" && img.Tag != "" {
 			return fmt.Sprintf("%s:%s", img.Repository, img.Tag), nil
 		}
 	}
-	return "", fmt.Errorf("no lakom image with repository and tag found in %s", path)
+	return "", fmt.Errorf("no lakom image with repository and tag found in extension %q", extension.Name)
 }

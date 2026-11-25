@@ -6,6 +6,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 
 	apislakom "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/apis/lakom"
@@ -14,53 +15,62 @@ import (
 
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
-	"github.com/onsi/gomega"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 // AddOrUpdateShootResourceReference adds or updates a resource reference to the given shoot.
-func AddOrUpdateShootResourceReference(shoot *gardencorev1beta1.Shoot, resourceRefName, kind, resourceName string) {
-	resource := gardencorev1beta1.NamedResourceReference{
-		Name: resourceRefName,
-		ResourceRef: autoscalingv1.CrossVersionObjectReference{
-			Kind:       kind,
-			APIVersion: "v1",
-			Name:       resourceName,
-		},
+func AddOrUpdateShootResourceReference(shoot *gardencorev1beta1.Shoot, resourceRefName string, resource client.Object, resourceName string, scheme *runtime.Scheme) error {
+	refs, err := addOrUpdateResourceRef(shoot.Spec.Resources, resourceRefName, resource, resourceName, scheme)
+	if err != nil {
+		return err
 	}
-
-	i := slices.IndexFunc(shoot.Spec.Resources, func(resource gardencorev1beta1.NamedResourceReference) bool {
-		return resource.Name == resourceRefName
-	})
-
-	if i == -1 {
-		shoot.Spec.Resources = append(shoot.Spec.Resources, resource)
-	} else {
-		shoot.Spec.Resources[i] = resource
-	}
+	shoot.Spec.Resources = refs
+	return nil
 }
 
 // AddOrUpdateGardenResourceReference adds or updates a resource reference to the given garden resource.
-func AddOrUpdateGardenResourceReference(garden *operatorv1alpha1.Garden, refName, kind, resourceName string) {
+func AddOrUpdateGardenResourceReference(garden *operatorv1alpha1.Garden, refName string, resource client.Object, resourceName string, scheme *runtime.Scheme) error {
+	refs, err := addOrUpdateResourceRef(garden.Spec.Resources, refName, resource, resourceName, scheme)
+	if err != nil {
+		return err
+	}
+	garden.Spec.Resources = refs
+	return nil
+}
+
+// addOrUpdateResourceRef returns resources with a NamedResourceReference for refName added or updated to reference
+// resourceName. Kind and APIVersion are resolved from resource via scheme rather than hardcoded, because the
+// garden/shoot API allows references to resources from APIs other than core/v1. A freshly-constructed typed object
+// has an empty TypeMeta, so the GVK is resolved through the scheme (apiutil.GVKForObject) rather than via
+// resource.GetObjectKind().
+func addOrUpdateResourceRef(resources []gardencorev1beta1.NamedResourceReference, refName string, resource client.Object, resourceName string, scheme *runtime.Scheme) ([]gardencorev1beta1.NamedResourceReference, error) {
+	gvk, err := apiutil.GVKForObject(resource, scheme)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine GroupVersionKind for resource reference %q: %w", refName, err)
+	}
+
 	ref := gardencorev1beta1.NamedResourceReference{
 		Name: refName,
 		ResourceRef: autoscalingv1.CrossVersionObjectReference{
-			Kind:       kind,
-			APIVersion: "v1",
+			Kind:       gvk.Kind,
+			APIVersion: gvk.GroupVersion().String(),
 			Name:       resourceName,
 		},
 	}
 
-	i := slices.IndexFunc(garden.Spec.Resources, func(resource gardencorev1beta1.NamedResourceReference) bool {
-		return resource.Name == refName
+	i := slices.IndexFunc(resources, func(r gardencorev1beta1.NamedResourceReference) bool {
+		return r.Name == refName
 	})
 	if i == -1 {
-		garden.Spec.Resources = append(garden.Spec.Resources, ref)
+		resources = append(resources, ref)
 	} else {
-		garden.Spec.Resources[i] = ref
+		resources[i] = ref
 	}
+	return resources, nil
 }
 
 // RemoveShootResourceReference removes the resource reference from the given shoot.
@@ -86,14 +96,16 @@ func HasResourceReference(shoot *gardencorev1beta1.Shoot, resourceRefName string
 
 // AddOrUpdateShootLakomExtension adds or updates the shoot-lakom-service extension on the given shoot with the provided
 // LakomConfig provider config. The extension is enabled (Disabled=false).
-func AddOrUpdateShootLakomExtension(shoot *gardencorev1beta1.Shoot, providerConfig *lakomv1alpha1.LakomConfig) {
+func AddOrUpdateShootLakomExtension(shoot *gardencorev1beta1.Shoot, providerConfig *lakomv1alpha1.LakomConfig) error {
 	providerConfig.TypeMeta = metav1.TypeMeta{
 		APIVersion: lakomv1alpha1.SchemeGroupVersion.String(),
 		Kind:       "LakomConfig",
 	}
 
 	providerConfigJSON, err := json.Marshal(providerConfig)
-	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
+	if err != nil {
+		return fmt.Errorf("could not marshal lakom provider config: %w", err)
+	}
 
 	extension := gardencorev1beta1.Extension{
 		Type: constants.ExtensionType,
@@ -110,12 +122,13 @@ func AddOrUpdateShootLakomExtension(shoot *gardencorev1beta1.Shoot, providerConf
 	} else {
 		shoot.Spec.Extensions[i] = extension
 	}
+	return nil
 }
 
 // AddOrUpdateShootLakomExtensionWithTrustedKeys adds or updates the shoot-lakom-service extension on the given shoot,
 // configured with the given admission scope and a reference to a Secret providing additional trusted cosign public keys.
-func AddOrUpdateShootLakomExtensionWithTrustedKeys(shoot *gardencorev1beta1.Shoot, scope apislakom.ScopeType, trustedKeysResourceName string) {
-	AddOrUpdateShootLakomExtension(shoot, &lakomv1alpha1.LakomConfig{
+func AddOrUpdateShootLakomExtensionWithTrustedKeys(shoot *gardencorev1beta1.Shoot, scope apislakom.ScopeType, trustedKeysResourceName string) error {
+	return AddOrUpdateShootLakomExtension(shoot, &lakomv1alpha1.LakomConfig{
 		Scope:                   &scope,
 		TrustedKeysResourceName: &trustedKeysResourceName,
 	})
@@ -123,14 +136,16 @@ func AddOrUpdateShootLakomExtensionWithTrustedKeys(shoot *gardencorev1beta1.Shoo
 
 // AddOrUpdateGardenLakomExtension adds or updates the shoot-lakom-service extension on the given garden with the provided
 // LakomConfig provider config. The extension is enabled (Disabled=false).
-func AddOrUpdateGardenLakomExtension(garden *operatorv1alpha1.Garden, providerConfig *lakomv1alpha1.LakomConfig) {
+func AddOrUpdateGardenLakomExtension(garden *operatorv1alpha1.Garden, providerConfig *lakomv1alpha1.LakomConfig) error {
 	providerConfig.TypeMeta = metav1.TypeMeta{
 		APIVersion: lakomv1alpha1.SchemeGroupVersion.String(),
 		Kind:       "LakomConfig",
 	}
 
 	providerConfigJSON, err := json.Marshal(providerConfig)
-	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
+	if err != nil {
+		return fmt.Errorf("could not marshal lakom provider config: %w", err)
+	}
 
 	extension := operatorv1alpha1.GardenExtension{
 		Type: constants.ExtensionType,
@@ -147,13 +162,14 @@ func AddOrUpdateGardenLakomExtension(garden *operatorv1alpha1.Garden, providerCo
 	} else {
 		garden.Spec.Extensions[i] = extension
 	}
+	return nil
 }
 
 // AddOrUpdateGardenLakomExtensionWithTrustedKeys adds or updates the shoot-lakom-service extension on the given garden,
 // configured with a reference to a Secret providing additional trusted cosign public keys. Scope is intentionally
 // omitted: the garden webhooks have fixed rules, so scope is irrelevant.
-func AddOrUpdateGardenLakomExtensionWithTrustedKeys(garden *operatorv1alpha1.Garden, trustedKeysResourceName string) {
-	AddOrUpdateGardenLakomExtension(garden, &lakomv1alpha1.LakomConfig{
+func AddOrUpdateGardenLakomExtensionWithTrustedKeys(garden *operatorv1alpha1.Garden, trustedKeysResourceName string) error {
+	return AddOrUpdateGardenLakomExtension(garden, &lakomv1alpha1.LakomConfig{
 		TrustedKeysResourceName: &trustedKeysResourceName,
 	})
 }
