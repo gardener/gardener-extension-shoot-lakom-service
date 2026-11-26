@@ -5,9 +5,13 @@
 package verifysignature_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
@@ -195,6 +199,38 @@ var _ = Describe("Admission Handler", func() {
 		}
 	})
 
+	DescribeTable("does not disclose upstream errors in denials, warnings, or logs", func(allowUntrusted bool) {
+
+		const sensitive = "upstream-secret-and-internal-connection-details"
+		var requests atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			requests.Add(1)
+			http.Error(w, sensitive, http.StatusForbidden)
+		}))
+		DeferCleanup(server.Close)
+		var logs bytes.Buffer
+		h, err := verifysignature.NewHandleBuilder().
+			WithManager(mgr).
+			WithLogger(logzap.New(logzap.WriteTo(&logs))).
+			WithUseOnlyImagePullSecrets(true).
+			WithLakomConfig(cosignConfig).
+			WithAllowUntrustedImages(allowUntrusted).Build()
+		Expect(err).NotTo(HaveOccurred())
+		image := strings.TrimPrefix(server.URL, "http://") + "/image@" + signedImageDigest
+		response := h.Handle(ctx, admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: podWithImage(pod, image)}.Build())
+		Expect(response.Allowed).To(Equal(allowUntrusted))
+
+		Expect(requests.Load()).To(BeNumerically(">", 0))
+		serialized, err := json.Marshal(response)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(serialized)).NotTo(ContainSubstring(sensitive))
+		Expect(logs.String()).NotTo(ContainSubstring(sensitive))
+		Expect(string(serialized)).To(ContainSubstring("failed to verify artifact signature"))
+	},
+		Entry("denial", false),
+		Entry("warning", true),
+	)
+
 	DescribeTable("Resource handling",
 		func(requestBuilder func() admission.Request, allowed bool, errMsg string) {
 			request := requestBuilder()
@@ -340,7 +376,7 @@ var _ = Describe("Admission Handler", func() {
 		req := admissionRequestBuilder{
 			gvk:       podGVK,
 			operation: admissionv1.Update,
-			object:    podWithImage(pod, "alpine@sha256:11e21d7b981a59554b3f822c49f6e9f57b6068bb74f49c4cd5cc4c663c7e5160"),
+			object:    podWithImage(pod, unsignedImageFullRef),
 		}.Build()
 		ar := allowUntrustedHandler.Handle(ctx, req)
 		Expect(ar.Allowed).To(BeTrue())

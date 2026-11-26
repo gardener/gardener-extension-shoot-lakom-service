@@ -409,16 +409,18 @@ func (h *handler) resolveArtifact(ctx context.Context, image string, kcr utils.K
 	resolved, err := h.resolver.Resolve(ctx, tagRef, kcr)
 	if err != nil {
 		metrics.ResolvedTagErrors.WithLabelValues().Inc()
-		return nil, err
+		// Registry and credential-provider errors can contain response bodies or internal addresses.
+		logger.Info("Image resolution failed", "errorType", fmt.Sprintf("%T", err))
+		return nil, fmt.Errorf("failed to resolve image %q", image)
 	}
 
 	metrics.ResolvedTag.WithLabelValues().Inc()
-	logger.Info("Image has been resolved", "imageWithDigest", resolved)
 
 	digestRef, err := name.NewDigest(resolved, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse resolved reference %q as image using digest: %w", resolved, err)
+		return nil, fmt.Errorf("registry returned an invalid digest for image %q", image)
 	}
+	logger.Info("Image has been resolved", "imageWithDigest", digestRef.Name())
 
 	return &resolvedArtefact{
 		ref:        resolved,
