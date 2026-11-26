@@ -285,7 +285,6 @@ func getResources(
 						v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
 					}),
 				},
 				Spec: corev1.PodSpec{
@@ -403,6 +402,10 @@ func getResources(
 			},
 		},
 	}
+	if !useOnlyImagePullSecrets {
+		lakomDeployment.Spec.Template.Labels[v1beta1constants.LabelNetworkPolicyToBlockedCIDRs] = v1beta1constants.LabelNetworkPolicyAllowed
+	}
+
 	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
 
 	if err := references.InjectAnnotations(lakomDeployment); err != nil {

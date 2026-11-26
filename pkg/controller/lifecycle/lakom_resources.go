@@ -194,6 +194,11 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 		args = append(args, "--kubeconfig="+gardenerutils.PathGenericKubeconfig)
 	}
 
+	// Cloud credential helpers need metadata access only when ambient credentials are enabled.
+	if !opts.useOnlyImagePullSecrets {
+		opts.deploymentLabels[v1beta1constants.LabelNetworkPolicyToBlockedCIDRs] = v1beta1constants.LabelNetworkPolicyAllowed
+	}
+
 	lakomDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        opts.serviceName,
@@ -460,7 +465,6 @@ func getShootRuntimeObjects(
 		v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
 		gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
 	})
 
@@ -498,7 +502,6 @@ func getSeedRuntimeObjects(
 		v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
 	})
 	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,
@@ -538,7 +541,6 @@ func getGardenVirtualObjects(
 		v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
 		gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
 	})
 
@@ -576,7 +578,6 @@ func getGardenRuntimeObjects(
 		v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
 	})
 	return getLakomObjects(lakomResourceOptions{
 		replicas:                    lakomReplicas,

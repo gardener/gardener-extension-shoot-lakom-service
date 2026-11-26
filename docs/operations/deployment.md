@@ -54,3 +54,9 @@ spec:
       disabled: true
 ...
 ```
+
+### Cloud metadata access
+
+When `useOnlyImagePullSecrets: true` is configured, managed Lakom Pods no longer request Gardener's `networking.gardener.cloud/to-blocked-cidrs` egress grant. This removes the additional access used by cloud credential helpers. The extension controller itself does not need this grant either.
+
+This label controls Gardener-generated NetworkPolicies; removing it only restricts traffic where these policies isolate the Pods. Operators of standalone deployments or namespaces without egress isolation must enforce equivalent restrictions through their network configuration.

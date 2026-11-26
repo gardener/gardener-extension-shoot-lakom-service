@@ -359,8 +359,7 @@ spec:
       labels:
         app.kubernetes.io/name: lakom-seed
         app.kubernetes.io/part-of: shoot-lakom-service
-        networking.gardener.cloud/to-blocked-cidrs: allowed
-        networking.gardener.cloud/to-dns: allowed
+` + metadataNetworkLabel(useOnlyImagePullSecrets) + `        networking.gardener.cloud/to-dns: allowed
         networking.gardener.cloud/to-public-networks: allowed
         networking.gardener.cloud/to-runtime-apiserver: allowed
     spec:
@@ -549,4 +548,12 @@ spec:
     updateMode: InPlaceOrRecreate
 status: {}
 `
+}
+
+// metadataNetworkLabel renders the optional metadata egress grant in expected manifests.
+func metadataNetworkLabel(useOnlyImagePullSecrets string) string {
+	if useOnlyImagePullSecrets == "true" {
+		return ""
+	}
+	return "        networking.gardener.cloud/to-blocked-cidrs: allowed\n"
 }
