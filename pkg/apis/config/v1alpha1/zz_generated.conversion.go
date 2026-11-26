@@ -68,6 +68,7 @@ func autoConvert_v1alpha1_Configuration_To_config_Configuration(in *Configuratio
 		return err
 	}
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
+	out.AllowedPrivateRegistryCIDRs = *(*[]string)(unsafe.Pointer(&in.AllowedPrivateRegistryCIDRs))
 	out.AllowUntrustedImages = in.AllowUntrustedImages
 	out.AllowInsecureRegistries = in.AllowInsecureRegistries
 	out.DefaultAdmissionScope = lakom.ScopeType(in.DefaultAdmissionScope)
@@ -88,6 +89,7 @@ func autoConvert_config_Configuration_To_v1alpha1_Configuration(in *config.Confi
 		return err
 	}
 	out.UseOnlyImagePullSecrets = in.UseOnlyImagePullSecrets
+	out.AllowedPrivateRegistryCIDRs = *(*[]string)(unsafe.Pointer(&in.AllowedPrivateRegistryCIDRs))
 	out.AllowUntrustedImages = in.AllowUntrustedImages
 	out.AllowInsecureRegistries = in.AllowInsecureRegistries
 	out.DefaultAdmissionScope = lakom.ScopeType(in.DefaultAdmissionScope)

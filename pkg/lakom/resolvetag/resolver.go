@@ -6,6 +6,7 @@ package resolvetag
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
@@ -16,11 +17,13 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-type directResolver struct{}
+type directResolver struct {
+	transport http.RoundTripper
+}
 
 // NewDirectResolver creates new resolver and returns it.
-func NewDirectResolver() *directResolver {
-	dc := &directResolver{}
+func NewDirectResolver(transport http.RoundTripper) *directResolver {
+	dc := &directResolver{transport: transport}
 	return dc
 }
 
@@ -33,6 +36,7 @@ func (r *directResolver) Resolve(ctx context.Context, tagRef name.Tag, kcr utils
 
 	remoteOpts := []remote.Option{
 		remote.WithContext(ctx),
+		remote.WithTransport(r.transport),
 		remote.WithUserAgent(constants.ApplicationName),
 		remote.WithAuthFromKeychain(keyChain),
 	}

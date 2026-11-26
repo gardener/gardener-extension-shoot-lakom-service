@@ -14,6 +14,7 @@ import (
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/registryaccess"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/verifysignature"
 
@@ -72,6 +73,8 @@ func NewAdmissionCommand() *cobra.Command {
 
 // Options has all the context and parameters needed to run lakom admission controller.
 type Options struct {
+	// AllowedPrivateRegistryCIDRs permits registry requests to the specified private networks.
+	AllowedPrivateRegistryCIDRs []string
 	// BindAddress is the address the HTTP server should bind to.
 	BindAddress string
 	// Port is the port that should be opened by the HTTP server.
@@ -108,6 +111,7 @@ type Options struct {
 
 // AddFlags adds lakom admission controller's flags to the specified FlagSet.
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
+	fs.StringSliceVar(&o.AllowedPrivateRegistryCIDRs, "allowed-private-registry-cidrs", nil, "Private CIDRs allowed for registry, authentication, and redirect requests. Empty by default.")
 	fs.StringVar(&o.BindAddress, "bind-address", "0.0.0.0", "Address to bind to")
 	fs.IntVar(&o.Port, "port", 9443, "Webhook server port")
 	fs.StringVar(&o.ServerCertDir, "tls-cert-dir", "", "Directory with server TLS certificate and key (must contain a tls.crt and tls.key file)")
@@ -125,6 +129,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 // validate validates all the required options.
 func (o *Options) validate() error {
+	if _, err := registryaccess.ParseAllowedPrivateRegistryCIDRs(o.AllowedPrivateRegistryCIDRs); err != nil {
+		return err
+	}
 	if len(o.BindAddress) == 0 {
 		return fmt.Errorf("missing bind address")
 	}
@@ -156,6 +163,12 @@ func (o *Options) validate() error {
 
 // Run runs lakom admission controller using the specified options.
 func (o *Options) Run(ctx context.Context) error {
+	registryTransport, err := registryaccess.NewTransport(o.AllowedPrivateRegistryCIDRs)
+	if err != nil {
+		return err
+	}
+	defer registryTransport.CloseIdleConnections()
+
 	log.Info("Getting rest config")
 	restConfig, err := config.GetConfig()
 	if err != nil {
@@ -210,6 +223,7 @@ func (o *Options) Run(ctx context.Context) error {
 	}
 
 	imageTagResolverHandler, err := resolvetag.NewHandleBuilder().
+		WithRegistryTransport(registryTransport).
 		WithManager(mgr).
 		WithLogger(log.WithName("image-tag-resolver")).
 		WithCacheTTL(o.CacheTTL).
@@ -227,6 +241,7 @@ func (o *Options) Run(ctx context.Context) error {
 	}
 
 	cosignSignatureVerifyHandler, err := verifysignature.NewHandleBuilder().
+		WithRegistryTransport(registryTransport).
 		WithManager(mgr).
 		WithLogger(log.WithName("cosign-signature-verifier")).
 		WithLakomConfig(*config).

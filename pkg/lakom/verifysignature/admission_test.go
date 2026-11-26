@@ -22,6 +22,7 @@ import (
 	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -91,6 +92,7 @@ var _ = Describe("Admission Handler", func() {
 
 		h, err := verifysignature.
 			NewHandleBuilder().
+			WithRegistryTransport(remote.DefaultTransport).
 			WithManager(mgr).
 			WithLogger(logger.WithName("test-cosign-signature-verifier")).
 			WithLakomConfig(cosignConfig).
@@ -210,6 +212,7 @@ var _ = Describe("Admission Handler", func() {
 		DeferCleanup(server.Close)
 		var logs bytes.Buffer
 		h, err := verifysignature.NewHandleBuilder().
+			WithRegistryTransport(remote.DefaultTransport).
 			WithManager(mgr).
 			WithLogger(logzap.New(logzap.WriteTo(&logs))).
 			WithUseOnlyImagePullSecrets(true).
@@ -230,6 +233,21 @@ var _ = Describe("Admission Handler", func() {
 		Entry("denial", false),
 		Entry("warning", true),
 	)
+
+	It("blocks a local registry with the default transport", func() {
+		var requests atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			requests.Add(1)
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		DeferCleanup(server.Close)
+		h, err := verifysignature.NewHandleBuilder().WithManager(mgr).WithLogger(logger).WithUseOnlyImagePullSecrets(true).WithLakomConfig(cosignConfig).Build()
+		Expect(err).NotTo(HaveOccurred())
+		image := strings.TrimPrefix(server.URL, "http://") + "/image@" + signedImageDigest
+		response := h.Handle(ctx, admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: podWithImage(pod, image)}.Build())
+		Expect(response.Allowed).To(BeFalse())
+		Expect(requests.Load()).To(BeZero())
+	})
 
 	DescribeTable("Resource handling",
 		func(requestBuilder func() admission.Request, allowed bool, errMsg string) {
@@ -364,6 +382,7 @@ var _ = Describe("Admission Handler", func() {
 	It("Should allow untrusted artifacts", func() {
 		allowUntrustedHandler, err := verifysignature.
 			NewHandleBuilder().
+			WithRegistryTransport(remote.DefaultTransport).
 			WithManager(mgr).
 			WithLogger(logger.WithName("test-cosign-untrusted-handler")).
 			WithLakomConfig(cosignConfig).

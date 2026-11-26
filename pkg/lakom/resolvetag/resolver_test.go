@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/utils/ptr"
@@ -38,7 +39,7 @@ var _ = Describe("Resolver", func() {
 		refresh        = time.Millisecond * 100
 		ttl            = time.Second
 		kcr            = &anonymousKeyChainReader{}
-		directResolver = resolvetag.NewDirectResolver()
+		directResolver = resolvetag.NewDirectResolver(remote.DefaultTransport)
 		ctx            context.Context
 	)
 

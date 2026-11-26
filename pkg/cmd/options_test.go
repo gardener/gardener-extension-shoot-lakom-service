@@ -64,6 +64,23 @@ var _ = Describe("options", func() {
 	})
 
 	Describe("Validate", func() {
+		It("preserves private registry CIDRs when loading configuration", func() {
+			svcOpt, cleanup := prepareServiceOptions("allowedPrivateRegistryCIDRs: [10.20.30.40/32, 'fd12:3456::1/128']")
+			defer cleanup()
+			Expect(svcOpt.Complete()).To(Succeed())
+			Expect(svcOpt.Validate()).To(Succeed())
+			config := apisconfig.Configuration{}
+			svcOpt.Completed().Apply(&config)
+			Expect(config.AllowedPrivateRegistryCIDRs).To(Equal([]string{"10.20.30.40/32", "fd12:3456::1/128"}))
+		})
+
+		It("rejects a private registry exception covering the public internet", func() {
+			svcOpt, cleanup := prepareServiceOptions("allowedPrivateRegistryCIDRs: [0.0.0.0/0]")
+			defer cleanup()
+			Expect(svcOpt.Complete()).To(Succeed())
+			Expect(svcOpt.Validate()).To(MatchError(ContainSubstring("must be within a private network")))
+		})
+
 		DescribeTable("Should allow supported scopes", func(scope lakom.ScopeType) {
 			svcOpt, cleanupFunc := prepareServiceOptions(`defaultAdmissionScope: ` + string(scope))
 			defer cleanupFunc()

@@ -90,6 +90,9 @@ spec:
         {{- else if .Values.projectedKubeconfig }}
         - --kubeconfig={{ required ".Values.projectedKubeconfig.baseMountPath is required" .Values.projectedKubeconfig.baseMountPath }}/kubeconfig
         {{- end }}
+        {{- range .Values.allowedPrivateRegistryCIDRs }}
+        - --allowed-private-registry-cidrs={{ . }}
+        {{- end }}
         - --use-only-image-pull-secrets={{ .Values.useOnlyImagePullSecrets }}
         - --insecure-allow-untrusted-images={{ .Values.allowUntrustedImages }}
         - --insecure-allow-insecure-registries={{ .Values.allowInsecureRegistries }}

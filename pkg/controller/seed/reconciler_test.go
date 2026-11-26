@@ -73,6 +73,19 @@ var _ = Describe("Reconciler", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
+		It("passes private registry exceptions to the legacy seed deployment", func() {
+			resources, err := getResources(serverTLSSecretName, image, lakomConfig, caBundle,
+				true, false, false, seedTopologyAwareRoutingEnabled, seedK8sVersion, []string{"10.20.30.40/32"})
+			Expect(err).NotTo(HaveOccurred())
+			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(manifests).To(ContainElement(And(
+				ContainSubstring("networking.gardener.cloud/to-private-networks: allowed"),
+				ContainSubstring("--allowed-private-registry-cidrs=10.20.30.40/32"),
+				Not(ContainSubstring("networking.gardener.cloud/to-blocked-cidrs")),
+			)))
+		})
+
 		DescribeTable("Should ensure resources are correctly created",
 			func(onlyImagePullSecrets, untrustedImages, insecureRegistries bool) {
 				resources, err := getResources(
@@ -85,6 +98,7 @@ var _ = Describe("Reconciler", func() {
 					insecureRegistries,
 					seedTopologyAwareRoutingEnabled,
 					seedK8sVersion,
+					nil,
 				)
 
 				Expect(err).ToNot(HaveOccurred())
@@ -133,6 +147,7 @@ var _ = Describe("Reconciler", func() {
 					insecureRegistries,
 					seedTopologyAwareRoutingEnabled,
 					seedK8sVersion,
+					nil,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -156,6 +171,7 @@ var _ = Describe("Reconciler", func() {
 					insecureRegistries,
 					seedTopologyAwareRoutingEnabled,
 					seedK8sVersion,
+					nil,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -178,6 +194,7 @@ var _ = Describe("Reconciler", func() {
 				insecureRegistries,
 				seedTopologyAwareRoutingEnabled,
 				seedK8sVersion,
+				nil,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)

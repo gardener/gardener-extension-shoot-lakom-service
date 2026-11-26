@@ -1393,7 +1393,6 @@ spec:
         app.kubernetes.io/name: lakom
         app.kubernetes.io/part-of: shoot-lakom-service
 ` + metadataNetworkLabel(useOnlyImagePullSecrets) + `        networking.gardener.cloud/to-dns: allowed
-        networking.gardener.cloud/to-private-networks: allowed
         networking.gardener.cloud/to-public-networks: allowed
         networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
     spec:
@@ -1651,7 +1650,6 @@ spec:
         app.kubernetes.io/name: lakom
         app.kubernetes.io/part-of: shoot-lakom-service
 ` + metadataNetworkLabel(useOnlyImagePullSecrets) + `        networking.gardener.cloud/to-dns: allowed
-        networking.gardener.cloud/to-private-networks: allowed
         networking.gardener.cloud/to-public-networks: allowed
         networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
     spec:

@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
@@ -26,13 +27,15 @@ import (
 )
 
 type directVerifier struct {
+	transport  http.RoundTripper
 	publicKeys lakomconfig.CompletedConfig
 	insecure   bool
 }
 
 // NewDirectVerifier creates new verifier and returns it.
-func NewDirectVerifier(keys lakomconfig.CompletedConfig, allowInsecureRegistries bool) *directVerifier {
+func NewDirectVerifier(keys lakomconfig.CompletedConfig, allowInsecureRegistries bool, transport http.RoundTripper) *directVerifier {
 	dv := &directVerifier{
+		transport:  transport,
 		publicKeys: keys,
 		insecure:   allowInsecureRegistries,
 	}
@@ -62,6 +65,7 @@ func (r *directVerifier) Verify(ctx context.Context, artifact string, kcr utils.
 
 	remoteOpts := ociremote.WithRemoteOptions(
 		remote.WithContext(ctx),
+		remote.WithTransport(r.transport),
 		remote.WithUserAgent(constants.ApplicationName),
 		remote.WithAuthFromKeychain(keyChain),
 	)

@@ -53,6 +53,8 @@ controllers:
     #     -----END PUBLIC KEY-----
   healthPort: 8080
   metricsPort: 8081
+  # Private registry, token-service, and redirect destinations require explicit CIDRs.
+  allowedPrivateRegistryCIDRs: []
   useOnlyImagePullSecrets: false
   allowUntrustedImages: false
   allowInsecureRegistries: false

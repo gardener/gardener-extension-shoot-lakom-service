@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/registryaccess"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
 	gardencorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
@@ -32,6 +33,7 @@ import (
 
 // HandleBuilder implements builder pattern that builds admission handle.
 type HandleBuilder struct {
+	registryTransport       http.RoundTripper
 	mgr                     manager.Manager
 	logger                  logr.Logger
 	cacheTTL                time.Duration
@@ -43,6 +45,12 @@ type HandleBuilder struct {
 // NewHandleBuilder returns new handle builder.
 func NewHandleBuilder() HandleBuilder {
 	hb := HandleBuilder{}
+	return hb
+}
+
+// WithRegistryTransport sets the transport used for registry requests.
+func (hb HandleBuilder) WithRegistryTransport(transport http.RoundTripper) HandleBuilder {
+	hb.registryTransport = transport
 	return hb
 }
 
@@ -84,6 +92,13 @@ func (hb HandleBuilder) WithLogger(logger logr.Logger) HandleBuilder {
 
 // Build builds a handler from the HandleBuilder.
 func (hb HandleBuilder) Build() (*handler, error) {
+	if hb.registryTransport == nil {
+		transport, err := registryaccess.NewTransport(nil)
+		if err != nil {
+			return nil, err
+		}
+		hb.registryTransport = transport
+	}
 	var (
 		h = handler{
 			logger:                  hb.logger,
@@ -95,7 +110,7 @@ func (hb HandleBuilder) Build() (*handler, error) {
 		resolver Resolver
 	)
 
-	resolver = NewDirectResolver()
+	resolver = NewDirectResolver(hb.registryTransport)
 	if hb.cacheTTL != 0 {
 		cache, err := NewDigestCache(hb.cacheRefreshInterval, hb.cacheTTL)
 		if err != nil {
