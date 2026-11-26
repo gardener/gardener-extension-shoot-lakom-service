@@ -35,6 +35,11 @@ func (in *Configuration) DeepCopyInto(out *Configuration) {
 		**out = **in
 	}
 	out.SeedBootstrap = in.SeedBootstrap
+	if in.UseOnlyImagePullSecrets != nil {
+		in, out := &in.UseOnlyImagePullSecrets, &out.UseOnlyImagePullSecrets
+		*out = new(bool)
+		**out = **in
+	}
 	if in.AllowedPrivateRegistryCIDRs != nil {
 		in, out := &in.AllowedPrivateRegistryCIDRs, &out.AllowedPrivateRegistryCIDRs
 		*out = make([]string, len(*in))

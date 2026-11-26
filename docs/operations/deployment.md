@@ -58,6 +58,8 @@ spec:
 
 ### Cloud metadata access
 
+Lakom now defaults to `useOnlyImagePullSecrets: true` consistently in the extension controller configuration, both Helm charts, and the standalone CLI. Omitting the setting no longer enables node credentials or Docker configuration credentials. An explicit `false` still enables those sources; operators depending on them must opt in when upgrading.
+
 When `useOnlyImagePullSecrets: true` is configured, managed Lakom Pods no longer request Gardener's `networking.gardener.cloud/to-blocked-cidrs` egress grant. This removes the additional access used by cloud credential helpers. The extension controller itself does not need this grant either.
 
 This label controls Gardener-generated NetworkPolicies; removing it only restricts traffic where these policies isolate the Pods. Operators of standalone deployments or namespaces without egress isolation must enforce equivalent restrictions through their network configuration.

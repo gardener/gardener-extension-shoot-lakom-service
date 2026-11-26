@@ -63,6 +63,21 @@ var _ = Describe("options", func() {
 		})
 	})
 
+	DescribeTable("defaults to image pull secrets while preserving explicit choices", func(setting string, expected bool) {
+		svcOpt, cleanup := prepareServiceOptions(setting)
+		defer cleanup()
+		Expect(svcOpt.Complete()).To(Succeed())
+		Expect(svcOpt.Validate()).To(Succeed())
+		config := apisconfig.Configuration{}
+		svcOpt.Completed().Apply(&config)
+		Expect(config.UseOnlyImagePullSecrets).To(Equal(expected))
+	},
+		Entry("omitted", "", true),
+		Entry("null", "useOnlyImagePullSecrets: null", true),
+		Entry("explicit true", "useOnlyImagePullSecrets: true", true),
+		Entry("explicit false", "useOnlyImagePullSecrets: false", false),
+	)
+
 	Describe("Validate", func() {
 		It("preserves private registry CIDRs when loading configuration", func() {
 			svcOpt, cleanup := prepareServiceOptions("allowedPrivateRegistryCIDRs: [10.20.30.40/32, 'fd12:3456::1/128']")

@@ -50,7 +50,7 @@ type HandleBuilder struct {
 
 // NewHandleBuilder returns new handle builder.
 func NewHandleBuilder() HandleBuilder {
-	hb := HandleBuilder{}
+	hb := HandleBuilder{useOnlyImagePullSecrets: true}
 	return hb
 }
 

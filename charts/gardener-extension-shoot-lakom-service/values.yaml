@@ -55,7 +55,8 @@ controllers:
   metricsPort: 8081
   # Private registry, token-service, and redirect destinations require explicit CIDRs.
   allowedPrivateRegistryCIDRs: []
-  useOnlyImagePullSecrets: false
+  # Ambient credentials require an explicit opt-in by setting this to false.
+  useOnlyImagePullSecrets: true
   allowUntrustedImages: false
   allowInsecureRegistries: false
   debugConfig:
