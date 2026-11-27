@@ -9,15 +9,18 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
+	imagevectorutils "github.com/gardener/gardener/pkg/utils/imagevector"
 	"github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("Reconciler", func() {
-
 	It("Should get labels", func() {
 		labels := getLabels()
 
@@ -85,13 +88,14 @@ var _ = Describe("Reconciler", func() {
 					insecureRegistries,
 					seedTopologyAwareRoutingEnabled,
 					seedK8sVersion,
+					nil,
 				)
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resources).To(HaveKey("data.yaml.br"))
 				compressedData := resources["data.yaml.br"]
 				data, err := test.BrotliDecompression(compressedData)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				manifests := strings.Split(string(data), "\n---\n") // Just '---\n' does not work because of the header/footer in the public keys that match the same manifest separator
 				Expect(manifests).To(HaveLen(10))
@@ -133,6 +137,7 @@ var _ = Describe("Reconciler", func() {
 					insecureRegistries,
 					seedTopologyAwareRoutingEnabled,
 					seedK8sVersion,
+					nil,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -156,6 +161,7 @@ var _ = Describe("Reconciler", func() {
 					insecureRegistries,
 					seedTopologyAwareRoutingEnabled,
 					seedK8sVersion,
+					nil,
 				)
 				Expect(err).ToNot(HaveOccurred())
 				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -178,6 +184,7 @@ var _ = Describe("Reconciler", func() {
 				insecureRegistries,
 				seedTopologyAwareRoutingEnabled,
 				seedK8sVersion,
+				nil,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
@@ -185,13 +192,86 @@ var _ = Describe("Reconciler", func() {
 
 			Expect(manifests).To(ContainElement(expectedClusterRoleBinding()))
 		})
+
+		Context("Registry CA bundle", func() {
+			registryCAConfigMapNamePrefix := constants.SeedExtensionServiceName + "-registry-ca-"
+
+			getManifests := func(bundle *imagevectorutils.CABundle) ([]string, string) {
+				resources, err := getResources(
+					serverTLSSecretName,
+					image,
+					lakomConfig,
+					caBundle,
+					useOnlyImagePullSecrets,
+					allowUntrustedImages,
+					insecureRegistries,
+					seedTopologyAwareRoutingEnabled,
+					seedK8sVersion,
+					bundle,
+				)
+				Expect(err).ToNot(HaveOccurred())
+				manifests, err := test.ExtractManifestsFromManagedResourceData(resources)
+				Expect(err).ToNot(HaveOccurred())
+				rawData, err := test.BrotliDecompression(resources["data.yaml.br"])
+				Expect(err).ToNot(HaveOccurred())
+				return manifests, string(rawData)
+			}
+
+			findDeployment := func(manifests []string) string {
+				for _, m := range manifests {
+					if strings.Contains(m, "kind: Deployment") {
+						return m
+					}
+				}
+				Fail("deployment manifest not found")
+				return ""
+			}
+
+			hasRegistryCAConfigMap := func(raw string) bool {
+				return strings.Contains(raw, registryCAConfigMapNamePrefix)
+			}
+
+			It("should not mount a registry CA when no bundle is configured", func() {
+				manifests, raw := getManifests(nil)
+
+				Expect(hasRegistryCAConfigMap(raw)).To(BeFalse())
+
+				deployment := findDeployment(manifests)
+				Expect(deployment).ToNot(ContainSubstring("--registry-ca-dir"))
+				Expect(deployment).ToNot(ContainSubstring("registry-ca"))
+			})
+
+			It("should mount the registry CA when a bundle is configured", func() {
+				const registryCA = "-----BEGIN CERTIFICATE-----\nregistry-ca\n-----END CERTIFICATE-----"
+				manifests, raw := getManifests(&imagevectorutils.CABundle{Inline: ptr.To(registryCA)})
+
+				Expect(hasRegistryCAConfigMap(raw)).To(BeTrue(), "registry CA ConfigMap should be rendered")
+				Expect(raw).To(ContainSubstring("bundle.crt"))
+				Expect(raw).To(ContainSubstring("immutable: true"))
+				Expect(raw).To(ContainSubstring(references.LabelKeyGarbageCollectable))
+
+				deployment := findDeployment(manifests)
+				Expect(deployment).To(ContainSubstring("--registry-ca-dir=/etc/lakom/registry-ca"))
+				Expect(deployment).ToNot(ContainSubstring("SSL_CERT_DIR"))
+				Expect(deployment).To(ContainSubstring("name: registry-ca"))
+				Expect(deployment).To(ContainSubstring(registryCAConfigMapNamePrefix))
+				Expect(deployment).To(ContainSubstring(references.AnnotationKeyPrefix))
+			})
+
+			It("should ignore a bundle whose inline value is unset", func() {
+				manifests, raw := getManifests(&imagevectorutils.CABundle{})
+
+				Expect(hasRegistryCAConfigMap(raw)).To(BeFalse())
+
+				deployment := findDeployment(manifests)
+				Expect(deployment).ToNot(ContainSubstring("--registry-ca-dir"))
+			})
+		})
 	})
 })
 
 func expectedMutatingWebhook(caBundle []byte) string {
-	var (
-		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
-	)
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
 
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
@@ -236,9 +316,7 @@ webhooks:
 }
 
 func expectedValidatingWebhook(caBundle []byte) string {
-	var (
-		caBundleEncoded = b64.StdEncoding.EncodeToString(caBundle)
-	)
+	caBundleEncoded := b64.StdEncoding.EncodeToString(caBundle)
 	return `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
@@ -465,7 +543,6 @@ status:
 }
 
 func expectedConfigMapLakomConfig(namespace, lakomConfigSecretName, lakomConfig string) string {
-
 	return `apiVersion: v1
 data:
   config.yaml: |

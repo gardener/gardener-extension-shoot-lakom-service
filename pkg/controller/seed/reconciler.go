@@ -7,6 +7,7 @@ package seed
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strconv"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/gardener/gardener/pkg/resourcemanager/controller/garbagecollector/references"
 	"github.com/gardener/gardener/pkg/utils"
 	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
+	imagevectorutils "github.com/gardener/gardener/pkg/utils/imagevector"
 	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
 	"github.com/gardener/gardener/pkg/utils/managedresources"
 	secretsutils "github.com/gardener/gardener/pkg/utils/secrets"
@@ -82,9 +84,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 	const (
 		kubeSystemNamespaceName = metav1.NamespaceSystem
 	)
-	var (
-		ownerNamespace = kcr.serviceConfig.SeedBootstrap.OwnerNamespace
-	)
+	ownerNamespace := kcr.serviceConfig.SeedBootstrap.OwnerNamespace
 
 	if !kcr.serviceConfig.SeedBootstrap.Enabled {
 		logger.Info("Deleting lakom admission controller from the seed cluster")
@@ -137,6 +137,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		kcr.serviceConfig.AllowInsecureRegistries,
 		kcr.seedTopologyAwareRoutingEnabled,
 		kcr.seedK8sVersion,
+		imagevector.CABundle(),
 	)
 	if err != nil {
 		return err
@@ -165,6 +166,50 @@ func getLabels() map[string]string {
 		"app.kubernetes.io/name":    constants.SeedApplicationName,
 		"app.kubernetes.io/part-of": constants.ExtensionType,
 	}
+}
+
+// registryCAMountPath is the directory where the optional registry CA bundle ConfigMap is mounted
+// into the Lakom container. The webhook is pointed at it via the --registry-ca-dir flag.
+const registryCAMountPath = "/etc/lakom/registry-ca"
+
+// injectRegistryCABundle mounts the optional registry CA bundle into the Lakom deployment's single
+// container and returns the ConfigMap to include in its ManagedResource.
+func injectRegistryCABundle(deployment *appsv1.Deployment, bundle *imagevectorutils.CABundle) (*corev1.ConfigMap, error) {
+	if bundle == nil || bundle.Inline == nil {
+		return nil, nil
+	}
+
+	const volumeName = "registry-ca"
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deployment.Name + "-registry-ca",
+			Namespace: deployment.Namespace,
+			Labels:    maps.Clone(deployment.Spec.Selector.MatchLabels),
+		},
+		Data: map[string]string{secretsutils.DataKeyCertificateBundle: *bundle.Inline},
+	}
+	if err := kubernetesutils.MakeUnique(configMap); err != nil {
+		return nil, err
+	}
+
+	podSpec := &deployment.Spec.Template.Spec
+	container := &podSpec.Containers[0]
+	// The bundle is read by the webhook (via --registry-ca-dir) and added to the registry client's
+	// TLS trust alongside the system roots. Trust stays scoped to the OCI registry client.
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      volumeName,
+		MountPath: registryCAMountPath,
+		ReadOnly:  true,
+	})
+	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: configMap.Name},
+			},
+		},
+	})
+	return configMap, nil
 }
 
 func (kcr *kubeSystemReconciler) setOwnerReferenceToSecrets(ctx context.Context, ownerNamespaceName string) error {
@@ -206,6 +251,7 @@ func getResources(
 	allowInsecureRegistries,
 	seedTopologyAwareRoutingEnabled bool,
 	seedK8sVersion *semver.Version,
+	registryCABundle *imagevectorutils.CABundle,
 ) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
@@ -258,6 +304,22 @@ func getResources(
 
 	if err := kubernetesutils.MakeUnique(&lakomConfigConfigMap); err != nil {
 		return nil, err
+	}
+
+	args := []string{
+		"--cache-ttl=" + cacheTTL.String(),
+		"--cache-refresh-interval=" + cacheRefreshInterval.String(),
+		"--lakom-config-path=" + lakomConfigDir + "/config.yaml",
+		"--tls-cert-dir=" + webhookTLSCertDir,
+		"--health-bind-address=:" + healthPort.String(),
+		"--metrics-bind-address=:" + metricsPort.String(),
+		"--port=" + serverPort.String(),
+		"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
+		"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
+		"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
+	}
+	if registryCABundle != nil && registryCABundle.Inline != nil {
+		args = append(args, "--registry-ca-dir="+registryCAMountPath)
 	}
 
 	lakomDeployment := &appsv1.Deployment{
@@ -316,18 +378,7 @@ func getResources(
 							AllowPrivilegeEscalation: ptr.To(false),
 							Privileged:               ptr.To(false),
 						},
-						Args: []string{
-							"--cache-ttl=" + cacheTTL.String(),
-							"--cache-refresh-interval=" + cacheRefreshInterval.String(),
-							"--lakom-config-path=" + lakomConfigDir + "/config.yaml",
-							"--tls-cert-dir=" + webhookTLSCertDir,
-							"--health-bind-address=:" + healthPort.String(),
-							"--metrics-bind-address=:" + metricsPort.String(),
-							"--port=" + serverPort.String(),
-							"--use-only-image-pull-secrets=" + strconv.FormatBool(useOnlyImagePullSecrets),
-							"--insecure-allow-untrusted-images=" + strconv.FormatBool(allowUntrustedImages),
-							"--insecure-allow-insecure-registries=" + strconv.FormatBool(allowInsecureRegistries),
-						},
+						Args: args,
 						Ports: []corev1.ContainerPort{
 							{
 								Name:          "https",
@@ -404,6 +455,16 @@ func getResources(
 		},
 	}
 	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
+
+	registryCAConfigMap, err := injectRegistryCABundle(lakomDeployment, registryCABundle)
+	if err != nil {
+		return nil, err
+	}
+	if registryCAConfigMap != nil {
+		if err := registry.Add(registryCAConfigMap); err != nil {
+			return nil, err
+		}
+	}
 
 	if err := references.InjectAnnotations(lakomDeployment); err != nil {
 		return nil, err
@@ -574,7 +635,6 @@ func getResources(
 			},
 		},
 	)
-
 	if err != nil {
 		return nil, err
 	}

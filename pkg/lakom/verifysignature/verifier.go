@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
@@ -28,13 +29,18 @@ import (
 type directVerifier struct {
 	publicKeys lakomconfig.CompletedConfig
 	insecure   bool
+	// transport is the registry CA-aware HTTP transport. It is nil when no custom registry CA is
+	// configured, in which case go-containerregistry uses its default transport (system roots).
+	transport http.RoundTripper
 }
 
-// NewDirectVerifier creates new verifier and returns it.
-func NewDirectVerifier(keys lakomconfig.CompletedConfig, allowInsecureRegistries bool) *directVerifier {
+// NewDirectVerifier creates new verifier and returns it. The optional transport carries custom
+// registry CA trust; pass nil to use go-containerregistry's default transport.
+func NewDirectVerifier(keys lakomconfig.CompletedConfig, allowInsecureRegistries bool, transport http.RoundTripper) *directVerifier {
 	dv := &directVerifier{
 		publicKeys: keys,
 		insecure:   allowInsecureRegistries,
+		transport:  transport,
 	}
 	return dv
 }
@@ -55,11 +61,15 @@ func (r *directVerifier) Verify(ctx context.Context, artifact string, kcr utils.
 		return false, err
 	}
 
-	remoteOpts := ociremote.WithRemoteOptions(
+	registryOpts := []remote.Option{
 		remote.WithContext(ctx),
 		remote.WithUserAgent(constants.ApplicationName),
 		remote.WithAuthFromKeychain(keyChain),
-	)
+	}
+	if r.transport != nil {
+		registryOpts = append(registryOpts, remote.WithTransport(r.transport))
+	}
+	remoteOpts := ociremote.WithRemoteOptions(registryOpts...)
 
 	return verify(ctx, artifactRef, r.publicKeys, remoteOpts)
 }

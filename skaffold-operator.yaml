@@ -16,8 +16,6 @@ build:
             template: '{{.EFFECTIVE_VERSION}}'
         - name: sha
           inputDigest: {}
-  insecureRegistries:
-    - registry.local.gardener.cloud:5001
   artifacts:
     - image: local-skaffold/gardener-extension-shoot-lakom-service
       requires:
@@ -69,6 +67,7 @@ build:
       hooks:
         after:
           - command: ["sh", "hack/skaffold-operator-imagevector.sh"]
+          - command: ["sh", "hack/prepare-local-registry-ca.sh"]
       ko:
         dependencies:
           paths:

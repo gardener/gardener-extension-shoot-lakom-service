@@ -44,6 +44,7 @@ type HandleBuilder struct {
 	useOnlyImagePullSecrets bool
 	allowUntrustedImages    bool
 	allowInsecureRegistries bool
+	registryCADir           string
 }
 
 // NewHandleBuilder returns new handle builder.
@@ -73,6 +74,13 @@ func (hb HandleBuilder) WithAllowUntrustedImages(allowUntrustedImages bool) Hand
 // WithAllowInsecureRegistries configures lakom to communicate via HTTP with registries if HTTPS is not possible
 func (hb HandleBuilder) WithAllowInsecureRegistries(allowInsecureRegistries bool) HandleBuilder {
 	hb.allowInsecureRegistries = allowInsecureRegistries
+	return hb
+}
+
+// WithRegistryCADir sets the directory containing the registry CA bundle (key "bundle.crt") used to
+// trust HTTPS registries served by a private CA. An empty value keeps the default system trust.
+func (hb HandleBuilder) WithRegistryCADir(registryCADir string) HandleBuilder {
+	hb.registryCADir = registryCADir
 	return hb
 }
 
@@ -122,7 +130,12 @@ func (hb HandleBuilder) Build() (*handler, error) {
 		hb.logger.Info("Verifier is configured with a key", "name", key.Name, "type", fmt.Sprintf("%T", key.Key), "rsaScheme", key.RSAScheme, "hash", key.Hash)
 	}
 
-	verifier = NewDirectVerifier(*lakomConfig, hb.allowInsecureRegistries)
+	transport, err := utils.RegistryTransport(hb.registryCADir)
+	if err != nil {
+		return nil, err
+	}
+
+	verifier = NewDirectVerifier(*lakomConfig, hb.allowInsecureRegistries, transport)
 	if hb.cacheTTL != 0 {
 		cache, err := NewSignatureVerificationResultCache(hb.cacheRefreshInterval, hb.cacheTTL)
 		if err != nil {
