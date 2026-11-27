@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ############# builder
-FROM --platform=$BUILDPLATFORM golang:1.27.3@sha256:f24164268fc1e741bbdc0066dbadcf1c8426c5a8489f0729c02c3905a53032fd AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.4@sha256:205c7636d74e0ffbe3d007162df7d74f859f5a8c8322dfb9f907977686c126cf AS builder
 
 ARG EFFECTIVE_VERSION
 ARG TARGETOS
