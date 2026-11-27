@@ -577,6 +577,7 @@ func getClientKeys(ctx context.Context, client client.Client, resources []garden
 
 // clusterContext contains cluster-specific settings extracted based on the extension class.
 type clusterContext struct {
+	allowedPrivateRegistryCIDRs []string
 	namespace                   string
 	genericTokenKubeconfigName  string
 	secretsManager              secretsmanager.Interface
@@ -621,6 +622,7 @@ func (a *actuator) buildShootClusterContext(ctx context.Context, logger logr.Log
 	}
 
 	clusterCtx := &clusterContext{
+		allowedPrivateRegistryCIDRs: a.serviceConfig.AllowedPrivateRegistryCIDRs,
 		namespace:                   namespace,
 		genericTokenKubeconfigName:  extensions.GenericTokenKubeconfigSecretNameFromCluster(cluster),
 		secretsManager:              secretsManager,
@@ -669,6 +671,7 @@ func (a *actuator) buildSeedClusterContext(ctx context.Context, logger logr.Logg
 	}
 
 	clusterCtx := &clusterContext{
+		allowedPrivateRegistryCIDRs: a.serviceConfig.AllowedPrivateRegistryCIDRs,
 		namespace:                   namespace,
 		secretsManager:              secretsManager,
 		kubernetesVersion:           versionInfo.GitVersion,
@@ -726,6 +729,7 @@ func (a *actuator) buildGardenClusterContext(ctx context.Context, logger logr.Lo
 	}
 
 	clusterCtx := &clusterContext{
+		allowedPrivateRegistryCIDRs: a.serviceConfig.AllowedPrivateRegistryCIDRs,
 		namespace:                   namespace,
 		genericTokenKubeconfigName:  genericTokenKubeconfigName,
 		secretsManager:              secretsManager,

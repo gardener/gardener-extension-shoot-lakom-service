@@ -28,7 +28,7 @@ viq configuration file provided with the flag `--lakom-config-path`.
 | `--port` | Webhook server port | 9443 |
 | `--profiling` | Enable profiling via web interface host:port/debug/pprof/ | false |
 | `--tls-cert-dir` | Directory with server TLS certificate and key (must contain a tls.crt and tls.key file | |
-| `--use-only-image-pull-secrets` | If set, only the credentials from the image pull secrets of the pod are used to access the OCI registry. Otherwise, the node identity and docker config are also used. | false |
+| `--use-only-image-pull-secrets` | If set, only the credentials from the image pull secrets of the pod are used to access the OCI registry. Otherwise, the node identity and docker config are also used. | true |
 | `--version` | prints version information and quits; --version=vX.Y.Z... sets the reported version | |
 
 ## Lakom Cosign Public Keys Configuration File

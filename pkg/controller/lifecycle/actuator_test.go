@@ -1392,9 +1392,7 @@ spec:
       labels:
         app.kubernetes.io/name: lakom
         app.kubernetes.io/part-of: shoot-lakom-service
-        networking.gardener.cloud/to-blocked-cidrs: allowed
-        networking.gardener.cloud/to-dns: allowed
-        networking.gardener.cloud/to-private-networks: allowed
+` + metadataNetworkLabel(useOnlyImagePullSecrets) + `        networking.gardener.cloud/to-dns: allowed
         networking.gardener.cloud/to-public-networks: allowed
         networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
     spec:
@@ -1651,9 +1649,7 @@ spec:
         app.kubernetes.io/instance: extension-shoot-lakom-service-garden-virtual
         app.kubernetes.io/name: lakom
         app.kubernetes.io/part-of: shoot-lakom-service
-        networking.gardener.cloud/to-blocked-cidrs: allowed
-        networking.gardener.cloud/to-dns: allowed
-        networking.gardener.cloud/to-private-networks: allowed
+` + metadataNetworkLabel(useOnlyImagePullSecrets) + `        networking.gardener.cloud/to-dns: allowed
         networking.gardener.cloud/to-public-networks: allowed
         networking.resources.gardener.cloud/to-kube-apiserver-tcp-443: allowed
     spec:
@@ -1917,8 +1913,7 @@ spec:
         app.kubernetes.io/instance: extension-shoot-lakom-service-garden-runtime
         app.kubernetes.io/name: lakom
         app.kubernetes.io/part-of: shoot-lakom-service
-        networking.gardener.cloud/to-blocked-cidrs: allowed
-        networking.gardener.cloud/to-dns: allowed
+` + metadataNetworkLabel(useOnlyImagePullSecrets) + `        networking.gardener.cloud/to-dns: allowed
         networking.gardener.cloud/to-public-networks: allowed
         networking.gardener.cloud/to-runtime-apiserver: allowed
     spec:
@@ -2198,8 +2193,7 @@ spec:
       labels:
         app.kubernetes.io/name: lakom
         app.kubernetes.io/part-of: shoot-lakom-service
-        networking.gardener.cloud/to-blocked-cidrs: allowed
-        networking.gardener.cloud/to-dns: allowed
+` + metadataNetworkLabel(useOnlyImagePullSecrets) + `        networking.gardener.cloud/to-dns: allowed
         networking.gardener.cloud/to-public-networks: allowed
         networking.gardener.cloud/to-runtime-apiserver: allowed
     spec:
@@ -2407,4 +2401,12 @@ spec:
     updateMode: InPlaceOrRecreate
 status: {}
 `
+}
+
+// metadataNetworkLabel renders the optional metadata egress grant in expected manifests.
+func metadataNetworkLabel(useOnlyImagePullSecrets string) string {
+	if useOnlyImagePullSecrets == "true" {
+		return ""
+	}
+	return "        networking.gardener.cloud/to-blocked-cidrs: allowed\n"
 }

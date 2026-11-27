@@ -65,7 +65,10 @@ runtime:
     #     -----BEGIN PUBLIC KEY-----
     #     abcd
     #     -----END PUBLIC KEY-----
-  useOnlyImagePullSecrets: false
+  # Private registry, token-service, and redirect destinations require explicit CIDRs.
+  allowedPrivateRegistryCIDRs: []
+  # Ambient credentials require an explicit opt-in by setting this to false.
+  useOnlyImagePullSecrets: true
   allowUntrustedImages: false
   allowInsecureRegistries: false
   projectedKubeconfig: {}

@@ -5,9 +5,13 @@
 package resolvetag_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/resolvetag"
@@ -17,6 +21,7 @@ import (
 	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
@@ -83,6 +88,7 @@ var _ = Describe("Admission Handler", func() {
 		logger = logzap.New(logzap.WriteTo(GinkgoWriter))
 		h, err := resolvetag.
 			NewHandleBuilder().
+			WithRegistryTransport(remote.DefaultTransport).
 			WithManager(mgr).
 			WithLogger(logger.WithName("test-image-tag-resolver")).
 			WithCacheTTL(time.Minute * 10).
@@ -208,6 +214,49 @@ var _ = Describe("Admission Handler", func() {
 				Name:      "invalid-name",
 			},
 		}
+	})
+
+	It("does not disclose upstream errors in admission responses or logs", func() {
+
+		const sensitive = "upstream-secret-and-internal-connection-details"
+		var requests atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			requests.Add(1)
+			http.Error(w, sensitive, http.StatusForbidden)
+		}))
+		DeferCleanup(server.Close)
+		var logs bytes.Buffer
+		h, err := resolvetag.NewHandleBuilder().
+			WithRegistryTransport(remote.DefaultTransport).
+			WithManager(mgr).
+			WithLogger(logzap.New(logzap.WriteTo(&logs))).
+			WithUseOnlyImagePullSecrets(true).Build()
+		Expect(err).NotTo(HaveOccurred())
+		image := strings.TrimPrefix(server.URL, "http://") + "/image:latest"
+		response := h.Handle(ctx, arb{}.withKind(podGVK).withOperation(admissionv1.Create).withObject(podWithImage(pod, image)).Build())
+		Expect(response.Allowed).To(BeFalse())
+		Expect(response.Result.Message).To(ContainSubstring("failed to resolve image"))
+
+		Expect(requests.Load()).To(BeNumerically(">", 0))
+		serialized, err := json.Marshal(response)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(serialized)).NotTo(ContainSubstring(sensitive))
+		Expect(logs.String()).NotTo(ContainSubstring(sensitive))
+	})
+
+	It("blocks a local registry with the default transport", func() {
+		var requests atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			requests.Add(1)
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		DeferCleanup(server.Close)
+		h, err := resolvetag.NewHandleBuilder().WithManager(mgr).WithLogger(logger).WithUseOnlyImagePullSecrets(true).Build()
+		Expect(err).NotTo(HaveOccurred())
+		image := strings.TrimPrefix(server.URL, "http://") + "/image:latest"
+		response := h.Handle(ctx, arb{}.withKind(podGVK).withOperation(admissionv1.Create).withObject(podWithImage(pod, image)).Build())
+		Expect(response.Allowed).To(BeFalse())
+		Expect(requests.Load()).To(BeZero())
 	})
 
 	DescribeTable("Resource handling",

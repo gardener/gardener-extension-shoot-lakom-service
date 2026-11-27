@@ -15,6 +15,7 @@ import (
 	healthcheckcontroller "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/healthcheck"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/lifecycle"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/controller/seed"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/registryaccess"
 
 	extensionsconfigv1alpha1 "github.com/gardener/gardener/extensions/pkg/apis/config/v1alpha1"
 	"github.com/gardener/gardener/extensions/pkg/controller/cmd"
@@ -110,6 +111,9 @@ func ControllerSwitches() *cmd.SwitchOptions {
 
 // Validate validates the options.
 func (o *LakomServiceOptions) Validate() error {
+	if _, err := registryaccess.ParseAllowedPrivateRegistryCIDRs(o.config.config.AllowedPrivateRegistryCIDRs); err != nil {
+		return err
+	}
 	if scope := o.config.config.DefaultAdmissionScope; scope != "" {
 		if !lakom.AllowedScopes.Has(scope) {
 			return fmt.Errorf("unsupported defaultAdmissionScope: %s, supported scopes: %v", scope, lakom.AllowedScopes.UnsortedList())

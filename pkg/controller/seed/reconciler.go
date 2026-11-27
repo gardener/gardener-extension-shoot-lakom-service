@@ -137,6 +137,7 @@ func (kcr *kubeSystemReconciler) reconcile(ctx context.Context, logger logr.Logg
 		kcr.serviceConfig.AllowInsecureRegistries,
 		kcr.seedTopologyAwareRoutingEnabled,
 		kcr.seedK8sVersion,
+		kcr.serviceConfig.AllowedPrivateRegistryCIDRs,
 	)
 	if err != nil {
 		return err
@@ -206,6 +207,7 @@ func getResources(
 	allowInsecureRegistries,
 	seedTopologyAwareRoutingEnabled bool,
 	seedK8sVersion *semver.Version,
+	allowedPrivateRegistryCIDRs []string,
 ) (map[string][]byte, error) {
 	var (
 		tcpProto                 = corev1.ProtocolTCP
@@ -285,7 +287,6 @@ func getResources(
 						v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
 						v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
-						v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
 					}),
 				},
 				Spec: corev1.PodSpec{
@@ -403,6 +404,17 @@ func getResources(
 			},
 		},
 	}
+	if !useOnlyImagePullSecrets {
+		lakomDeployment.Spec.Template.Labels[v1beta1constants.LabelNetworkPolicyToBlockedCIDRs] = v1beta1constants.LabelNetworkPolicyAllowed
+	}
+
+	if len(allowedPrivateRegistryCIDRs) > 0 {
+		lakomDeployment.Spec.Template.Labels[v1beta1constants.LabelNetworkPolicyToPrivateNetworks] = v1beta1constants.LabelNetworkPolicyAllowed
+	}
+	for _, cidr := range allowedPrivateRegistryCIDRs {
+		lakomDeployment.Spec.Template.Spec.Containers[0].Args = append(lakomDeployment.Spec.Template.Spec.Containers[0].Args, "--allowed-private-registry-cidrs="+cidr)
+	}
+
 	lakomDeployment.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
 
 	if err := references.InjectAnnotations(lakomDeployment); err != nil {

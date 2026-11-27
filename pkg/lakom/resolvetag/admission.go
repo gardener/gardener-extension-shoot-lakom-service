@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/metrics"
+	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/registryaccess"
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/utils"
 
 	gardencorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
@@ -32,6 +33,7 @@ import (
 
 // HandleBuilder implements builder pattern that builds admission handle.
 type HandleBuilder struct {
+	registryTransport       http.RoundTripper
 	mgr                     manager.Manager
 	logger                  logr.Logger
 	cacheTTL                time.Duration
@@ -42,7 +44,13 @@ type HandleBuilder struct {
 
 // NewHandleBuilder returns new handle builder.
 func NewHandleBuilder() HandleBuilder {
-	hb := HandleBuilder{}
+	hb := HandleBuilder{useOnlyImagePullSecrets: true}
+	return hb
+}
+
+// WithRegistryTransport sets the transport used for registry requests.
+func (hb HandleBuilder) WithRegistryTransport(transport http.RoundTripper) HandleBuilder {
+	hb.registryTransport = transport
 	return hb
 }
 
@@ -84,6 +92,13 @@ func (hb HandleBuilder) WithLogger(logger logr.Logger) HandleBuilder {
 
 // Build builds a handler from the HandleBuilder.
 func (hb HandleBuilder) Build() (*handler, error) {
+	if hb.registryTransport == nil {
+		transport, err := registryaccess.NewTransport(nil)
+		if err != nil {
+			return nil, err
+		}
+		hb.registryTransport = transport
+	}
 	var (
 		h = handler{
 			logger:                  hb.logger,
@@ -95,7 +110,7 @@ func (hb HandleBuilder) Build() (*handler, error) {
 		resolver Resolver
 	)
 
-	resolver = NewDirectResolver()
+	resolver = NewDirectResolver(hb.registryTransport)
 	if hb.cacheTTL != 0 {
 		cache, err := NewDigestCache(hb.cacheRefreshInterval, hb.cacheTTL)
 		if err != nil {
@@ -409,16 +424,18 @@ func (h *handler) resolveArtifact(ctx context.Context, image string, kcr utils.K
 	resolved, err := h.resolver.Resolve(ctx, tagRef, kcr)
 	if err != nil {
 		metrics.ResolvedTagErrors.WithLabelValues().Inc()
-		return nil, err
+		// Registry and credential-provider errors can contain response bodies or internal addresses.
+		logger.Info("Image resolution failed", "errorType", fmt.Sprintf("%T", err))
+		return nil, fmt.Errorf("failed to resolve image %q", image)
 	}
 
 	metrics.ResolvedTag.WithLabelValues().Inc()
-	logger.Info("Image has been resolved", "imageWithDigest", resolved)
 
 	digestRef, err := name.NewDigest(resolved, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse resolved reference %q as image using digest: %w", resolved, err)
+		return nil, fmt.Errorf("registry returned an invalid digest for image %q", image)
 	}
+	logger.Info("Image has been resolved", "imageWithDigest", digestRef.Name())
 
 	return &resolvedArtefact{
 		ref:        resolved,

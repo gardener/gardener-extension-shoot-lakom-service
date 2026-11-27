@@ -53,7 +53,10 @@ controllers:
     #     -----END PUBLIC KEY-----
   healthPort: 8080
   metricsPort: 8081
-  useOnlyImagePullSecrets: false
+  # Private registry, token-service, and redirect destinations require explicit CIDRs.
+  allowedPrivateRegistryCIDRs: []
+  # Ambient credentials require an explicit opt-in by setting this to false.
+  useOnlyImagePullSecrets: true
   allowUntrustedImages: false
   allowInsecureRegistries: false
   debugConfig:

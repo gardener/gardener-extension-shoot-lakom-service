@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sigstore/cosign/v3/pkg/cosign"
@@ -80,7 +81,7 @@ var _ = Describe("Verifier", func() {
 			// this logic was but I remember seeing it.
 			//
 			// Thus when testing the fake registry on localhost, the `false` here does not matter.
-			directVerifier = verifysignature.NewDirectVerifier(*lakomConfig, false)
+			directVerifier = verifysignature.NewDirectVerifier(*lakomConfig, false, remote.DefaultTransport)
 		})
 
 		DescribeTable("Verify images",
@@ -124,7 +125,7 @@ var _ = Describe("Verifier", func() {
 			cache, err = verifysignature.NewSignatureVerificationResultCache(refresh, ttl)
 			Expect(err).ToNot(HaveOccurred())
 
-			directVerifier := verifysignature.NewDirectVerifier(*lakomConfig, false)
+			directVerifier := verifysignature.NewDirectVerifier(*lakomConfig, false, remote.DefaultTransport)
 			cachedVerifier = verifysignature.NewCacheVerifier(cache, directVerifier)
 		})
 

@@ -124,6 +124,7 @@ func getWebhookObjects(
 
 // lakomResourceOptions parameterizes getLakomObjects across deployment flavours.
 type lakomResourceOptions struct {
+	allowedPrivateRegistryCIDRs []string
 	replicas                    *int32
 	serverTLSSecretName         string
 	lakomPublicKeysConfig       string
@@ -190,8 +191,21 @@ func getLakomObjects(opts lakomResourceOptions) ([]client.Object, error) {
 		"--insecure-allow-untrusted-images=" + strconv.FormatBool(opts.allowUntrustedImages),
 		"--insecure-allow-insecure-registries=" + strconv.FormatBool(opts.allowInsecureRegistries),
 	}
+	for _, cidr := range opts.allowedPrivateRegistryCIDRs {
+		args = append(args, "--allowed-private-registry-cidrs="+cidr)
+	}
 	if !opts.useInClusterAuth {
 		args = append(args, "--kubeconfig="+gardenerutils.PathGenericKubeconfig)
+	}
+
+	// Cloud credential helpers need metadata access only when ambient credentials are enabled.
+	if !opts.useOnlyImagePullSecrets {
+		opts.deploymentLabels[v1beta1constants.LabelNetworkPolicyToBlockedCIDRs] = v1beta1constants.LabelNetworkPolicyAllowed
+	}
+
+	if len(opts.allowedPrivateRegistryCIDRs) > 0 {
+		// The registry transport restricts connections to the configured CIDRs.
+		opts.deploymentLabels[v1beta1constants.LabelNetworkPolicyToPrivateNetworks] = v1beta1constants.LabelNetworkPolicyAllowed
 	}
 
 	lakomDeployment := &appsv1.Deployment{
@@ -459,12 +473,11 @@ func getShootRuntimeObjects(
 	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
 		v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
 		gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
 	})
 
 	return getLakomObjects(lakomResourceOptions{
+		allowedPrivateRegistryCIDRs: clusterCtx.allowedPrivateRegistryCIDRs,
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
@@ -498,9 +511,9 @@ func getSeedRuntimeObjects(
 		v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
 	})
 	return getLakomObjects(lakomResourceOptions{
+		allowedPrivateRegistryCIDRs: clusterCtx.allowedPrivateRegistryCIDRs,
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
@@ -537,12 +550,11 @@ func getGardenVirtualObjects(
 	deploymentLabels := utils.MergeStringMaps(baseLabels, map[string]string{
 		v1beta1constants.LabelNetworkPolicyToDNS:                                                                    v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPublicNetworks:                                                         v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToPrivateNetworks:                                                        v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:                                                           v1beta1constants.LabelNetworkPolicyAllowed,
 		gardenerutils.NetworkPolicyLabel(v1beta1constants.DeploymentNameKubeAPIServer, kubeapiserverconstants.Port): v1beta1constants.LabelNetworkPolicyAllowed,
 	})
 
 	return getLakomObjects(lakomResourceOptions{
+		allowedPrivateRegistryCIDRs: clusterCtx.allowedPrivateRegistryCIDRs,
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         clusterCtx.generatedSecrets[constants.GardenVirtualWebhookTLSSecretName].Name,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),
@@ -576,9 +588,9 @@ func getGardenRuntimeObjects(
 		v1beta1constants.LabelNetworkPolicyToDNS:              v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToPublicNetworks:   v1beta1constants.LabelNetworkPolicyAllowed,
 		v1beta1constants.LabelNetworkPolicyToRuntimeAPIServer: v1beta1constants.LabelNetworkPolicyAllowed,
-		v1beta1constants.LabelNetworkPolicyToBlockedCIDRs:     v1beta1constants.LabelNetworkPolicyAllowed,
 	})
 	return getLakomObjects(lakomResourceOptions{
+		allowedPrivateRegistryCIDRs: clusterCtx.allowedPrivateRegistryCIDRs,
 		replicas:                    lakomReplicas,
 		serverTLSSecretName:         serverTLSSecretName,
 		lakomPublicKeysConfig:       string(clusterCtx.lakomPublicKeysConfig),

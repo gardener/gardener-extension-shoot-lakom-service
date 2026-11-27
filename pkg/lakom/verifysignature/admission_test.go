@@ -5,9 +5,13 @@
 package verifysignature_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
@@ -18,6 +22,7 @@ import (
 	seedmanagementv1alpha1 "github.com/gardener/gardener/pkg/apis/seedmanagement/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -87,6 +92,7 @@ var _ = Describe("Admission Handler", func() {
 
 		h, err := verifysignature.
 			NewHandleBuilder().
+			WithRegistryTransport(remote.DefaultTransport).
 			WithManager(mgr).
 			WithLogger(logger.WithName("test-cosign-signature-verifier")).
 			WithLakomConfig(cosignConfig).
@@ -193,6 +199,54 @@ var _ = Describe("Admission Handler", func() {
 				Name:      "invalid-name",
 			},
 		}
+	})
+
+	DescribeTable("does not disclose upstream errors in denials, warnings, or logs", func(allowUntrusted bool) {
+
+		const sensitive = "upstream-secret-and-internal-connection-details"
+		var requests atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			requests.Add(1)
+			http.Error(w, sensitive, http.StatusForbidden)
+		}))
+		DeferCleanup(server.Close)
+		var logs bytes.Buffer
+		h, err := verifysignature.NewHandleBuilder().
+			WithRegistryTransport(remote.DefaultTransport).
+			WithManager(mgr).
+			WithLogger(logzap.New(logzap.WriteTo(&logs))).
+			WithUseOnlyImagePullSecrets(true).
+			WithLakomConfig(cosignConfig).
+			WithAllowUntrustedImages(allowUntrusted).Build()
+		Expect(err).NotTo(HaveOccurred())
+		image := strings.TrimPrefix(server.URL, "http://") + "/image@" + signedImageDigest
+		response := h.Handle(ctx, admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: podWithImage(pod, image)}.Build())
+		Expect(response.Allowed).To(Equal(allowUntrusted))
+
+		Expect(requests.Load()).To(BeNumerically(">", 0))
+		serialized, err := json.Marshal(response)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(serialized)).NotTo(ContainSubstring(sensitive))
+		Expect(logs.String()).NotTo(ContainSubstring(sensitive))
+		Expect(string(serialized)).To(ContainSubstring("failed to verify artifact signature"))
+	},
+		Entry("denial", false),
+		Entry("warning", true),
+	)
+
+	It("blocks a local registry with the default transport", func() {
+		var requests atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			requests.Add(1)
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		DeferCleanup(server.Close)
+		h, err := verifysignature.NewHandleBuilder().WithManager(mgr).WithLogger(logger).WithUseOnlyImagePullSecrets(true).WithLakomConfig(cosignConfig).Build()
+		Expect(err).NotTo(HaveOccurred())
+		image := strings.TrimPrefix(server.URL, "http://") + "/image@" + signedImageDigest
+		response := h.Handle(ctx, admissionRequestBuilder{gvk: podGVK, operation: admissionv1.Create, object: podWithImage(pod, image)}.Build())
+		Expect(response.Allowed).To(BeFalse())
+		Expect(requests.Load()).To(BeZero())
 	})
 
 	DescribeTable("Resource handling",
@@ -328,6 +382,7 @@ var _ = Describe("Admission Handler", func() {
 	It("Should allow untrusted artifacts", func() {
 		allowUntrustedHandler, err := verifysignature.
 			NewHandleBuilder().
+			WithRegistryTransport(remote.DefaultTransport).
 			WithManager(mgr).
 			WithLogger(logger.WithName("test-cosign-untrusted-handler")).
 			WithLakomConfig(cosignConfig).
@@ -340,7 +395,7 @@ var _ = Describe("Admission Handler", func() {
 		req := admissionRequestBuilder{
 			gvk:       podGVK,
 			operation: admissionv1.Update,
-			object:    podWithImage(pod, "alpine@sha256:11e21d7b981a59554b3f822c49f6e9f57b6068bb74f49c4cd5cc4c663c7e5160"),
+			object:    podWithImage(pod, unsignedImageFullRef),
 		}.Build()
 		ar := allowUntrustedHandler.Handle(ctx, req)
 		Expect(ar.Allowed).To(BeTrue())

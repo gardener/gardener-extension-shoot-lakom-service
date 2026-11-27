@@ -38,6 +38,7 @@ build:
             - pkg/controller/lifecycle
             - pkg/controller/seed
             - pkg/imagevector
+            - pkg/lakom/registryaccess
             - pkg/secrets
             - VERSION
         ldflags:
@@ -77,6 +78,7 @@ build:
             - pkg/constants
             - pkg/lakom/config
             - pkg/lakom/metrics
+            - pkg/lakom/registryaccess
             - pkg/lakom/resolvetag
             - pkg/lakom/utils
             - pkg/lakom/verifysignature

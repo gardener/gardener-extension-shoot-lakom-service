@@ -16,6 +16,7 @@ cosignPublicKeys:
 seedBootstrap:
   ownerNamespace: lakom-extension
 useOnlyImagePullSecrets: true
+allowedPrivateRegistryCIDRs: []
 allowUntrustedImages: true
 allowInsecureRegistries: true
 debugConfig:

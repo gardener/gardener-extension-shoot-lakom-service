@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/gardener/gardener-extension-shoot-lakom-service/pkg/constants"
 	lakomconfig "github.com/gardener/gardener-extension-shoot-lakom-service/pkg/lakom/config"
@@ -26,13 +27,15 @@ import (
 )
 
 type directVerifier struct {
+	transport  http.RoundTripper
 	publicKeys lakomconfig.CompletedConfig
 	insecure   bool
 }
 
 // NewDirectVerifier creates new verifier and returns it.
-func NewDirectVerifier(keys lakomconfig.CompletedConfig, allowInsecureRegistries bool) *directVerifier {
+func NewDirectVerifier(keys lakomconfig.CompletedConfig, allowInsecureRegistries bool, transport http.RoundTripper) *directVerifier {
 	dv := &directVerifier{
+		transport:  transport,
 		publicKeys: keys,
 		insecure:   allowInsecureRegistries,
 	}
@@ -50,25 +53,36 @@ func (r *directVerifier) Verify(ctx context.Context, artifact string, kcr utils.
 		return false, err
 	}
 
-	keyChain, err := kcr.GetKeyChain()
-	if err != nil {
-		return false, err
-	}
-
-	remoteOpts := ociremote.WithRemoteOptions(
-		remote.WithContext(ctx),
-		remote.WithUserAgent(constants.ApplicationName),
-		remote.WithAuthFromKeychain(keyChain),
-	)
-
-	return verify(ctx, artifactRef, r.publicKeys, remoteOpts)
-}
-
-func verify(ctx context.Context, artifactRef name.Reference, keys lakomconfig.CompletedConfig, opts ...ociremote.Option) (bool, error) {
 	if _, ok := artifactRef.(name.Digest); !ok {
 		return false, fmt.Errorf("artifact reference is not a digest, reference: %q", artifactRef.Name())
 	}
 
+	keyChain, err := kcr.GetKeyChain()
+	if err != nil {
+		logf.FromContext(ctx).Info("Registry credential lookup failed", "errorType", fmt.Sprintf("%T", err))
+		return false, errors.New("failed to obtain registry credentials")
+	}
+
+	remoteOpts := ociremote.WithRemoteOptions(
+		remote.WithContext(ctx),
+		remote.WithTransport(r.transport),
+		remote.WithUserAgent(constants.ApplicationName),
+		remote.WithAuthFromKeychain(keyChain),
+	)
+
+	verified, err := verify(ctx, artifactRef, r.publicKeys, remoteOpts)
+	if err != nil {
+		if ctx.Err() != nil {
+			return false, ctx.Err()
+		}
+		// Do not expose upstream response bodies, URLs, or connection details in admission responses or logs.
+		logf.FromContext(ctx).Info("Signature verification failed", "errorType", fmt.Sprintf("%T", err))
+		return false, errors.New("failed to verify artifact signature")
+	}
+	return verified, nil
+}
+
+func verify(ctx context.Context, artifactRef name.Reference, keys lakomconfig.CompletedConfig, opts ...ociremote.Option) (bool, error) {
 	logger := logf.FromContext(ctx).WithValues("image", artifactRef.Name())
 
 	// We need successful verification for at least one key, therefore any other failures can be ignored.
@@ -104,7 +118,7 @@ func verify(ctx context.Context, artifactRef name.Reference, keys lakomconfig.Co
 		})
 		if err != nil {
 			if IsNoSignaturesFound(err) {
-				log.Info("No signatures found for the artifact", "error", err.Error())
+				log.Info("No signatures found for the artifact")
 				return false, nil
 			}
 
@@ -112,11 +126,11 @@ func verify(ctx context.Context, artifactRef name.Reference, keys lakomconfig.Co
 				if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 					// Mitigation for https://github.com/gardener/gardener-extension-shoot-lakom-service/issues/25
 					// TODO(vpnachev): remove when https://github.com/sigstore/cosign/issues/3133 is fixed and vendored
-					log.Info("No matching signatures error detected as canceled or deadline exceeded context", "error", err)
+					log.Info("No matching signatures error detected as canceled or deadline exceeded context")
 					return false, err
 				}
 
-				log.Info("No matching signatures found for current public key", "error", err.Error())
+				log.Info("No matching signatures found for current public key")
 				continue
 			}
 
